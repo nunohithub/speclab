@@ -3243,13 +3243,14 @@ $pageSubtitle = 'Editor de Especificação';
         grid.innerHTML = '<div class="muted" style="padding:var(--spacing-md); text-align:center;">A carregar...</div>';
         fetch('<?= BASE_PATH ?>/api.php?action=get_legislacao_banco')
         .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (!data.success || !data.legislacao || data.legislacao.length === 0) {
+        .then(function(resp) {
+            var legs = resp.data && resp.data.legislacao ? resp.data.legislacao : [];
+            if (!resp.success || legs.length === 0) {
                 grid.innerHTML = '<div class="muted" style="padding:var(--spacing-md); text-align:center;">Nenhuma legislação no banco. Contacte o administrador.</div>';
                 return;
             }
             var html = '';
-            data.legislacao.forEach(function(leg) {
+            legs.forEach(function(leg) {
                 html += '<label class="ensaio-check-item" style="display:flex; gap:8px; padding:8px 10px; border-bottom:1px solid var(--color-border); cursor:pointer;">' +
                     '<input type="checkbox" name="sel_leg" data-norma="' + escapeHtml(leg.legislacao_norma) + '" data-rolhas="' + escapeHtml(leg.rolhas_aplicaveis || '') + '" data-resumo="' + escapeHtml(leg.resumo || '') + '">' +
                     '<div style="flex:1;">' +

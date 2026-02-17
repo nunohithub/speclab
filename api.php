@@ -1508,7 +1508,7 @@ try {
         // ===================================================================
         case 'get_legislacao_banco':
             $stmt = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo FROM legislacao_banco WHERE ativo = 1 ORDER BY legislacao_norma');
-            jsonSuccess(['legislacao' => $stmt->fetchAll()]);
+            jsonSuccess('OK', ['legislacao' => $stmt->fetchAll()]);
             break;
 
         case 'save_legislacao_banco':
