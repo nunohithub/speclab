@@ -514,10 +514,12 @@ $tamNome    = (int)$cv['tamanho_nome'];
         ?>
         <img src="<?= $fallbackLogoSrc ?>" alt="<?= $fallbackLogoAlt ?>" onerror="this.style.display='none'">
         <div class="title">
-            <h1><?= san($data['titulo']) ?></h1>
+            <span style="font-size: 14pt; font-weight: 700; color: <?= san($corTitulos) ?>;">Caderno de Encargos</span>
             <p><?= san($data['numero']) ?> | Versão <?= san($data['versao']) ?></p>
         </div>
     </div>
+
+    <h1><?= san($data['titulo']) ?></h1>
 
     <div class="meta">
         <div class="meta-full"><span>Produto:</span> <strong><?= san($data['produto_nome'] ?? '-') ?></strong></div>

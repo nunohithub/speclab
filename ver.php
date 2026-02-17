@@ -55,12 +55,13 @@ function san(string $s): string {
         .doc-container { max-width: 900px; margin: 0 auto; padding: 24px; }
         .doc-header {
             display: flex; align-items: center; justify-content: space-between;
-            padding-bottom: 12px; border-bottom: 3px solid <?= $corPrimaria ?>; margin-bottom: 24px;
+            padding-bottom: 12px; border-bottom: 3px solid <?= $corPrimaria ?>; margin-bottom: 12px;
         }
         .doc-header img { height: 48px; }
         .doc-header .doc-title { text-align: right; }
-        .doc-header .doc-title h1 { font-size: 18px; color: <?= $corPrimaria ?>; margin: 0; }
+        .doc-header .doc-title .doc-label { font-size: 14px; font-weight: 700; color: <?= $corPrimaria ?>; display: block; }
         .doc-header .doc-title p { font-size: 12px; color: #667085; margin: 4px 0 0; }
+        .doc-nome { font-size: 18px; color: <?= $corPrimaria ?>; margin: 0 0 16px; }
         .doc-section { margin-bottom: 24px; }
         .doc-section h2 {
             font-size: 14px; color: <?= $corPrimaria ?>; border-bottom: 1px solid <?= $corPrimariaLight ?>;
@@ -126,10 +127,12 @@ function san(string $s): string {
             <div class="doc-header">
                 <img src="<?= $orgLogo ?>" alt="<?= sanitize($orgNome) ?>" onerror="this.style.display='none'">
                 <div class="doc-title">
-                    <h1><?= san($data['titulo']) ?></h1>
+                    <span class="doc-label">Caderno de Encargos</span>
                     <p><?= san($data['numero']) ?> | Versão <?= san($data['versao']) ?></p>
                 </div>
             </div>
+
+            <h1 class="doc-nome"><?= san($data['titulo']) ?></h1>
 
             <!-- Meta -->
             <div class="doc-meta">
