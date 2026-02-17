@@ -1,0 +1,31 @@
+# EXI LAB - Cadernos de Encargo
+# Configuração Apache
+
+# Prevenir listagem de diretórios
+Options -Indexes
+
+# Proteger ficheiros sensíveis
+<FilesMatch "\.(sql|json|md|log)$">
+    Deny from all
+</FilesMatch>
+
+# Permitir composer.json para o instalador
+<Files "composer.json">
+    Allow from all
+</Files>
+
+# Bloquear acesso direto ao config
+<Files "database.php">
+    Deny from all
+</Files>
+
+# Upload max (apenas se mod_php estiver disponível)
+<IfModule mod_php.c>
+    php_value upload_max_filesize 50M
+    php_value post_max_size 55M
+    php_value max_execution_time 300
+    php_value memory_limit 256M
+</IfModule>
+
+# UTF-8
+AddDefaultCharset utf-8

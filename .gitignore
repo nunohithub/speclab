@@ -1,0 +1,21 @@
+# Dependências
+vendor/
+node_modules/
+
+# Configuração local (contém credenciais)
+config/database.php
+
+# Uploads de utilizadores
+uploads/*
+!uploads/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log

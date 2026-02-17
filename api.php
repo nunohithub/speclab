@@ -1,0 +1,1521 @@
+<?php
+/**
+ * SpecLab - Cadernos de Encargos
+ * API Handler - Processa todos os pedidos AJAX do editor
+ */
+
+require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/functions.php';
+
+header('Content-Type: application/json; charset=utf-8');
+
+// ---------------------------------------------------------------------------
+// Autenticação obrigatória para todas as ações
+// ---------------------------------------------------------------------------
+if (!isLoggedIn()) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'Sessão expirada. Faça login novamente.']);
+    exit;
+}
+
+$user = getCurrentUser();
+$db   = getDB();
+
+// ---------------------------------------------------------------------------
+// Determinar a ação solicitada
+// ---------------------------------------------------------------------------
+// Suportar JSON body (para fetch com Content-Type: application/json)
+$rawInput = file_get_contents('php://input');
+$jsonBody = json_decode($rawInput, true);
+if (is_array($jsonBody)) {
+    $_POST = array_merge($_POST, $jsonBody);
+    // Unwrap nested 'data' key (frontend sends { action: '...', data: { ...fields } })
+    if (isset($_POST['data']) && is_array($_POST['data'])) {
+        $_POST = array_merge($_POST, $_POST['data']);
+    }
+}
+
+$action = $_POST['action'] ?? $_GET['action'] ?? '';
+
+if ($action === '') {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Ação não especificada.']);
+    exit;
+}
+
+// Aliases para compatibilidade frontend ↔ API
+$aliases = [
+    'criar_especificacao' => 'save_especificacao',
+    'atualizar_especificacao' => 'save_especificacao',
+    'remover_ficheiro' => 'delete_ficheiro',
+];
+if (isset($aliases[$action])) {
+    $action = $aliases[$action];
+}
+
+// ---------------------------------------------------------------------------
+// Extensões permitidas para upload
+// ---------------------------------------------------------------------------
+$allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv', 'zip'];
+
+// ---------------------------------------------------------------------------
+// Helper: resposta JSON de sucesso
+// ---------------------------------------------------------------------------
+function jsonSuccess(string $message = 'Operação realizada com sucesso.', array $data = []): void {
+    echo json_encode(['success' => true, 'message' => $message, 'data' => $data], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// ---------------------------------------------------------------------------
+// Helper: resposta JSON de erro
+// ---------------------------------------------------------------------------
+function jsonError(string $error, int $httpCode = 400): void {
+    http_response_code($httpCode);
+    echo json_encode(['success' => false, 'error' => $error], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// ---------------------------------------------------------------------------
+// Helper: verificar se o utilizador é admin
+// ---------------------------------------------------------------------------
+function requireAdminApi(array $user): void {
+    if (!in_array($user['role'], ['super_admin', 'org_admin'])) {
+        jsonError('Acesso negado. Apenas administradores podem realizar esta ação.', 403);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: verificar acesso multi-tenant a uma especificação
+// ---------------------------------------------------------------------------
+function verifySpecAccess(PDO $db, int $specId, array $user): void {
+    if (isSuperAdmin()) return;
+    $stmt = $db->prepare('SELECT organizacao_id FROM especificacoes WHERE id = ?');
+    $stmt->execute([$specId]);
+    $orgId = $stmt->fetchColumn();
+    if ($orgId !== false && (int)$orgId !== (int)$user['org_id']) {
+        jsonError('Acesso negado.', 403);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: verificar acesso multi-tenant a um cliente
+// ---------------------------------------------------------------------------
+function verifyClienteAccess(PDO $db, int $clienteId, array $user): void {
+    if (isSuperAdmin()) return;
+    $stmt = $db->prepare('SELECT organizacao_id FROM clientes WHERE id = ?');
+    $stmt->execute([$clienteId]);
+    $orgId = $stmt->fetchColumn();
+    if ($orgId !== false && (int)$orgId !== (int)$user['org_id']) {
+        jsonError('Acesso negado.', 403);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: verificar acesso multi-tenant a um produto
+// ---------------------------------------------------------------------------
+function verifyProdutoAccess(PDO $db, int $produtoId, array $user): void {
+    if (isSuperAdmin()) return;
+    $stmt = $db->prepare('SELECT organizacao_id FROM produtos WHERE id = ?');
+    $stmt->execute([$produtoId]);
+    $orgId = $stmt->fetchColumn();
+    // Produtos globais (organizacao_id = NULL) são acessíveis a todos
+    if ($orgId !== false && $orgId !== null && (int)$orgId !== (int)$user['org_id']) {
+        jsonError('Acesso negado.', 403);
+    }
+}
+
+// ===========================================================================
+// ROUTER DE AÇÕES
+// ===========================================================================
+
+try {
+    switch ($action) {
+
+        // ===================================================================
+        // 1. SAVE ESPECIFICAÇÃO
+        // ===================================================================
+        case 'save_especificacao':
+            $id            = (int)($_POST['id'] ?? 0);
+            $numero        = sanitize($_POST['numero'] ?? '');
+            $titulo        = sanitize($_POST['titulo'] ?? '');
+            $cliente_id    = !empty($_POST['cliente_id']) ? (int)$_POST['cliente_id'] : null;
+
+            // Produtos e fornecedores: arrays (muitos-para-muitos)
+            $produto_ids = [];
+            if (!empty($_POST['produto_ids']) && is_array($_POST['produto_ids'])) {
+                $produto_ids = array_filter(array_map('intval', $_POST['produto_ids']));
+            } elseif (!empty($_POST['produto_id'])) {
+                $produto_ids = [(int)$_POST['produto_id']];
+            }
+            $fornecedor_ids = [];
+            if (!empty($_POST['fornecedor_ids']) && is_array($_POST['fornecedor_ids'])) {
+                $fornecedor_ids = array_filter(array_map('intval', $_POST['fornecedor_ids']));
+            } elseif (!empty($_POST['fornecedor_id'])) {
+                $fornecedor_ids = [(int)$_POST['fornecedor_id']];
+            }
+            $versao        = sanitize($_POST['versao'] ?? '1');
+            $data_emissao  = !empty($_POST['data_emissao']) ? $_POST['data_emissao'] : date('Y-m-d');
+            $data_revisao  = !empty($_POST['data_revisao']) ? $_POST['data_revisao'] : null;
+            $data_validade = !empty($_POST['data_validade']) ? $_POST['data_validade'] : null;
+            $estado        = sanitize($_POST['estado'] ?? 'rascunho');
+            $tipo_doc      = sanitize($_POST['tipo_doc'] ?? 'caderno');
+            if (!in_array($tipo_doc, ['caderno', 'ficha_tecnica'])) $tipo_doc = 'caderno';
+
+            // Acesso público
+            $codigo_acesso_input = trim($_POST['codigo_acesso'] ?? '');
+            $senha_publica  = trim($_POST['senha_publica'] ?? '');
+
+            // Campos de texto (rich text)
+            $objetivo       = sanitizeRichText($_POST['objetivo'] ?? '');
+            $ambito         = sanitizeRichText($_POST['ambito'] ?? '');
+            $definicao_material = sanitizeRichText($_POST['definicao_material'] ?? '');
+            $regulamentacao = sanitizeRichText($_POST['regulamentacao'] ?? '');
+            $processos      = sanitizeRichText($_POST['processos'] ?? '');
+            $embalagem      = sanitizeRichText($_POST['embalagem'] ?? '');
+            $aceitacao      = sanitizeRichText($_POST['aceitacao'] ?? '');
+            $arquivo_texto  = sanitizeRichText($_POST['arquivo_texto'] ?? '');
+            $indemnizacao   = sanitizeRichText($_POST['indemnizacao'] ?? '');
+            $observacoes    = sanitizeRichText($_POST['observacoes'] ?? '');
+            $config_visual  = $_POST['config_visual'] ?? null;
+
+            // Validação básica
+            if ($titulo === '') {
+                jsonError('O título é obrigatório.');
+            }
+
+            // Validar estado
+            if (!in_array($estado, ['rascunho', 'ativo', 'obsoleto'])) {
+                jsonError('Estado inválido.');
+            }
+
+            if ($id === 0) {
+                // --- CRIAR NOVA ---
+                // Verificar limite de especificações do plano
+                if ($user['org_id']) {
+                    $limiteSpec = podeCriarEspecificacao($db, $user['org_id']);
+                    if (!$limiteSpec['ok']) {
+                        jsonError($limiteSpec['msg']);
+                    }
+                }
+
+                if ($numero === '') {
+                    $numero = gerarNumeroEspecificacao($db, $user['org_id']);
+                }
+                $codigo_acesso = gerarCodigoAcesso();
+
+                $stmt = $db->prepare('
+                    INSERT INTO especificacoes (
+                        numero, titulo, tipo_doc, cliente_id, versao,
+                        data_emissao, data_revisao, data_validade, estado, codigo_acesso,
+                        objetivo, ambito, definicao_material, regulamentacao,
+                        processos, embalagem, aceitacao, arquivo_texto,
+                        indemnizacao, observacoes, config_visual, criado_por,
+                        organizacao_id, created_at, updated_at
+                    ) VALUES (
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, NOW(), NOW()
+                    )
+                ');
+                $stmt->execute([
+                    $numero, $titulo, $tipo_doc, $cliente_id, $versao,
+                    $data_emissao, $data_revisao, $data_validade, $estado, $codigo_acesso,
+                    $objetivo, $ambito, $definicao_material, $regulamentacao,
+                    $processos, $embalagem, $aceitacao, $arquivo_texto,
+                    $indemnizacao, $observacoes, $config_visual, $user['id'],
+                    $user['org_id'],
+                ]);
+
+                $newId = (int)$db->lastInsertId();
+
+                // Guardar produtos e fornecedores (muitos-para-muitos)
+                saveEspecProdutos($db, $newId, $produto_ids);
+                saveEspecFornecedores($db, $newId, $fornecedor_ids);
+
+                jsonSuccess('Especificação criada com sucesso.', [
+                    'id'     => $newId,
+                    'numero' => $numero,
+                ]);
+
+            } else {
+                // --- ATUALIZAR EXISTENTE ---
+                verifySpecAccess($db, $id, $user);
+
+                // Tratar password de acesso público
+                $passwordUpdate = '';
+                $extraParams = [];
+                if ($senha_publica !== '') {
+                    $passwordUpdate = ', password_acesso = ?';
+                    $extraParams[] = password_hash($senha_publica, PASSWORD_DEFAULT);
+                }
+                // Tratar código de acesso
+                $codigoUpdate = '';
+                if ($codigo_acesso_input !== '') {
+                    $codigoUpdate = ', codigo_acesso = ?';
+                    $extraParams[] = $codigo_acesso_input;
+                }
+
+                $stmt = $db->prepare('
+                    UPDATE especificacoes SET
+                        numero = ?, titulo = ?, tipo_doc = ?, cliente_id = ?, versao = ?,
+                        data_emissao = ?, data_revisao = ?, data_validade = ?, estado = ?,
+                        objetivo = ?, ambito = ?, definicao_material = ?, regulamentacao = ?,
+                        processos = ?, embalagem = ?, aceitacao = ?, arquivo_texto = ?,
+                        indemnizacao = ?, observacoes = ?, config_visual = ?, updated_at = NOW()
+                        ' . $passwordUpdate . $codigoUpdate . '
+                    WHERE id = ?
+                ');
+                $executeParams = [
+                    $numero, $titulo, $tipo_doc, $cliente_id, $versao,
+                    $data_emissao, $data_revisao, $data_validade, $estado,
+                    $objetivo, $ambito, $definicao_material, $regulamentacao,
+                    $processos, $embalagem, $aceitacao, $arquivo_texto,
+                    $indemnizacao, $observacoes, $config_visual,
+                ];
+                $executeParams = array_merge($executeParams, $extraParams, [$id]);
+                $stmt->execute($executeParams);
+
+                // Guardar produtos e fornecedores (muitos-para-muitos)
+                saveEspecProdutos($db, $id, $produto_ids);
+                saveEspecFornecedores($db, $id, $fornecedor_ids);
+
+                jsonSuccess('Especificação guardada com sucesso.', [
+                    'id'     => $id,
+                    'numero' => $numero,
+                ]);
+            }
+            break;
+
+        // ===================================================================
+        // 2. SAVE PARÂMETROS
+        // ===================================================================
+        case 'save_parametros':
+            $especificacao_id = (int)($_POST['especificacao_id'] ?? 0);
+            if ($especificacao_id <= 0) {
+                jsonError('ID da especificação inválido.');
+            }
+
+            verifySpecAccess($db, $especificacao_id, $user);
+
+            $parametros = $_POST['parametros'] ?? [];
+
+            $db->beginTransaction();
+            try {
+                // Apagar existentes
+                $stmt = $db->prepare('DELETE FROM especificacao_parametros WHERE especificacao_id = ?');
+                $stmt->execute([$especificacao_id]);
+
+                // Inserir novos
+                if (!empty($parametros) && is_array($parametros)) {
+                    $stmt = $db->prepare('
+                        INSERT INTO especificacao_parametros
+                            (especificacao_id, categoria, ensaio, especificacao_valor, metodo, amostra_nqa, ordem)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ');
+                    foreach ($parametros as $i => $p) {
+                        $stmt->execute([
+                            $especificacao_id,
+                            sanitize($p['categoria'] ?? ''),
+                            sanitize($p['ensaio'] ?? ''),
+                            sanitize($p['especificacao_valor'] ?? ''),
+                            sanitize($p['metodo'] ?? ''),
+                            sanitize($p['amostra_nqa'] ?? ''),
+                            (int)($p['ordem'] ?? $i),
+                        ]);
+                    }
+                }
+
+                // Atualizar timestamp da especificação
+                $stmt = $db->prepare('UPDATE especificacoes SET updated_at = NOW() WHERE id = ?');
+                $stmt->execute([$especificacao_id]);
+
+                $db->commit();
+                jsonSuccess('Parâmetros guardados com sucesso.');
+            } catch (Exception $e) {
+                $db->rollBack();
+                throw $e;
+            }
+            break;
+
+        // ===================================================================
+        // 3. SAVE CLASSES VISUAIS
+        // ===================================================================
+        case 'save_classes':
+            $especificacao_id = (int)($_POST['especificacao_id'] ?? 0);
+            if ($especificacao_id <= 0) {
+                jsonError('ID da especificação inválido.');
+            }
+
+            verifySpecAccess($db, $especificacao_id, $user);
+
+            $classes = $_POST['classes'] ?? [];
+
+            $db->beginTransaction();
+            try {
+                $stmt = $db->prepare('DELETE FROM especificacao_classes WHERE especificacao_id = ?');
+                $stmt->execute([$especificacao_id]);
+
+                if (!empty($classes) && is_array($classes)) {
+                    $stmt = $db->prepare('
+                        INSERT INTO especificacao_classes
+                            (especificacao_id, classe, defeitos_max, descricao, ordem)
+                        VALUES (?, ?, ?, ?, ?)
+                    ');
+                    foreach ($classes as $i => $c) {
+                        $stmt->execute([
+                            $especificacao_id,
+                            sanitize($c['classe'] ?? ''),
+                            (int)($c['defeitos_max'] ?? 0),
+                            sanitize($c['descricao'] ?? ''),
+                            (int)($c['ordem'] ?? $i),
+                        ]);
+                    }
+                }
+
+                $stmt = $db->prepare('UPDATE especificacoes SET updated_at = NOW() WHERE id = ?');
+                $stmt->execute([$especificacao_id]);
+
+                $db->commit();
+                jsonSuccess('Classes visuais guardadas com sucesso.');
+            } catch (Exception $e) {
+                $db->rollBack();
+                throw $e;
+            }
+            break;
+
+        // ===================================================================
+        // 4. SAVE DEFEITOS
+        // ===================================================================
+        case 'save_defeitos':
+            $especificacao_id = (int)($_POST['especificacao_id'] ?? 0);
+            if ($especificacao_id <= 0) {
+                jsonError('ID da especificação inválido.');
+            }
+
+            verifySpecAccess($db, $especificacao_id, $user);
+
+            $defeitos = $_POST['defeitos'] ?? [];
+
+            $db->beginTransaction();
+            try {
+                $stmt = $db->prepare('DELETE FROM especificacao_defeitos WHERE especificacao_id = ?');
+                $stmt->execute([$especificacao_id]);
+
+                if (!empty($defeitos) && is_array($defeitos)) {
+                    $stmt = $db->prepare('
+                        INSERT INTO especificacao_defeitos
+                            (especificacao_id, nome, tipo, descricao, ordem)
+                        VALUES (?, ?, ?, ?, ?)
+                    ');
+                    foreach ($defeitos as $i => $d) {
+                        $tipo = sanitize($d['tipo'] ?? 'menor');
+                        if (!in_array($tipo, ['critico', 'maior', 'menor'])) {
+                            $tipo = 'menor';
+                        }
+                        $stmt->execute([
+                            $especificacao_id,
+                            sanitize($d['nome'] ?? ''),
+                            $tipo,
+                            sanitize($d['descricao'] ?? ''),
+                            (int)($d['ordem'] ?? $i),
+                        ]);
+                    }
+                }
+
+                $stmt = $db->prepare('UPDATE especificacoes SET updated_at = NOW() WHERE id = ?');
+                $stmt->execute([$especificacao_id]);
+
+                $db->commit();
+                jsonSuccess('Defeitos guardados com sucesso.');
+            } catch (Exception $e) {
+                $db->rollBack();
+                throw $e;
+            }
+            break;
+
+        // ===================================================================
+        // 4B. SAVE SECÇÕES
+        // ===================================================================
+        case 'save_seccoes':
+            $especificacao_id = (int)($_POST['especificacao_id'] ?? 0);
+            if ($especificacao_id <= 0) {
+                jsonError('ID da especificação inválido.');
+            }
+
+            verifySpecAccess($db, $especificacao_id, $user);
+
+            $seccoes = $_POST['seccoes'] ?? [];
+
+            $db->beginTransaction();
+            try {
+                $stmt = $db->prepare('DELETE FROM especificacao_seccoes WHERE especificacao_id = ?');
+                $stmt->execute([$especificacao_id]);
+
+                if (!empty($seccoes) && is_array($seccoes)) {
+                    $stmt = $db->prepare('
+                        INSERT INTO especificacao_seccoes
+                            (especificacao_id, titulo, conteudo, tipo, ordem)
+                        VALUES (?, ?, ?, ?, ?)
+                    ');
+                    foreach ($seccoes as $i => $s) {
+                        $titulo = trim($s['titulo'] ?? '');
+                        if ($titulo === '') $titulo = 'Secção ' . ($i + 1);
+                        $tipo = ($s['tipo'] ?? 'texto') === 'ensaios' ? 'ensaios' : 'texto';
+                        $conteudo = $s['conteudo'] ?? '';
+                        // Para ensaios, o conteúdo é JSON - não sanitizar como rich text
+                        if ($tipo === 'texto') {
+                            $conteudo = $conteudo; // rich text já vem sanitizado do frontend
+                        }
+                        $stmt->execute([
+                            $especificacao_id,
+                            $titulo,
+                            $conteudo,
+                            $tipo,
+                            (int)($s['ordem'] ?? $i),
+                        ]);
+                    }
+                }
+
+                $stmt = $db->prepare('UPDATE especificacoes SET updated_at = NOW() WHERE id = ?');
+                $stmt->execute([$especificacao_id]);
+
+                $db->commit();
+                jsonSuccess('Secções guardadas com sucesso.');
+            } catch (Exception $e) {
+                $db->rollBack();
+                throw $e;
+            }
+            break;
+
+        // ===================================================================
+        // 4C. AI ASSIST (OpenAI proxy)
+        // ===================================================================
+        case 'ai_assist':
+            $mode      = $_POST['mode'] ?? '';       // 'sugerir' ou 'melhorar'
+            $prompt    = trim($_POST['prompt'] ?? '');
+            $conteudo  = $_POST['conteudo'] ?? '';
+            $titulo    = trim($_POST['titulo'] ?? '');
+
+            if (!in_array($mode, ['sugerir', 'melhorar'])) {
+                jsonError('Modo inválido.');
+            }
+            if ($prompt === '') {
+                jsonError('Escreva uma indicação para a IA.');
+            }
+
+            $apiKey = getConfiguracao('openai_api_key', '');
+
+            $systemMsg = 'És um assistente técnico especializado em cadernos de encargo e especificações técnicas para a indústria de rolhas de cortiça. Responde sempre em português de Portugal. Gera conteúdo profissional, técnico e conciso em formato HTML simples (usa <p>, <ul>, <li>, <strong>, <em> - sem <html>, <head> ou <body>).';
+
+            if ($mode === 'sugerir') {
+                $userMsg = "Secção: \"{$titulo}\"\n\nO utilizador pede:\n{$prompt}\n\nGera o conteúdo para esta secção de um caderno de encargo técnico.";
+            } else {
+                $userMsg = "Secção: \"{$titulo}\"\n\nConteúdo atual:\n{$conteudo}\n\nO utilizador pede para melhorar:\n{$prompt}\n\nReescreve o conteúdo melhorado mantendo o contexto técnico.";
+            }
+
+            $payload = [
+                'model'    => 'gpt-4o-mini',
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemMsg],
+                    ['role' => 'user',   'content' => $userMsg],
+                ],
+                'max_tokens'  => 2000,
+                'temperature' => 0.7,
+            ];
+
+            $ch = curl_init('https://api.openai.com/v1/chat/completions');
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $apiKey,
+                ],
+                CURLOPT_POSTFIELDS     => json_encode($payload),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 60,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr  = curl_error($ch);
+            curl_close($ch);
+
+            if ($curlErr) {
+                jsonError('Erro de ligação à API: ' . $curlErr);
+            }
+
+            $result = json_decode($response, true);
+
+            if ($httpCode !== 200 || !isset($result['choices'][0]['message']['content'])) {
+                $errMsg = $result['error']['message'] ?? 'Erro desconhecido da API OpenAI.';
+                jsonError('OpenAI: ' . $errMsg);
+            }
+
+            $aiContent = $result['choices'][0]['message']['content'];
+            jsonSuccess('Conteúdo gerado.', ['content' => $aiContent]);
+            break;
+
+        // ===================================================================
+        // 4D. UPLOAD LOGO PERSONALIZADO
+        // ===================================================================
+        case 'upload_logo_custom':
+            $especificacao_id = (int)($_POST['especificacao_id'] ?? 0);
+            if ($especificacao_id <= 0) {
+                jsonError('ID da especificação inválido.');
+            }
+
+            verifySpecAccess($db, $especificacao_id, $user);
+
+            if (!isset($_FILES['logo']) || $_FILES['logo']['error'] !== UPLOAD_ERR_OK) {
+                jsonError('Nenhum ficheiro enviado.');
+            }
+
+            $file = $_FILES['logo'];
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            if (!in_array($ext, ['png', 'jpg', 'jpeg', 'svg'])) {
+                jsonError('Formato inválido. Use PNG, JPG ou SVG.');
+            }
+
+            $logosDir = UPLOAD_DIR . 'logos/';
+            if (!is_dir($logosDir)) {
+                mkdir($logosDir, 0755, true);
+            }
+
+            $filename = 'logo_' . $especificacao_id . '_' . time() . '.' . $ext;
+            $destPath = $logosDir . $filename;
+
+            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+                jsonError('Erro ao guardar o ficheiro.');
+            }
+
+            // Guardar na config_visual da especificação
+            $stmt = $db->prepare('SELECT config_visual FROM especificacoes WHERE id = ?');
+            $stmt->execute([$especificacao_id]);
+            $currentConfig = $stmt->fetchColumn();
+            $cv = $currentConfig ? json_decode($currentConfig, true) : [];
+            if (!is_array($cv)) $cv = [];
+
+            // Remover logo antigo se existir
+            if (!empty($cv['logo_custom']) && file_exists($logosDir . $cv['logo_custom'])) {
+                unlink($logosDir . $cv['logo_custom']);
+            }
+
+            $cv['logo_custom'] = $filename;
+
+            $stmt = $db->prepare('UPDATE especificacoes SET config_visual = ?, updated_at = NOW() WHERE id = ?');
+            $stmt->execute([json_encode($cv, JSON_UNESCAPED_UNICODE), $especificacao_id]);
+
+            jsonSuccess('Logo carregado.', ['filename' => $filename]);
+            break;
+
+        // ===================================================================
+        // 5. UPLOAD FICHEIRO
+        // ===================================================================
+        case 'upload_ficheiro':
+            $especificacao_id = (int)($_POST['especificacao_id'] ?? 0);
+            if ($especificacao_id <= 0) {
+                jsonError('ID da especificação inválido.');
+            }
+
+            verifySpecAccess($db, $especificacao_id, $user);
+
+            if (!isset($_FILES['ficheiro']) || $_FILES['ficheiro']['error'] !== UPLOAD_ERR_OK) {
+                $uploadErrors = [
+                    UPLOAD_ERR_INI_SIZE   => 'O ficheiro excede o tamanho máximo permitido pelo servidor.',
+                    UPLOAD_ERR_FORM_SIZE  => 'O ficheiro excede o tamanho máximo permitido pelo formulário.',
+                    UPLOAD_ERR_PARTIAL    => 'O ficheiro foi apenas parcialmente enviado.',
+                    UPLOAD_ERR_NO_FILE    => 'Nenhum ficheiro foi enviado.',
+                    UPLOAD_ERR_NO_TMP_DIR => 'Diretório temporário em falta.',
+                    UPLOAD_ERR_CANT_WRITE => 'Erro ao escrever o ficheiro no disco.',
+                    UPLOAD_ERR_EXTENSION  => 'Upload bloqueado por extensão do servidor.',
+                ];
+                $errorCode = $_FILES['ficheiro']['error'] ?? UPLOAD_ERR_NO_FILE;
+                $errorMsg  = $uploadErrors[$errorCode] ?? 'Erro desconhecido no upload.';
+                jsonError($errorMsg);
+            }
+
+            $file = $_FILES['ficheiro'];
+
+            // Validar tamanho
+            if ($file['size'] > MAX_UPLOAD_SIZE) {
+                jsonError('O ficheiro excede o tamanho máximo de ' . formatFileSize(MAX_UPLOAD_SIZE) . '.');
+            }
+
+            // Validar extensão
+            $originalName = $file['name'];
+            $extension    = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+            if (!in_array($extension, $allowedExtensions)) {
+                jsonError('Tipo de ficheiro não permitido. Extensões permitidas: ' . implode(', ', $allowedExtensions));
+            }
+
+            // Criar diretório de uploads se não existir
+            if (!is_dir(UPLOAD_DIR)) {
+                mkdir(UPLOAD_DIR, 0755, true);
+            }
+
+            // Gerar nome único
+            $uniqueName = uniqid('file_', true) . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
+            $destPath   = UPLOAD_DIR . $uniqueName;
+
+            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+                jsonError('Erro ao guardar o ficheiro no servidor.');
+            }
+
+            // Optimize images (resize large photos, compress)
+            $imageExts = ['jpg', 'jpeg', 'png', 'gif'];
+            if (in_array($extension, $imageExts) && function_exists('imagecreatefromjpeg')) {
+                $maxWidth = 2000;
+                $maxHeight = 2000;
+                $quality = 85;
+
+                $imageInfo = @getimagesize($destPath);
+                if ($imageInfo) {
+                    $origWidth = $imageInfo[0];
+                    $origHeight = $imageInfo[1];
+                    $mimeType = $imageInfo['mime'];
+
+                    if ($origWidth > $maxWidth || $origHeight > $maxHeight) {
+                        $ratio = min($maxWidth / $origWidth, $maxHeight / $origHeight);
+                        $newWidth = (int)($origWidth * $ratio);
+                        $newHeight = (int)($origHeight * $ratio);
+
+                        $srcImage = null;
+                        switch ($mimeType) {
+                            case 'image/jpeg': $srcImage = @imagecreatefromjpeg($destPath); break;
+                            case 'image/png':  $srcImage = @imagecreatefrompng($destPath); break;
+                            case 'image/gif':  $srcImage = @imagecreatefromgif($destPath); break;
+                        }
+
+                        if ($srcImage) {
+                            $dstImage = imagecreatetruecolor($newWidth, $newHeight);
+
+                            // Preserve transparency for PNG
+                            if ($mimeType === 'image/png') {
+                                imagealphablending($dstImage, false);
+                                imagesavealpha($dstImage, true);
+                            }
+
+                            imagecopyresampled($dstImage, $srcImage, 0, 0, 0, 0, $newWidth, $newHeight, $origWidth, $origHeight);
+
+                            switch ($mimeType) {
+                                case 'image/jpeg': imagejpeg($dstImage, $destPath, $quality); break;
+                                case 'image/png':  imagepng($dstImage, $destPath, 6); break;
+                                case 'image/gif':  imagegif($dstImage, $destPath); break;
+                            }
+
+                            imagedestroy($srcImage);
+                            imagedestroy($dstImage);
+
+                            // Update file size after optimization
+                            $file['size'] = filesize($destPath);
+                        }
+                    } elseif ($mimeType === 'image/jpeg' && $file['size'] > 500000) {
+                        // Compress large JPEGs even if dimensions are OK
+                        $srcImage = @imagecreatefromjpeg($destPath);
+                        if ($srcImage) {
+                            imagejpeg($srcImage, $destPath, $quality);
+                            imagedestroy($srcImage);
+                            $file['size'] = filesize($destPath);
+                        }
+                    }
+                }
+            }
+
+            // Inserir na base de dados
+            $stmt = $db->prepare('
+                INSERT INTO especificacao_ficheiros
+                    (especificacao_id, nome_original, nome_servidor, tamanho, tipo_ficheiro, uploaded_at)
+                VALUES (?, ?, ?, ?, ?, NOW())
+            ');
+            $stmt->execute([
+                $especificacao_id,
+                $originalName,
+                $uniqueName,
+                $file['size'],
+                $file['type'],
+            ]);
+
+            $ficheiroId = (int)$db->lastInsertId();
+
+            // Atualizar timestamp da especificação
+            $stmt = $db->prepare('UPDATE especificacoes SET updated_at = NOW() WHERE id = ?');
+            $stmt->execute([$especificacao_id]);
+
+            jsonSuccess('Ficheiro enviado com sucesso.', [
+                'id'             => $ficheiroId,
+                'nome_original'  => $originalName,
+                'nome_servidor'  => $uniqueName,
+                'tamanho'        => $file['size'],
+                'tamanho_fmt'    => formatFileSize($file['size']),
+                'tipo_mime'      => $file['type'],
+            ]);
+            break;
+
+        // ===================================================================
+        // 6. DELETE FICHEIRO
+        // ===================================================================
+        case 'delete_ficheiro':
+            $ficheiro_id = (int)($_POST['ficheiro_id'] ?? $_POST['id'] ?? 0);
+            if ($ficheiro_id <= 0) {
+                jsonError('ID do ficheiro inválido.');
+            }
+
+            // Obter informação do ficheiro
+            $stmt = $db->prepare('SELECT * FROM especificacao_ficheiros WHERE id = ?');
+            $stmt->execute([$ficheiro_id]);
+            $ficheiro = $stmt->fetch();
+
+            if (!$ficheiro) {
+                jsonError('Ficheiro não encontrado.', 404);
+            }
+
+            verifySpecAccess($db, (int)$ficheiro['especificacao_id'], $user);
+
+            // Remover do disco
+            $filePath = UPLOAD_DIR . $ficheiro['nome_servidor'];
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+
+            // Remover da base de dados
+            $stmt = $db->prepare('DELETE FROM especificacao_ficheiros WHERE id = ?');
+            $stmt->execute([$ficheiro_id]);
+
+            // Atualizar timestamp da especificação
+            $stmt = $db->prepare('UPDATE especificacoes SET updated_at = NOW() WHERE id = ?');
+            $stmt->execute([$ficheiro['especificacao_id']]);
+
+            jsonSuccess('Ficheiro eliminado com sucesso.');
+            break;
+
+        // ===================================================================
+        // 7. DELETE ESPECIFICAÇÃO
+        // ===================================================================
+        case 'delete_especificacao':
+            requireAdminApi($user);
+
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) {
+                jsonError('ID da especificação inválido.');
+            }
+
+            // Verificar se existe
+            $stmt = $db->prepare('SELECT id FROM especificacoes WHERE id = ?');
+            $stmt->execute([$id]);
+            if (!$stmt->fetch()) {
+                jsonError('Especificação não encontrada.', 404);
+            }
+
+            verifySpecAccess($db, $id, $user);
+
+            // Obter ficheiros associados para apagar do disco
+            $stmt = $db->prepare('SELECT nome_servidor FROM especificacao_ficheiros WHERE especificacao_id = ?');
+            $stmt->execute([$id]);
+            $ficheiros = $stmt->fetchAll();
+
+            $db->beginTransaction();
+            try {
+                // Apagar dados relacionados
+                $db->prepare('DELETE FROM especificacao_produtos WHERE especificacao_id = ?')->execute([$id]);
+                $db->prepare('DELETE FROM especificacao_fornecedores WHERE especificacao_id = ?')->execute([$id]);
+                $db->prepare('DELETE FROM especificacao_parametros WHERE especificacao_id = ?')->execute([$id]);
+                $db->prepare('DELETE FROM especificacao_classes WHERE especificacao_id = ?')->execute([$id]);
+                $db->prepare('DELETE FROM especificacao_defeitos WHERE especificacao_id = ?')->execute([$id]);
+                $db->prepare('DELETE FROM especificacao_seccoes WHERE especificacao_id = ?')->execute([$id]);
+                $db->prepare('DELETE FROM especificacao_ficheiros WHERE especificacao_id = ?')->execute([$id]);
+
+                // Apagar a especificação
+                $db->prepare('DELETE FROM especificacoes WHERE id = ?')->execute([$id]);
+
+                $db->commit();
+
+                // Apagar ficheiros do disco (depois do commit para garantir consistência)
+                foreach ($ficheiros as $f) {
+                    $filePath = UPLOAD_DIR . $f['nome_servidor'];
+                    if (file_exists($filePath)) {
+                        unlink($filePath);
+                    }
+                }
+
+                jsonSuccess('Especificação eliminada com sucesso.');
+            } catch (Exception $e) {
+                $db->rollBack();
+                throw $e;
+            }
+            break;
+
+        // ===================================================================
+        // 8. SET PASSWORD (acesso público)
+        // ===================================================================
+        case 'set_password':
+            $especificacao_id = (int)($_POST['especificacao_id'] ?? 0);
+            $password         = $_POST['password'] ?? '';
+
+            if ($especificacao_id <= 0) {
+                jsonError('ID da especificação inválido.');
+            }
+
+            verifySpecAccess($db, $especificacao_id, $user);
+
+            // Verificar se a especificação existe
+            $stmt = $db->prepare('SELECT id, codigo_acesso FROM especificacoes WHERE id = ?');
+            $stmt->execute([$especificacao_id]);
+            $espec = $stmt->fetch();
+
+            if (!$espec) {
+                jsonError('Especificação não encontrada.', 404);
+            }
+
+            // Gerar código de acesso se não existir
+            $codigo_acesso = $espec['codigo_acesso'];
+            if (empty($codigo_acesso)) {
+                $codigo_acesso = gerarCodigoAcesso();
+            }
+
+            if ($password !== '') {
+                // Definir ou atualizar password
+                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $db->prepare('
+                    UPDATE especificacoes
+                    SET password_acesso = ?, codigo_acesso = ?, updated_at = NOW()
+                    WHERE id = ?
+                ');
+                $stmt->execute([$hashedPassword, $codigo_acesso, $especificacao_id]);
+            } else {
+                // Remover password (acesso público sem password)
+                $stmt = $db->prepare('
+                    UPDATE especificacoes
+                    SET password_acesso = NULL, codigo_acesso = ?, updated_at = NOW()
+                    WHERE id = ?
+                ');
+                $stmt->execute([$codigo_acesso, $especificacao_id]);
+            }
+
+            jsonSuccess('Configuração de acesso atualizada com sucesso.', [
+                'codigo_acesso' => $codigo_acesso,
+            ]);
+            break;
+
+        // ===================================================================
+        // 9. GET ESPECIFICAÇÃO (dados completos em JSON)
+        // ===================================================================
+        case 'get_especificacao':
+            $id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
+            if ($id <= 0) {
+                jsonError('ID da especificação inválido.');
+            }
+
+            verifySpecAccess($db, $id, $user);
+
+            $espec = getEspecificacaoCompleta($db, $id);
+            if (!$espec) {
+                jsonError('Especificação não encontrada.', 404);
+            }
+
+            jsonSuccess('Especificação carregada.', $espec);
+            break;
+
+        // ===================================================================
+        // 10. SAVE CLIENTE
+        // ===================================================================
+        case 'save_cliente':
+            $id       = (int)($_POST['id'] ?? 0);
+            $nome     = sanitize($_POST['nome'] ?? '');
+            $sigla    = sanitize($_POST['sigla'] ?? '');
+            $morada   = sanitize($_POST['morada'] ?? '');
+            $telefone = sanitize($_POST['telefone'] ?? '');
+            $email    = sanitize($_POST['email'] ?? '');
+            $nif      = sanitize($_POST['nif'] ?? '');
+            $contacto = sanitize($_POST['contacto'] ?? '');
+
+            if ($nome === '') {
+                jsonError('O nome do cliente é obrigatório.');
+            }
+
+            if ($id === 0) {
+                // Criar novo cliente
+                $stmt = $db->prepare('
+                    INSERT INTO clientes (nome, sigla, morada, telefone, email, nif, contacto, organizacao_id, ativo, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
+                ');
+                $stmt->execute([$nome, $sigla, $morada, $telefone, $email, $nif, $contacto, $user['org_id']]);
+                $newId = (int)$db->lastInsertId();
+
+                jsonSuccess('Cliente criado com sucesso.', ['id' => $newId]);
+            } else {
+                // Atualizar cliente existente
+                verifyClienteAccess($db, $id, $user);
+
+                $stmt = $db->prepare('
+                    UPDATE clientes SET
+                        nome = ?, sigla = ?, morada = ?, telefone = ?,
+                        email = ?, nif = ?, contacto = ?
+                    WHERE id = ?
+                ');
+                $stmt->execute([$nome, $sigla, $morada, $telefone, $email, $nif, $contacto, $id]);
+
+                jsonSuccess('Cliente atualizado com sucesso.', ['id' => $id]);
+            }
+            break;
+
+        // ===================================================================
+        // 11. SAVE PRODUTO
+        // ===================================================================
+        case 'save_produto':
+            $id        = (int)($_POST['id'] ?? 0);
+            $nome      = sanitize($_POST['nome'] ?? '');
+            $tipo      = sanitize($_POST['tipo'] ?? '');
+            $descricao = sanitize($_POST['descricao'] ?? '');
+
+            if ($nome === '') {
+                jsonError('O nome do produto é obrigatório.');
+            }
+
+            // Determinar organizacao_id: super_admin pode definir NULL (global), org_admin usa a sua org
+            $produtoOrgId = $user['org_id'];
+            if (isSuperAdmin() && isset($_POST['global']) && $_POST['global']) {
+                $produtoOrgId = null;
+            }
+
+            if ($id === 0) {
+                // Criar novo produto
+                $stmt = $db->prepare('
+                    INSERT INTO produtos (nome, tipo, descricao, organizacao_id, ativo, created_at)
+                    VALUES (?, ?, ?, ?, 1, NOW())
+                ');
+                $stmt->execute([$nome, $tipo, $descricao, $produtoOrgId]);
+                $newId = (int)$db->lastInsertId();
+
+                jsonSuccess('Produto criado com sucesso.', ['id' => $newId]);
+            } else {
+                // Atualizar produto existente
+                verifyProdutoAccess($db, $id, $user);
+
+                $updateFields = 'nome = ?, tipo = ?, descricao = ?';
+                $updateParams = [$nome, $tipo, $descricao];
+
+                // Super admin pode alterar se é global
+                if (isSuperAdmin()) {
+                    $updateFields .= ', organizacao_id = ?';
+                    $updateParams[] = $produtoOrgId;
+                }
+
+                $updateParams[] = $id;
+                $stmt = $db->prepare("UPDATE produtos SET {$updateFields} WHERE id = ?");
+                $stmt->execute($updateParams);
+
+                jsonSuccess('Produto atualizado com sucesso.', ['id' => $id]);
+            }
+            break;
+
+        // ===================================================================
+        // 12. DELETE CLIENTE (soft delete)
+        // ===================================================================
+        case 'delete_cliente':
+            requireAdminApi($user);
+
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) {
+                jsonError('ID do cliente inválido.');
+            }
+
+            $stmt = $db->prepare('SELECT id FROM clientes WHERE id = ?');
+            $stmt->execute([$id]);
+            if (!$stmt->fetch()) {
+                jsonError('Cliente não encontrado.', 404);
+            }
+
+            verifyClienteAccess($db, $id, $user);
+
+            $stmt = $db->prepare('UPDATE clientes SET ativo = 0 WHERE id = ?');
+            $stmt->execute([$id]);
+
+            jsonSuccess('Cliente eliminado com sucesso.');
+            break;
+
+        // ===================================================================
+        // 13. DELETE PRODUTO (soft delete)
+        // ===================================================================
+        case 'delete_produto':
+            requireAdminApi($user);
+
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) {
+                jsonError('ID do produto inválido.');
+            }
+
+            $stmt = $db->prepare('SELECT id FROM produtos WHERE id = ?');
+            $stmt->execute([$id]);
+            if (!$stmt->fetch()) {
+                jsonError('Produto não encontrado.', 404);
+            }
+
+            verifyProdutoAccess($db, $id, $user);
+
+            $stmt = $db->prepare('UPDATE produtos SET ativo = 0 WHERE id = ?');
+            $stmt->execute([$id]);
+
+            jsonSuccess('Produto eliminado com sucesso.');
+            break;
+
+        // ===================================================================
+        // 14. DUPLICATE ESPECIFICAÇÃO
+        // ===================================================================
+        case 'duplicate_especificacao':
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) {
+                jsonError('ID da especificação inválido.');
+            }
+
+            verifySpecAccess($db, $id, $user);
+
+            // Verificar limite de especificações
+            if ($user['org_id']) {
+                $limiteSpec = podeCriarEspecificacao($db, $user['org_id']);
+                if (!$limiteSpec['ok']) {
+                    jsonError($limiteSpec['msg']);
+                }
+            }
+
+            // Obter especificação original completa
+            $espec = getEspecificacaoCompleta($db, $id);
+            if (!$espec) {
+                jsonError('Especificação não encontrada.', 404);
+            }
+
+            $db->beginTransaction();
+            try {
+                // Gerar novo número
+                $novoNumero = gerarNumeroEspecificacao($db, $user['org_id']);
+
+                // Inserir cópia da especificação
+                $stmt = $db->prepare('
+                    INSERT INTO especificacoes (
+                        numero, titulo, cliente_id, versao,
+                        data_emissao, data_revisao, estado, codigo_acesso,
+                        objetivo, ambito, definicao_material, regulamentacao,
+                        processos, embalagem, aceitacao, arquivo_texto,
+                        indemnizacao, observacoes, criado_por,
+                        organizacao_id, created_at, updated_at
+                    ) VALUES (
+                        ?, ?, ?, ?,
+                        ?, NULL, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?,
+                        ?, NOW(), NOW()
+                    )
+                ');
+                $stmt->execute([
+                    $novoNumero,
+                    $espec['titulo'] . ' (cópia)',
+                    $espec['cliente_id'],
+                    '1',
+                    date('Y-m-d'),
+                    'rascunho',
+                    gerarCodigoAcesso(),
+                    $espec['objetivo'],
+                    $espec['ambito'],
+                    $espec['definicao_material'],
+                    $espec['regulamentacao'],
+                    $espec['processos'],
+                    $espec['embalagem'],
+                    $espec['aceitacao'],
+                    $espec['arquivo_texto'],
+                    $espec['indemnizacao'],
+                    $espec['observacoes'],
+                    $user['id'],
+                    $user['org_id'],
+                ]);
+
+                $novoId = (int)$db->lastInsertId();
+
+                // Copiar produtos e fornecedores (muitos-para-muitos)
+                saveEspecProdutos($db, $novoId, $espec['produto_ids'] ?? []);
+                saveEspecFornecedores($db, $novoId, $espec['fornecedor_ids'] ?? []);
+
+                // Copiar parâmetros
+                if (!empty($espec['parametros'])) {
+                    $stmt = $db->prepare('
+                        INSERT INTO especificacao_parametros
+                            (especificacao_id, categoria, ensaio, especificacao_valor, metodo, amostra_nqa, ordem)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ');
+                    foreach ($espec['parametros'] as $p) {
+                        $stmt->execute([
+                            $novoId,
+                            $p['categoria'],
+                            $p['ensaio'],
+                            $p['especificacao_valor'],
+                            $p['metodo'],
+                            $p['amostra_nqa'],
+                            $p['ordem'],
+                        ]);
+                    }
+                }
+
+                // Copiar classes visuais
+                if (!empty($espec['classes'])) {
+                    $stmt = $db->prepare('
+                        INSERT INTO especificacao_classes
+                            (especificacao_id, classe, defeitos_max, descricao, ordem)
+                        VALUES (?, ?, ?, ?, ?)
+                    ');
+                    foreach ($espec['classes'] as $c) {
+                        $stmt->execute([
+                            $novoId,
+                            $c['classe'],
+                            $c['defeitos_max'],
+                            $c['descricao'],
+                            $c['ordem'],
+                        ]);
+                    }
+                }
+
+                // Copiar defeitos
+                if (!empty($espec['defeitos'])) {
+                    $stmt = $db->prepare('
+                        INSERT INTO especificacao_defeitos
+                            (especificacao_id, nome, tipo, descricao, ordem)
+                        VALUES (?, ?, ?, ?, ?)
+                    ');
+                    foreach ($espec['defeitos'] as $d) {
+                        $stmt->execute([
+                            $novoId,
+                            $d['nome'],
+                            $d['tipo'],
+                            $d['descricao'],
+                            $d['ordem'],
+                        ]);
+                    }
+                }
+
+                // Copiar secções personalizadas
+                if (!empty($espec['seccoes'])) {
+                    $stmt = $db->prepare('
+                        INSERT INTO especificacao_seccoes
+                            (especificacao_id, titulo, conteudo, tipo, ordem)
+                        VALUES (?, ?, ?, ?, ?)
+                    ');
+                    foreach ($espec['seccoes'] as $s) {
+                        $stmt->execute([
+                            $novoId,
+                            $s['titulo'],
+                            $s['conteudo'],
+                            $s['tipo'] ?? 'texto',
+                            $s['ordem'],
+                        ]);
+                    }
+                }
+
+                $db->commit();
+
+                jsonSuccess('Especificação duplicada com sucesso.', [
+                    'id'     => $novoId,
+                    'numero' => $novoNumero,
+                ]);
+            } catch (Exception $e) {
+                $db->rollBack();
+                throw $e;
+            }
+            break;
+
+        // ===================================================================
+        // 15. ENVIAR EMAIL
+        // ===================================================================
+        case 'enviar_email':
+            require_once __DIR__ . '/includes/email.php';
+
+            $especificacao_id = (int)($_POST['especificacao_id'] ?? 0);
+            $destinatario = sanitize($_POST['destinatario'] ?? '');
+            $assunto = sanitize($_POST['assunto'] ?? '');
+            $mensagem = $_POST['mensagem'] ?? '';
+            $anexarPdf = !empty($_POST['anexar_pdf']);
+            $incluirLink = !empty($_POST['incluir_link']);
+
+            if ($especificacao_id <= 0) jsonError('ID da especificação inválido.');
+            if (empty($destinatario) || !filter_var($destinatario, FILTER_VALIDATE_EMAIL)) jsonError('Email de destino inválido.');
+
+            verifySpecAccess($db, $especificacao_id, $user);
+
+            $espec = getEspecificacaoCompleta($db, $especificacao_id);
+            if (!$espec) jsonError('Especificação não encontrada.', 404);
+
+            // Gerar link público se solicitado
+            $linkPublico = '';
+            if ($incluirLink && !empty($espec['codigo_acesso'])) {
+                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                $linkPublico = $protocol . '://' . $host . BASE_PATH . '/publico.php?code=' . $espec['codigo_acesso'];
+            }
+
+            // Corpo do email
+            $corpo = !empty($mensagem) ? '<p>' . nl2br(htmlspecialchars($mensagem)) . '</p><hr>' : '';
+            $corpo .= gerarCorpoEmail($espec, $linkPublico);
+
+            if (empty($assunto)) {
+                $assunto = 'Caderno de Encargos: ' . $espec['numero'] . ' - ' . $espec['titulo'];
+            }
+
+            $result = enviarEmail($db, $especificacao_id, $destinatario, $assunto, $corpo, $anexarPdf, $user['id']);
+
+            if ($result['success']) {
+                jsonSuccess($result['message']);
+            } else {
+                jsonError($result['error']);
+            }
+            break;
+
+        // ===================================================================
+        // 16. DOWNLOAD FICHEIRO (via GET)
+        // ===================================================================
+        case 'download_ficheiro':
+            $fid = (int)($_GET['id'] ?? 0);
+            if ($fid <= 0) jsonError('ID inválido.');
+
+            $stmt = $db->prepare('SELECT * FROM especificacao_ficheiros WHERE id = ?');
+            $stmt->execute([$fid]);
+            $f = $stmt->fetch();
+            if (!$f) jsonError('Ficheiro não encontrado.', 404);
+
+            $filepath = UPLOAD_DIR . $f['nome_servidor'];
+            if (!file_exists($filepath)) jsonError('Ficheiro não encontrado no servidor.', 404);
+
+            header('Content-Type: ' . ($f['tipo_ficheiro'] ?: 'application/octet-stream'));
+            header('Content-Disposition: attachment; filename="' . $f['nome_original'] . '"');
+            header('Content-Length: ' . filesize($filepath));
+            readfile($filepath);
+            exit;
+
+        // ===================================================================
+        // 17. GET PRODUCT TEMPLATES
+        // ===================================================================
+        case 'get_templates':
+            $produto_id = (int)($_GET['produto_id'] ?? $_POST['produto_id'] ?? 0);
+            if ($produto_id <= 0) jsonError('ID do produto inválido.');
+
+            if (isSuperAdmin()) {
+                $stmt = $db->prepare('SELECT * FROM produto_parametros_template WHERE produto_id = ? ORDER BY ordem, categoria, ensaio');
+                $stmt->execute([$produto_id]);
+            } else {
+                $stmt = $db->prepare('
+                    SELECT ppt.* FROM produto_parametros_template ppt
+                    INNER JOIN produtos p ON p.id = ppt.produto_id
+                    WHERE ppt.produto_id = ?
+                      AND (p.organizacao_id IS NULL OR p.organizacao_id = ?)
+                    ORDER BY ppt.ordem, ppt.categoria, ppt.ensaio
+                ');
+                $stmt->execute([$produto_id, $user['org_id']]);
+            }
+            $templates = $stmt->fetchAll();
+
+            jsonSuccess('Templates carregados.', $templates);
+            break;
+
+        // ===================================================================
+        // 18. SAVE PRODUCT TEMPLATE
+        // ===================================================================
+        case 'save_template':
+            $produto_id = (int)($_POST['produto_id'] ?? 0);
+            if ($produto_id <= 0) jsonError('ID do produto inválido.');
+
+            $categoria = sanitize($_POST['categoria'] ?? '');
+            $ensaio = sanitize($_POST['ensaio'] ?? '');
+            $especificacao_valor = sanitize($_POST['especificacao_valor'] ?? '');
+            $metodo = sanitize($_POST['metodo'] ?? '');
+            $amostra_nqa = sanitize($_POST['amostra_nqa'] ?? '');
+
+            if (empty($ensaio)) jsonError('O nome do ensaio é obrigatório.');
+
+            // Get next order
+            $stmt = $db->prepare('SELECT COALESCE(MAX(ordem), 0) + 1 FROM produto_parametros_template WHERE produto_id = ?');
+            $stmt->execute([$produto_id]);
+            $ordem = (int)$stmt->fetchColumn();
+
+            $stmt = $db->prepare('INSERT INTO produto_parametros_template (produto_id, categoria, ensaio, especificacao_valor, metodo, amostra_nqa, ordem) VALUES (?, ?, ?, ?, ?, ?, ?)');
+            $stmt->execute([$produto_id, $categoria, $ensaio, $especificacao_valor, $metodo, $amostra_nqa, $ordem]);
+
+            jsonSuccess('Template adicionado.', ['id' => (int)$db->lastInsertId()]);
+            break;
+
+        // ===================================================================
+        // 19. DELETE PRODUCT TEMPLATE
+        // ===================================================================
+        case 'delete_template':
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) jsonError('ID do template inválido.');
+
+            $stmt = $db->prepare('DELETE FROM produto_parametros_template WHERE id = ?');
+            $stmt->execute([$id]);
+
+            jsonSuccess('Template removido.');
+            break;
+
+        // ===================================================================
+        // 20. GET PRODUCT TEMPLATES FOR EDITOR (load into spec)
+        // ===================================================================
+        case 'load_product_templates':
+            $produto_id = (int)($_GET['produto_id'] ?? $_POST['produto_id'] ?? 0);
+            if ($produto_id <= 0) jsonError('ID do produto inválido.');
+
+            if (isSuperAdmin()) {
+                $stmt = $db->prepare('SELECT categoria, ensaio, especificacao_valor, metodo, amostra_nqa, ordem FROM produto_parametros_template WHERE produto_id = ? ORDER BY ordem, categoria');
+                $stmt->execute([$produto_id]);
+            } else {
+                $stmt = $db->prepare('
+                    SELECT ppt.categoria, ppt.ensaio, ppt.especificacao_valor, ppt.metodo, ppt.amostra_nqa, ppt.ordem
+                    FROM produto_parametros_template ppt
+                    INNER JOIN produtos p ON p.id = ppt.produto_id
+                    WHERE ppt.produto_id = ?
+                      AND (p.organizacao_id IS NULL OR p.organizacao_id = ?)
+                    ORDER BY ppt.ordem, ppt.categoria
+                ');
+                $stmt->execute([$produto_id, $user['org_id']]);
+            }
+            $templates = $stmt->fetchAll();
+
+            jsonSuccess('Templates do produto carregados.', $templates);
+            break;
+
+        // ===================================================================
+        // 21. SAVE ORGANIZAÇÃO (super_admin only)
+        // ===================================================================
+        case 'save_organizacao':
+            if (!isSuperAdmin()) {
+                jsonError('Acesso negado. Apenas super administradores podem gerir organizações.', 403);
+            }
+
+            $id     = (int)($_POST['id'] ?? 0);
+            $nome   = sanitize($_POST['nome'] ?? '');
+            $slug   = sanitize($_POST['slug'] ?? '');
+            $nif    = sanitize($_POST['nif'] ?? '');
+            $morada = sanitize($_POST['morada'] ?? '');
+            $telefone = sanitize($_POST['telefone'] ?? '');
+            $email  = sanitize($_POST['email'] ?? '');
+            $website = sanitize($_POST['website'] ?? '');
+            $cor_primaria = sanitize($_POST['cor_primaria'] ?? '#2596be');
+            $cor_primaria_dark = sanitize($_POST['cor_primaria_dark'] ?? '#1a7a9e');
+            $cor_primaria_light = sanitize($_POST['cor_primaria_light'] ?? '#e6f4f9');
+            $numeracao_prefixo = sanitize($_POST['numeracao_prefixo'] ?? 'CE');
+            $ativo  = isset($_POST['ativo']) ? (int)$_POST['ativo'] : 1;
+            $plano  = sanitize($_POST['plano'] ?? 'basico');
+            $max_utilizadores = isset($_POST['max_utilizadores']) ? (int)$_POST['max_utilizadores'] : 5;
+            $max_especificacoes = isset($_POST['max_especificacoes']) ? (int)$_POST['max_especificacoes'] : null;
+
+            if ($nome === '') {
+                jsonError('O nome da organização é obrigatório.');
+            }
+
+            if ($id === 0) {
+                // Criar nova organização
+                if ($slug === '') {
+                    $slug = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $nome));
+                    $slug = trim($slug, '-');
+                }
+
+                // Verificar slug único
+                $stmt = $db->prepare('SELECT id FROM organizacoes WHERE slug = ?');
+                $stmt->execute([$slug]);
+                if ($stmt->fetch()) {
+                    $slug .= '-' . time();
+                }
+
+                $stmt = $db->prepare('
+                    INSERT INTO organizacoes (nome, slug, nif, morada, telefone, email, website, cor_primaria, cor_primaria_dark, cor_primaria_light, numeracao_prefixo, ativo, plano, max_utilizadores, max_especificacoes, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                ');
+                $stmt->execute([$nome, $slug, $nif, $morada, $telefone, $email, $website, $cor_primaria, $cor_primaria_dark, $cor_primaria_light, $numeracao_prefixo, $ativo, $plano, $max_utilizadores, $max_especificacoes]);
+                $newId = (int)$db->lastInsertId();
+
+                jsonSuccess('Organização criada com sucesso.', ['id' => $newId, 'slug' => $slug]);
+            } else {
+                // Atualizar organização existente
+                $stmt = $db->prepare('
+                    UPDATE organizacoes SET
+                        nome = ?, slug = ?, nif = ?, morada = ?, telefone = ?,
+                        email = ?, website = ?, cor_primaria = ?, cor_primaria_dark = ?,
+                        cor_primaria_light = ?, numeracao_prefixo = ?, ativo = ?, plano = ?,
+                        max_utilizadores = ?, max_especificacoes = ?, updated_at = NOW()
+                    WHERE id = ?
+                ');
+                $stmt->execute([$nome, $slug, $nif, $morada, $telefone, $email, $website, $cor_primaria, $cor_primaria_dark, $cor_primaria_light, $numeracao_prefixo, $ativo, $plano, $max_utilizadores, $max_especificacoes, $id]);
+
+                jsonSuccess('Organização atualizada com sucesso.', ['id' => $id]);
+            }
+            break;
+
+        // ===================================================================
+        // 22. UPLOAD LOGO DA ORGANIZAÇÃO (super_admin only)
+        // ===================================================================
+        case 'upload_org_logo':
+            if (!isSuperAdmin()) {
+                jsonError('Acesso negado. Apenas super administradores podem gerir organizações.', 403);
+            }
+
+            $org_id = (int)($_POST['organizacao_id'] ?? 0);
+            if ($org_id <= 0) {
+                jsonError('ID da organização inválido.');
+            }
+
+            // Verificar se a organização existe
+            $stmt = $db->prepare('SELECT id, logo FROM organizacoes WHERE id = ?');
+            $stmt->execute([$org_id]);
+            $org = $stmt->fetch();
+            if (!$org) {
+                jsonError('Organização não encontrada.', 404);
+            }
+
+            if (!isset($_FILES['logo']) || $_FILES['logo']['error'] !== UPLOAD_ERR_OK) {
+                jsonError('Nenhum ficheiro enviado.');
+            }
+
+            $file = $_FILES['logo'];
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            if (!in_array($ext, ['png', 'jpg', 'jpeg', 'svg'])) {
+                jsonError('Formato inválido. Use PNG, JPG ou SVG.');
+            }
+
+            $logosDir = UPLOAD_DIR . 'logos/';
+            if (!is_dir($logosDir)) {
+                mkdir($logosDir, 0755, true);
+            }
+
+            $filename = 'org_' . $org_id . '_' . time() . '.' . $ext;
+            $destPath = $logosDir . $filename;
+
+            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+                jsonError('Erro ao guardar o ficheiro.');
+            }
+
+            // Remover logo antigo se existir
+            if (!empty($org['logo']) && file_exists($logosDir . $org['logo'])) {
+                unlink($logosDir . $org['logo']);
+            }
+
+            // Atualizar na base de dados
+            $stmt = $db->prepare('UPDATE organizacoes SET logo = ?, updated_at = NOW() WHERE id = ?');
+            $stmt->execute([$filename, $org_id]);
+
+            jsonSuccess('Logo da organização carregado.', ['filename' => $filename]);
+            break;
+
+        // ===================================================================
+        // AÇÃO DESCONHECIDA
+        // ===================================================================
+        default:
+            jsonError('Ação desconhecida: ' . sanitize($action));
+            break;
+    }
+
+} catch (PDOException $e) {
+    // Erro de base de dados
+    error_log('API DB Error [' . $action . ']: ' . $e->getMessage());
+    jsonError('Erro de base de dados. Tente novamente.', 500);
+
+} catch (Exception $e) {
+    // Erro genérico
+    error_log('API Error [' . $action . ']: ' . $e->getMessage());
+    jsonError('Erro interno. Tente novamente.', 500);
+}
