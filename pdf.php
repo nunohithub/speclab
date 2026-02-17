@@ -146,7 +146,7 @@ if ($useMpdf) {
             <tr>
                 <td width="30%">' . $logoHtml . '</td>
                 <td width="70%" style="text-align: right;">
-                    <span style="font-size: 12pt; font-weight: bold; color: ' . san($corNome) . ';">Caderno de Encargos</span><br>
+                    <span style="font-size: 12pt; font-weight: bold; color: ' . san($corNome) . ';">' . san($data['titulo']) . '</span><br>
                     <span style="font-size: 8pt; color: #666;">' . san($data['numero']) . ' | Versão ' . san($data['versao']) . '</span>
                 </td>
             </tr>
@@ -191,9 +191,6 @@ if ($useMpdf) {
 
     // HTML content
     $html = $css;
-
-    // Title
-    $html .= '<h1>' . san($data['titulo']) . '</h1>';
 
     // Meta — full-width rows for Produto/Cliente/Fornecedor, 2-column grid for the rest
     $metaFull = [];
@@ -514,12 +511,10 @@ $tamNome    = (int)$cv['tamanho_nome'];
         ?>
         <img src="<?= $fallbackLogoSrc ?>" alt="<?= $fallbackLogoAlt ?>" onerror="this.style.display='none'">
         <div class="title">
-            <span style="font-size: 14pt; font-weight: 700; color: <?= san($corTitulos) ?>;">Caderno de Encargos</span>
+            <h1><?= san($data['titulo']) ?></h1>
             <p><?= san($data['numero']) ?> | Versão <?= san($data['versao']) ?></p>
         </div>
     </div>
-
-    <h1><?= san($data['titulo']) ?></h1>
 
     <div class="meta">
         <div class="meta-full"><span>Produto:</span> <strong><?= san($data['produto_nome'] ?? '-') ?></strong></div>
