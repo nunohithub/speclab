@@ -993,6 +993,123 @@ $activeNav = $tab;
                 </div>
             </div>
 
+        <!-- LEGISLAÇÃO (super_admin only) -->
+        <?php elseif ($tab === 'legislacao' && $isSuperAdminUser): ?>
+            <div class="flex-between mb-md">
+                <h2>Banco de Legislação</h2>
+                <button class="btn btn-primary" onclick="document.getElementById('legModal').style.display='flex'; resetLegForm();">+ Nova Legislação</button>
+            </div>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Legislação / Norma</th>
+                            <th>Rolhas a que se aplica</th>
+                            <th>Resumo</th>
+                            <th>Estado</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="legRows">
+                        <tr><td colspan="5" class="muted" style="text-align:center; padding:20px;">A carregar...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Legislação Modal -->
+            <div class="modal-overlay" id="legModal" style="display:none;">
+                <div class="modal" style="max-width:700px;">
+                    <div class="modal-header">
+                        <h3 id="legModalTitle">Nova Legislação</h3>
+                        <button class="modal-close" onclick="document.getElementById('legModal').style.display='none';">&times;</button>
+                    </div>
+                    <input type="hidden" id="leg_id" value="0">
+                    <div class="form-group"><label>Legislação / Norma</label><input type="text" id="leg_norma" placeholder="Ex: Reg. (CE) 1935/2004"></div>
+                    <div class="form-group"><label>Rolhas a que se aplica</label><textarea id="leg_rolhas" rows="2" placeholder="Ex: Todas: natural, colmatada..."></textarea></div>
+                    <div class="form-group"><label>Resumo do que estabelece</label><textarea id="leg_resumo" rows="3" placeholder="Resumo da legislação..."></textarea></div>
+                    <div class="form-group"><label><input type="checkbox" id="leg_ativo" checked> Ativa</label></div>
+                    <div class="mt-md">
+                        <button class="btn btn-primary" onclick="guardarLeg()">Guardar</button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('legModal').style.display='none';">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+            function carregarLeg() {
+                fetch('<?= BASE_PATH ?>/api.php?action=get_legislacao_banco')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) return;
+                    var rows = data.legislacao || [];
+                    var tbody = document.getElementById('legRows');
+                    if (rows.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center; padding:20px;">Nenhuma legislação registada.</td></tr>';
+                        return;
+                    }
+                    var html = '';
+                    rows.forEach(function(r) {
+                        html += '<tr>';
+                        html += '<td><strong>' + esc(r.legislacao_norma) + '</strong></td>';
+                        html += '<td class="muted" style="font-size:12px; max-width:250px;">' + esc(r.rolhas_aplicaveis || '') + '</td>';
+                        html += '<td class="muted" style="font-size:12px; max-width:350px;">' + esc(r.resumo || '') + '</td>';
+                        html += '<td><span class="pill pill-success">Ativa</span></td>';
+                        html += '<td><button class="btn btn-ghost btn-sm" onclick=\'editLeg(' + JSON.stringify(r).replace(/'/g, "&#39;") + ')\'>Editar</button> ';
+                        html += '<button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarLeg(' + r.id + ')">Eliminar</button></td>';
+                        html += '</tr>';
+                    });
+                    tbody.innerHTML = html;
+                });
+            }
+            function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+            function resetLegForm() {
+                document.getElementById('legModalTitle').textContent = 'Nova Legislação';
+                document.getElementById('leg_id').value = '0';
+                document.getElementById('leg_norma').value = '';
+                document.getElementById('leg_rolhas').value = '';
+                document.getElementById('leg_resumo').value = '';
+                document.getElementById('leg_ativo').checked = true;
+            }
+            function editLeg(r) {
+                document.getElementById('legModalTitle').textContent = 'Editar Legislação';
+                document.getElementById('leg_id').value = r.id;
+                document.getElementById('leg_norma').value = r.legislacao_norma || '';
+                document.getElementById('leg_rolhas').value = r.rolhas_aplicaveis || '';
+                document.getElementById('leg_resumo').value = r.resumo || '';
+                document.getElementById('leg_ativo').checked = true;
+                document.getElementById('legModal').style.display = 'flex';
+            }
+            function guardarLeg() {
+                var fd = new FormData();
+                fd.append('action', 'save_legislacao_banco');
+                fd.append('id', document.getElementById('leg_id').value);
+                fd.append('legislacao_norma', document.getElementById('leg_norma').value);
+                fd.append('rolhas_aplicaveis', document.getElementById('leg_rolhas').value);
+                fd.append('resumo', document.getElementById('leg_resumo').value);
+                fd.append('ativo', document.getElementById('leg_ativo').checked ? '1' : '0');
+                fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('legModal').style.display = 'none';
+                        carregarLeg();
+                    } else {
+                        alert(data.error || 'Erro ao guardar.');
+                    }
+                });
+            }
+            function eliminarLeg(id) {
+                if (!confirm('Eliminar esta legislação?')) return;
+                var fd = new FormData();
+                fd.append('action', 'delete_legislacao_banco');
+                fd.append('id', id);
+                fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => { if (data.success) carregarLeg(); else alert(data.error || 'Erro.'); });
+            }
+            carregarLeg();
+            </script>
+
         <!-- CONFIGURAÇÕES -->
         <?php elseif ($tab === 'configuracoes'): ?>
             <h2 class="mb-md">Configurações</h2>

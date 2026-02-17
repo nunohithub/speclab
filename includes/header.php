@@ -69,6 +69,7 @@ $activeNav = $activeNav ?? '';
     <?php endif; ?>
     <?php if ($user['role'] === 'super_admin'): ?>
         <a href="<?= BASE_PATH ?>/admin.php?tab=organizacoes" class="nav-item <?= $activeNav === 'organizacoes' ? 'active' : '' ?>">Organizações</a>
+        <a href="<?= BASE_PATH ?>/admin.php?tab=legislacao" class="nav-item <?= $activeNav === 'legislacao' ? 'active' : '' ?>">Legislação</a>
         <a href="<?= BASE_PATH ?>/admin.php?tab=configuracoes" class="nav-item <?= $activeNav === 'configuracoes' ? 'active' : '' ?>">Configurações</a>
         <a href="<?= BASE_PATH ?>/admin.php?tab=planos" class="nav-item <?= $activeNav === 'planos' ? 'active' : '' ?>">Planos</a>
     <?php endif; ?>

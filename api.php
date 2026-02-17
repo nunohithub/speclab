@@ -177,6 +177,7 @@ try {
             $indemnizacao   = sanitizeRichText($_POST['indemnizacao'] ?? '');
             $observacoes    = sanitizeRichText($_POST['observacoes'] ?? '');
             $config_visual  = $_POST['config_visual'] ?? null;
+            $legislacao_json = $_POST['legislacao_json'] ?? null;
 
             // Validação básica
             if ($titulo === '') {
@@ -209,15 +210,15 @@ try {
                         data_emissao, data_revisao, data_validade, estado, codigo_acesso,
                         objetivo, ambito, definicao_material, regulamentacao,
                         processos, embalagem, aceitacao, arquivo_texto,
-                        indemnizacao, observacoes, config_visual, criado_por,
-                        organizacao_id, created_at, updated_at
+                        indemnizacao, observacoes, config_visual, legislacao_json,
+                        criado_por, organizacao_id, created_at, updated_at
                     ) VALUES (
                         ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?,
                         ?, ?, ?, ?,
                         ?, ?, ?, ?,
                         ?, ?, ?, ?,
-                        ?, NOW(), NOW()
+                        ?, ?, NOW(), NOW()
                     )
                 ');
                 $stmt->execute([
@@ -225,8 +226,8 @@ try {
                     $data_emissao, $data_revisao, $data_validade, $estado, $codigo_acesso,
                     $objetivo, $ambito, $definicao_material, $regulamentacao,
                     $processos, $embalagem, $aceitacao, $arquivo_texto,
-                    $indemnizacao, $observacoes, $config_visual, $user['id'],
-                    $user['org_id'],
+                    $indemnizacao, $observacoes, $config_visual, $legislacao_json,
+                    $user['id'], $user['org_id'],
                 ]);
 
                 $newId = (int)$db->lastInsertId();
@@ -264,7 +265,8 @@ try {
                         data_emissao = ?, data_revisao = ?, data_validade = ?, estado = ?,
                         objetivo = ?, ambito = ?, definicao_material = ?, regulamentacao = ?,
                         processos = ?, embalagem = ?, aceitacao = ?, arquivo_texto = ?,
-                        indemnizacao = ?, observacoes = ?, config_visual = ?, updated_at = NOW()
+                        indemnizacao = ?, observacoes = ?, config_visual = ?, legislacao_json = ?,
+                        updated_at = NOW()
                         ' . $passwordUpdate . $codigoUpdate . '
                     WHERE id = ?
                 ');
@@ -273,7 +275,7 @@ try {
                     $data_emissao, $data_revisao, $data_validade, $estado,
                     $objetivo, $ambito, $definicao_material, $regulamentacao,
                     $processos, $embalagem, $aceitacao, $arquivo_texto,
-                    $indemnizacao, $observacoes, $config_visual,
+                    $indemnizacao, $observacoes, $config_visual, $legislacao_json,
                 ];
                 $executeParams = array_merge($executeParams, $extraParams, [$id]);
                 $stmt->execute($executeParams);
@@ -1502,6 +1504,40 @@ try {
             break;
 
         // ===================================================================
+        // LEGISLAÇÃO - BANCO
+        // ===================================================================
+        case 'get_legislacao_banco':
+            $stmt = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo FROM legislacao_banco WHERE ativo = 1 ORDER BY legislacao_norma');
+            jsonSuccess(['legislacao' => $stmt->fetchAll()]);
+            break;
+
+        case 'save_legislacao_banco':
+            if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+            $lid = (int)($_POST['id'] ?? 0);
+            $norma = trim($_POST['legislacao_norma'] ?? '');
+            $rolhas = trim($_POST['rolhas_aplicaveis'] ?? '');
+            $resumo = trim($_POST['resumo'] ?? '');
+            $ativoL = (int)($_POST['ativo'] ?? 1);
+            if ($norma === '') jsonError('Introduza a legislação/norma.');
+            if ($lid > 0) {
+                $stmt = $db->prepare('UPDATE legislacao_banco SET legislacao_norma = ?, rolhas_aplicaveis = ?, resumo = ?, ativo = ? WHERE id = ?');
+                $stmt->execute([$norma, $rolhas, $resumo, $ativoL, $lid]);
+            } else {
+                $stmt = $db->prepare('INSERT INTO legislacao_banco (legislacao_norma, rolhas_aplicaveis, resumo, ativo) VALUES (?, ?, ?, ?)');
+                $stmt->execute([$norma, $rolhas, $resumo, $ativoL]);
+                $lid = $db->lastInsertId();
+            }
+            jsonSuccess(['id' => $lid, 'msg' => 'Legislação guardada.']);
+            break;
+
+        case 'delete_legislacao_banco':
+            if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+            $lid = (int)($_POST['id'] ?? 0);
+            if ($lid <= 0) jsonError('ID inválido.');
+            $db->prepare('DELETE FROM legislacao_banco WHERE id = ?')->execute([$lid]);
+            jsonSuccess(['msg' => 'Legislação removida.']);
+            break;
+
         // AÇÃO DESCONHECIDA
         // ===================================================================
         default:

@@ -835,6 +835,7 @@ $pageSubtitle = 'Editor de Especificação';
             <button class="tab" data-tab="conteudo">Conteúdo</button>
             <button class="tab" data-tab="parametros">Ensaios</button>
             <button class="tab" data-tab="classes-defeitos">Classes e Defeitos</button>
+            <button class="tab" data-tab="legislacao">Legislação</button>
             <button class="tab" data-tab="ficheiros">Ficheiros</button>
             <button class="tab" data-tab="partilha">Partilha</button>
             <button class="tab" data-tab="configuracoes">Configurações</button>
@@ -1093,6 +1094,7 @@ $pageSubtitle = 'Editor de Especificação';
                         <div class="content-actions-bar">
                             <button class="btn btn-primary btn-sm" onclick="adicionarSeccao()">&#128196; + Secção</button>
                             <button class="btn btn-secondary btn-sm" onclick="abrirSelectorEnsaios()">&#9881; + Ensaios</button>
+                            <button class="btn btn-secondary btn-sm" onclick="abrirSelectorLegConteudo()">&#9878; + Legislação</button>
                         </div>
                     </div>
                 </div>
@@ -1284,6 +1286,50 @@ $pageSubtitle = 'Editor de Especificação';
                                 endif; ?>
                             </div>
                             <button class="btn btn-ghost btn-sm mt-sm" onclick="adicionarDefeitoSeveridade('menor')">+ Adicionar Menor</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: LEGISLAÇÃO -->
+                <div class="tab-panel" id="panel-legislacao">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Legislação Aplicável</span>
+                            <span class="muted">Legislação e normas associadas a esta especificação</span>
+                        </div>
+                        <table class="legislacao-table" style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="padding:8px 10px; text-align:left; font-size:13px; border-bottom:2px solid var(--color-border);">Legislação / Norma</th>
+                                    <th style="padding:8px 10px; text-align:left; font-size:13px; border-bottom:2px solid var(--color-border);">Rolhas a que se aplica</th>
+                                    <th style="padding:8px 10px; text-align:left; font-size:13px; border-bottom:2px solid var(--color-border);">Resumo</th>
+                                    <th style="padding:8px 10px; width:40px; border-bottom:2px solid var(--color-border);"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="legislacaoRows">
+                                <?php
+                                $legData = [];
+                                if (!empty($espec['legislacao_json'])) {
+                                    $legParsed = json_decode($espec['legislacao_json'], true);
+                                    if (is_array($legParsed)) $legData = $legParsed;
+                                }
+                                if (empty($legData)): ?>
+                                    <tr id="legEmpty"><td colspan="4" class="muted" style="text-align:center; padding:20px;">Nenhuma legislação adicionada. Use o botão abaixo para adicionar.</td></tr>
+                                <?php else:
+                                    foreach ($legData as $leg): ?>
+                                    <tr class="leg-row">
+                                        <td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="<?= sanitize($leg['legislacao_norma'] ?? '') ?>" data-field="leg_norma" style="width:100%; border:none; background:transparent; font-weight:600; font-size:13px;"></td>
+                                        <td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="<?= sanitize($leg['rolhas_aplicaveis'] ?? '') ?>" data-field="leg_rolhas" style="width:100%; border:none; background:transparent; font-size:12px; color:var(--color-muted);"></td>
+                                        <td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="<?= sanitize($leg['resumo'] ?? '') ?>" data-field="leg_resumo" style="width:100%; border:none; background:transparent; font-size:12px; color:var(--color-muted);"></td>
+                                        <td style="padding:6px 10px; border-bottom:1px solid var(--color-border); text-align:center;"><button class="remove-btn" onclick="removerLegRow(this)" title="Remover">&times;</button></td>
+                                    </tr>
+                                    <?php endforeach;
+                                endif; ?>
+                            </tbody>
+                        </table>
+                        <div style="padding:var(--spacing-sm) var(--spacing-md); border-top:1px solid var(--color-border); display:flex; gap:var(--spacing-sm);">
+                            <button class="btn btn-secondary btn-sm" onclick="abrirSelectorLegislacao()">+ Adicionar do Banco</button>
+                            <button class="btn btn-ghost btn-sm" onclick="adicionarLegManual()">+ Linha Manual</button>
                         </div>
                     </div>
                 </div>
@@ -1683,6 +1729,24 @@ $pageSubtitle = 'Editor de Especificação';
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="fecharSelectorEnsaios()">Cancelar</button>
                 <button class="btn btn-primary" onclick="confirmarSelectorEnsaios()">Adicionar Selecionados</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: SELECTOR LEGISLAÇÃO -->
+    <div class="modal-overlay hidden" id="modalSelectorLeg">
+        <div class="modal-box modal-box-lg">
+            <div class="modal-header">
+                <h3>Selecionar Legislação</h3>
+                <button class="modal-close" onclick="document.getElementById('modalSelectorLeg').classList.add('hidden');">&times;</button>
+            </div>
+            <p class="muted mb-md">Escolha a legislação para adicionar. Selecione da lista abaixo.</p>
+            <div class="ensaios-selector-grid" id="legSelectorGrid" style="max-height:400px; overflow-y:auto;">
+                <div class="muted" style="padding:var(--spacing-md); text-align:center;">A carregar...</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="document.getElementById('modalSelectorLeg').classList.add('hidden');">Cancelar</button>
+                <button class="btn btn-primary" onclick="confirmarSelectorLeg()">Adicionar Selecionadas</button>
             </div>
         </div>
     </div>
@@ -3133,6 +3197,131 @@ $pageSubtitle = 'Editor de Especificação';
         return document.getElementById(id).value;
     }
 
+    // ============================================================
+    // LEGISLAÇÃO - Funções
+    // ============================================================
+    var legSelectorMode = 'tab'; // 'tab' = adicionar ao tab legislação, 'conteudo' = criar secção texto
+
+    function adicionarLegManual() {
+        var tbody = document.getElementById('legislacaoRows');
+        var empty = document.getElementById('legEmpty');
+        if (empty) empty.remove();
+        var tr = document.createElement('tr');
+        tr.className = 'leg-row';
+        tr.innerHTML = '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="" data-field="leg_norma" style="width:100%; border:none; background:transparent; font-weight:600; font-size:13px;" placeholder="Legislação / Norma"></td>' +
+            '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="" data-field="leg_rolhas" style="width:100%; border:none; background:transparent; font-size:12px; color:var(--color-muted);" placeholder="Rolhas a que se aplica"></td>' +
+            '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="" data-field="leg_resumo" style="width:100%; border:none; background:transparent; font-size:12px; color:var(--color-muted);" placeholder="Resumo"></td>' +
+            '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border); text-align:center;"><button class="remove-btn" onclick="removerLegRow(this)" title="Remover">&times;</button></td>';
+        tbody.appendChild(tr);
+        marcarAlterado();
+    }
+
+    function removerLegRow(btn) {
+        var tr = btn.closest('tr');
+        tr.remove();
+        var tbody = document.getElementById('legislacaoRows');
+        if (tbody.querySelectorAll('.leg-row').length === 0) {
+            tbody.innerHTML = '<tr id="legEmpty"><td colspan="4" class="muted" style="text-align:center; padding:20px;">Nenhuma legislação adicionada.</td></tr>';
+        }
+        marcarAlterado();
+    }
+
+    function abrirSelectorLegislacao() {
+        legSelectorMode = 'tab';
+        popularSelectorLeg();
+        document.getElementById('modalSelectorLeg').classList.remove('hidden');
+    }
+
+    function abrirSelectorLegConteudo() {
+        legSelectorMode = 'conteudo';
+        popularSelectorLeg();
+        document.getElementById('modalSelectorLeg').classList.remove('hidden');
+    }
+
+    function popularSelectorLeg() {
+        var grid = document.getElementById('legSelectorGrid');
+        grid.innerHTML = '<div class="muted" style="padding:var(--spacing-md); text-align:center;">A carregar...</div>';
+        fetch('<?= BASE_PATH ?>/api.php?action=get_legislacao_banco')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.success || !data.legislacao || data.legislacao.length === 0) {
+                grid.innerHTML = '<div class="muted" style="padding:var(--spacing-md); text-align:center;">Nenhuma legislação no banco. Contacte o administrador.</div>';
+                return;
+            }
+            var html = '';
+            data.legislacao.forEach(function(leg) {
+                html += '<label class="ensaio-check-item" style="display:flex; gap:8px; padding:8px 10px; border-bottom:1px solid var(--color-border); cursor:pointer;">' +
+                    '<input type="checkbox" name="sel_leg" data-norma="' + escapeHtml(leg.legislacao_norma) + '" data-rolhas="' + escapeHtml(leg.rolhas_aplicaveis || '') + '" data-resumo="' + escapeHtml(leg.resumo || '') + '">' +
+                    '<div style="flex:1;">' +
+                    '<div style="font-weight:600; font-size:13px;">' + escapeHtml(leg.legislacao_norma) + '</div>' +
+                    '<div style="font-size:11px; color:var(--color-muted);">' + escapeHtml(leg.rolhas_aplicaveis || '') + '</div>' +
+                    '</div></label>';
+            });
+            grid.innerHTML = html;
+        });
+    }
+
+    function confirmarSelectorLeg() {
+        var checks = document.querySelectorAll('#legSelectorGrid input[name="sel_leg"]:checked');
+        if (checks.length === 0) { alert('Selecione pelo menos uma legislação.'); return; }
+
+        if (legSelectorMode === 'tab') {
+            // Adicionar ao tab Legislação como linhas editáveis
+            var tbody = document.getElementById('legislacaoRows');
+            var empty = document.getElementById('legEmpty');
+            if (empty) empty.remove();
+            checks.forEach(function(cb) {
+                var tr = document.createElement('tr');
+                tr.className = 'leg-row';
+                tr.innerHTML = '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="' + escapeHtml(cb.getAttribute('data-norma')) + '" data-field="leg_norma" style="width:100%; border:none; background:transparent; font-weight:600; font-size:13px;"></td>' +
+                    '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="' + escapeHtml(cb.getAttribute('data-rolhas')) + '" data-field="leg_rolhas" style="width:100%; border:none; background:transparent; font-size:12px; color:var(--color-muted);"></td>' +
+                    '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="' + escapeHtml(cb.getAttribute('data-resumo')) + '" data-field="leg_resumo" style="width:100%; border:none; background:transparent; font-size:12px; color:var(--color-muted);"></td>' +
+                    '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border); text-align:center;"><button class="remove-btn" onclick="removerLegRow(this)" title="Remover">&times;</button></td>';
+                tbody.appendChild(tr);
+            });
+        } else {
+            // Criar nova secção de texto com bullet points
+            var ul = '<ul>';
+            checks.forEach(function(cb) {
+                ul += '<li>' + escapeHtml(cb.getAttribute('data-norma')) + '</li>';
+            });
+            ul += '</ul>';
+            adicionarSeccaoTexto('Legislação Aplicável', ul);
+        }
+
+        document.getElementById('modalSelectorLeg').classList.add('hidden');
+        marcarAlterado();
+    }
+
+    function adicionarSeccaoTexto(titulo, conteudo) {
+        var container = document.getElementById('seccoesContainer');
+        var idx = seccaoCounter++;
+        var result = criarSeccao(titulo, conteudo, idx);
+        container.appendChild(result.block);
+        var empty = document.getElementById('seccoesEmpty');
+        if (empty) empty.remove();
+        initSeccaoEditor(result.editorId);
+        renumerarSeccoes();
+    }
+
+    function recolherLegislacao() {
+        var rows = document.querySelectorAll('#legislacaoRows .leg-row');
+        var arr = [];
+        rows.forEach(function(tr) {
+            var norma = tr.querySelector('input[data-field="leg_norma"]');
+            var rolhas = tr.querySelector('input[data-field="leg_rolhas"]');
+            var resumo = tr.querySelector('input[data-field="leg_resumo"]');
+            if (norma && norma.value.trim()) {
+                arr.push({
+                    legislacao_norma: norma.value.trim(),
+                    rolhas_aplicaveis: rolhas ? rolhas.value.trim() : '',
+                    resumo: resumo ? resumo.value.trim() : ''
+                });
+            }
+        });
+        return arr;
+    }
+
     function recolherDados() {
         var data = {
             id: especId,
@@ -3150,6 +3339,7 @@ $pageSubtitle = 'Editor de Especificação';
             senha_publica: document.getElementById('senha_publica').value,
             codigo_acesso: document.getElementById('codigo_acesso').value,
             config_visual: JSON.stringify(recolherConfigVisual()),
+            legislacao_json: JSON.stringify(recolherLegislacao()),
             seccoes: [],
             parametros: [],
             classes: [],
