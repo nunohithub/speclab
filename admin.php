@@ -997,8 +997,38 @@ $activeNav = $tab;
         <?php elseif ($tab === 'legislacao' && $isSuperAdminUser): ?>
             <div class="flex-between mb-md">
                 <h2>Banco de Legislação</h2>
-                <button class="btn btn-primary" onclick="document.getElementById('legModal').style.display='flex'; resetLegForm();">+ Nova Legislação</button>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-secondary" id="btnVerificarIA" onclick="verificarLegIA()">&#9878; Verificar com IA</button>
+                    <button class="btn btn-secondary" onclick="toggleHistorico()">&#128196; Histórico</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('legModal').style.display='flex'; resetLegForm();">+ Nova Legislação</button>
+                </div>
             </div>
+
+            <!-- Resultados IA -->
+            <div id="legAiResults" style="display:none;" class="mb-md">
+                <div class="card" style="border-left:4px solid var(--color-primary);">
+                    <div class="flex-between mb-sm">
+                        <h3 style="margin:0;">Resultados da Verificação IA</h3>
+                        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('legAiResults').style.display='none'">&times; Fechar</button>
+                    </div>
+                    <div id="legAiResultsContent" style="max-height:500px; overflow-y:auto;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Histórico -->
+            <div id="legHistorico" style="display:none;" class="mb-md">
+                <div class="card">
+                    <div class="flex-between mb-sm">
+                        <h3 style="margin:0;">Histórico de Alterações</h3>
+                        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('legHistorico').style.display='none'">&times; Fechar</button>
+                    </div>
+                    <div id="legHistoricoContent" style="max-height:400px; overflow-y:auto; font-size:13px;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela principal -->
             <div class="card">
                 <table>
                     <thead>
@@ -1014,6 +1044,16 @@ $activeNav = $tab;
                         <tr><td colspan="5" class="muted" style="text-align:center; padding:20px;">A carregar...</td></tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Chat IA -->
+            <div class="card mt-md">
+                <h3 style="margin:0 0 12px 0;">Perguntar à IA sobre Legislação</h3>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="legChatInput" placeholder="Ex: A norma REACH aplica-se a rolhas naturais sem tratamento?" style="flex:1;" onkeydown="if(event.key==='Enter')enviarChatLeg()">
+                    <button class="btn btn-primary" id="btnChatLeg" onclick="enviarChatLeg()">Enviar</button>
+                </div>
+                <div id="legChatResposta" style="display:none; margin-top:12px; padding:12px; background:#f8f9fa; border-radius:8px; font-size:13px; line-height:1.6; white-space:pre-wrap;"></div>
             </div>
 
             <!-- Legislação Modal -->
@@ -1039,7 +1079,7 @@ $activeNav = $tab;
 
             <script>
             function carregarLeg() {
-                fetch('<?= BASE_PATH ?>/api.php?action=get_legislacao_banco')
+                fetch('<?= BASE_PATH ?>/api.php?action=get_legislacao_banco&all=1')
                 .then(r => r.json())
                 .then(data => {
                     if (!data.success) return;
@@ -1051,19 +1091,26 @@ $activeNav = $tab;
                     }
                     var html = '';
                     rows.forEach(function(r) {
-                        html += '<tr>';
+                        var inativa = r.ativo !== undefined && (r.ativo == 0 || r.ativo === '0');
+                        var rowStyle = inativa ? ' style="opacity:0.5; text-decoration:line-through;"' : '';
+                        html += '<tr' + rowStyle + '>';
                         html += '<td><strong>' + esc(r.legislacao_norma) + '</strong></td>';
                         html += '<td class="muted" style="font-size:12px; max-width:250px;">' + esc(r.rolhas_aplicaveis || '') + '</td>';
                         html += '<td class="muted" style="font-size:12px; max-width:350px;">' + esc(r.resumo || '') + '</td>';
-                        html += '<td><span class="pill pill-success">Ativa</span></td>';
-                        html += '<td><button class="btn btn-ghost btn-sm" onclick=\'editLeg(' + JSON.stringify(r).replace(/'/g, "&#39;") + ')\'>Editar</button> ';
-                        html += '<button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarLeg(' + r.id + ')">Eliminar</button></td>';
-                        html += '</tr>';
+                        html += '<td>' + (inativa ? '<span class="pill pill-error">Inativa</span>' : '<span class="pill pill-success">Ativa</span>') + '</td>';
+                        html += '<td>';
+                        if (!inativa) {
+                            html += '<button class="btn btn-ghost btn-sm" onclick=\'editLeg(' + JSON.stringify(r).replace(/'/g, "&#39;") + ')\'>Editar</button> ';
+                        }
+                        html += '<button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarLeg(' + r.id + ')">Eliminar</button>';
+                        html += '</td></tr>';
                     });
                     tbody.innerHTML = html;
                 });
             }
             function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+            // --- CRUD ---
             function resetLegForm() {
                 document.getElementById('legModalTitle').textContent = 'Nova Legislação';
                 document.getElementById('leg_id').value = '0';
@@ -1078,7 +1125,7 @@ $activeNav = $tab;
                 document.getElementById('leg_norma').value = r.legislacao_norma || '';
                 document.getElementById('leg_rolhas').value = r.rolhas_aplicaveis || '';
                 document.getElementById('leg_resumo').value = r.resumo || '';
-                document.getElementById('leg_ativo').checked = true;
+                document.getElementById('leg_ativo').checked = r.ativo != 0;
                 document.getElementById('legModal').style.display = 'flex';
             }
             function guardarLeg() {
@@ -1092,12 +1139,8 @@ $activeNav = $tab;
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(data => {
-                    if (data.success) {
-                        document.getElementById('legModal').style.display = 'none';
-                        carregarLeg();
-                    } else {
-                        alert(data.error || 'Erro ao guardar.');
-                    }
+                    if (data.success) { document.getElementById('legModal').style.display = 'none'; carregarLeg(); }
+                    else alert(data.error || 'Erro ao guardar.');
                 });
             }
             function eliminarLeg(id) {
@@ -1109,6 +1152,149 @@ $activeNav = $tab;
                 .then(r => r.json())
                 .then(data => { if (data.success) carregarLeg(); else alert(data.error || 'Erro.'); });
             }
+
+            // --- VERIFICAÇÃO IA ---
+            function verificarLegIA() {
+                var btn = document.getElementById('btnVerificarIA');
+                btn.disabled = true;
+                btn.textContent = 'A verificar...';
+                var panel = document.getElementById('legAiResults');
+                var content = document.getElementById('legAiResultsContent');
+                content.innerHTML = '<div class="muted" style="text-align:center; padding:20px;">A consultar a IA... pode demorar até 30 segundos.</div>';
+                panel.style.display = 'block';
+
+                var fd = new FormData();
+                fd.append('action', 'verificar_legislacao_ai');
+                fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(function(data) {
+                    btn.disabled = false;
+                    btn.innerHTML = '&#9878; Verificar com IA';
+                    if (!data.success) { content.innerHTML = '<div style="color:#b42318; padding:12px;">' + esc(data.error || 'Erro') + '</div>'; return; }
+                    var sugs = data.data.sugestoes || [];
+                    if (sugs.length === 0) { content.innerHTML = '<div class="muted" style="padding:12px;">Sem resultados.</div>'; return; }
+                    var html = '';
+                    var statusLabels = { ok: 'OK', corrigir: 'Corrigir', atualizada: 'Atualizada', revogada: 'Revogada', verificar: 'Verificar' };
+                    var statusPills = { ok: 'pill-success', corrigir: 'pill-warning', atualizada: 'pill-primary', revogada: 'pill-error', verificar: 'pill-muted' };
+                    sugs.forEach(function(s) {
+                        var pillClass = statusPills[s.status] || 'pill-muted';
+                        var label = statusLabels[s.status] || s.status;
+                        html += '<div style="padding:12px; border-bottom:1px solid var(--color-border);" id="sug_' + s.id + '">';
+                        html += '<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">';
+                        html += '<span class="pill ' + pillClass + '">' + label + '</span>';
+                        html += '<strong>' + esc(s.legislacao_norma) + '</strong>';
+                        html += '</div>';
+                        html += '<div class="muted" style="font-size:12px; margin-bottom:8px;">' + esc(s.notas || '') + '</div>';
+                        if (s.status !== 'ok') {
+                            html += '<div style="display:flex; gap:6px;">';
+                            html += '<button class="btn btn-primary btn-sm" onclick=\'aplicarSugestao(' + JSON.stringify(s).replace(/'/g, "&#39;") + ')\'>Aplicar</button>';
+                            html += '<button class="btn btn-ghost btn-sm" onclick="ignorarSugestao(' + s.id + ')">Ignorar</button>';
+                            html += '</div>';
+                        }
+                        html += '</div>';
+                    });
+                    content.innerHTML = html;
+                })
+                .catch(function() {
+                    btn.disabled = false;
+                    btn.innerHTML = '&#9878; Verificar com IA';
+                    content.innerHTML = '<div style="color:#b42318; padding:12px;">Erro de ligação.</div>';
+                });
+            }
+            function aplicarSugestao(s) {
+                if (!confirm('Aplicar sugestão da IA para: ' + s.legislacao_norma + '?\nAção: ' + s.status)) return;
+                var fd = new FormData();
+                fd.append('action', 'aplicar_sugestao_leg');
+                fd.append('id', s.id);
+                fd.append('status', s.status);
+                fd.append('legislacao_norma', s.legislacao_norma);
+                fd.append('rolhas_aplicaveis', s.rolhas_aplicaveis || '');
+                fd.append('resumo', s.resumo || '');
+                fd.append('notas', 'IA: ' + (s.notas || ''));
+                fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(function(data) {
+                    if (data.success) {
+                        var el = document.getElementById('sug_' + s.id);
+                        if (el) el.innerHTML = '<div style="color:#16a34a; padding:4px;">&#10003; Aplicada (' + esc(data.data.acao) + ')</div>';
+                        carregarLeg();
+                    } else {
+                        alert(data.error || 'Erro ao aplicar.');
+                    }
+                });
+            }
+            function ignorarSugestao(id) {
+                var el = document.getElementById('sug_' + id);
+                if (el) el.innerHTML = '<div class="muted" style="padding:4px;">Ignorada</div>';
+            }
+
+            // --- CHAT IA ---
+            function enviarChatLeg() {
+                var input = document.getElementById('legChatInput');
+                var btn = document.getElementById('btnChatLeg');
+                var resp = document.getElementById('legChatResposta');
+                var pergunta = input.value.trim();
+                if (!pergunta) return;
+                btn.disabled = true;
+                btn.textContent = 'A pensar...';
+                resp.style.display = 'block';
+                resp.textContent = 'A consultar a IA...';
+                var fd = new FormData();
+                fd.append('action', 'chat_legislacao');
+                fd.append('pergunta', pergunta);
+                fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(function(data) {
+                    btn.disabled = false;
+                    btn.textContent = 'Enviar';
+                    if (data.success && data.data.resposta) {
+                        resp.textContent = data.data.resposta;
+                    } else {
+                        resp.textContent = 'Erro: ' + (data.error || 'Sem resposta.');
+                    }
+                })
+                .catch(function() {
+                    btn.disabled = false;
+                    btn.textContent = 'Enviar';
+                    resp.textContent = 'Erro de ligação.';
+                });
+            }
+
+            // --- HISTÓRICO ---
+            function toggleHistorico() {
+                var panel = document.getElementById('legHistorico');
+                if (panel.style.display === 'none') {
+                    panel.style.display = 'block';
+                    carregarHistorico();
+                } else {
+                    panel.style.display = 'none';
+                }
+            }
+            function carregarHistorico() {
+                var content = document.getElementById('legHistoricoContent');
+                content.innerHTML = '<div class="muted" style="text-align:center; padding:12px;">A carregar...</div>';
+                fetch('<?= BASE_PATH ?>/api.php?action=get_legislacao_log')
+                .then(r => r.json())
+                .then(function(data) {
+                    if (!data.success) { content.innerHTML = '<div class="muted">Erro.</div>'; return; }
+                    var logs = data.data.log || [];
+                    if (logs.length === 0) { content.innerHTML = '<div class="muted" style="padding:12px;">Nenhuma alteração registada.</div>'; return; }
+                    var html = '<table style="width:100%; font-size:12px;"><thead><tr><th>Data</th><th>Ação</th><th>Notas</th><th>Por</th></tr></thead><tbody>';
+                    var acaoPills = { criada: 'pill-success', corrigida: 'pill-warning', atualizada: 'pill-primary', desativada: 'pill-error', eliminada: 'pill-error' };
+                    logs.forEach(function(l) {
+                        var pill = acaoPills[l.acao] || 'pill-muted';
+                        html += '<tr>';
+                        html += '<td style="white-space:nowrap;">' + esc(l.criado_em || '') + '</td>';
+                        html += '<td><span class="pill ' + pill + '">' + esc(l.acao) + '</span></td>';
+                        html += '<td style="max-width:400px;">' + esc(l.notas || '-') + '</td>';
+                        html += '<td>' + esc(l.utilizador_nome || '?') + '</td>';
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table>';
+                    content.innerHTML = html;
+                });
+            }
+
             carregarLeg();
             </script>
 

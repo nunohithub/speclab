@@ -1507,7 +1507,11 @@ try {
         // LEGISLAÇÃO - BANCO
         // ===================================================================
         case 'get_legislacao_banco':
-            $stmt = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo FROM legislacao_banco WHERE ativo = 1 ORDER BY legislacao_norma');
+            if (isSuperAdmin() && !empty($_GET['all'])) {
+                $stmt = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo, ativo FROM legislacao_banco ORDER BY ativo DESC, legislacao_norma');
+            } else {
+                $stmt = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo FROM legislacao_banco WHERE ativo = 1 ORDER BY legislacao_norma');
+            }
             jsonSuccess('OK', ['legislacao' => $stmt->fetchAll()]);
             break;
 
@@ -1534,8 +1538,202 @@ try {
             if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
             $lid = (int)($_POST['id'] ?? 0);
             if ($lid <= 0) jsonError('ID inválido.');
+            // Log before delete
+            $stmtDel = $db->prepare('SELECT * FROM legislacao_banco WHERE id = ?');
+            $stmtDel->execute([$lid]);
+            $delData = $stmtDel->fetch();
+            if ($delData) {
+                $db->prepare('INSERT INTO legislacao_log (legislacao_id, acao, dados_anteriores, notas, alterado_por) VALUES (?, ?, ?, ?, ?)')
+                   ->execute([$lid, 'eliminada', json_encode($delData, JSON_UNESCAPED_UNICODE), 'Eliminada manualmente', $user['id']]);
+            }
             $db->prepare('DELETE FROM legislacao_banco WHERE id = ?')->execute([$lid]);
-            jsonSuccess(['msg' => 'Legislação removida.']);
+            jsonSuccess('Legislação removida.');
+            break;
+
+        // ===================================================================
+        // LEGISLAÇÃO - VERIFICAÇÃO IA
+        // ===================================================================
+        case 'verificar_legislacao_ai':
+            if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+            $apiKey = getConfiguracao('openai_api_key', '');
+            if (!$apiKey) jsonError('Chave OpenAI não configurada em Configurações.');
+
+            $legs = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo FROM legislacao_banco WHERE ativo = 1 ORDER BY legislacao_norma')->fetchAll();
+            if (empty($legs)) jsonError('Nenhuma legislação ativa para verificar.');
+
+            $legJson = json_encode($legs, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+            $systemMsg = 'És um especialista em legislação europeia de materiais em contacto com alimentos, com foco na indústria de rolhas de cortiça. Responde sempre em português de Portugal.';
+
+            $userMsg = "Analisa a seguinte lista de legislação europeia relacionada com materiais em contacto com alimentos, especificamente para a indústria de rolhas de cortiça.\n\n" .
+                "REGRAS OBRIGATÓRIAS:\n" .
+                "1. NÃO inventes normas novas. Trabalha APENAS com as normas fornecidas na lista.\n" .
+                "2. Para cada norma, verifica:\n" .
+                "   a) Se a referência (número, ano, designação) está correta\n" .
+                "   b) Se existem erros de escrita no nome, rolhas aplicáveis ou resumo\n" .
+                "   c) Se a norma ainda está em vigor\n" .
+                "   d) Se foi revogada ou substituída por outra norma\n" .
+                "   e) Se sofreu alterações/amendments significativos desde a data indicada\n" .
+                "3. Se NÃO tens certeza absoluta sobre o estado de uma norma, coloca status \"verificar\"\n" .
+                "4. Corrige erros de escrita mantendo o sentido técnico original\n" .
+                "5. Mantém os campos originais inalterados quando não há correção a fazer\n\n" .
+                "Responde APENAS com um array JSON válido (sem markdown, sem blocos de código, sem texto extra).\n" .
+                "Formato por norma:\n" .
+                "{\"id\": <id>, \"status\": \"ok|corrigir|atualizada|revogada|verificar\", \"legislacao_norma\": \"...\", \"rolhas_aplicaveis\": \"...\", \"resumo\": \"...\", \"notas\": \"explicação das alterações ou 'Sem alterações necessárias'\"}\n\n" .
+                "Significado dos status:\n" .
+                "- ok: Norma correta, em vigor, sem alterações\n" .
+                "- corrigir: Erros de escrita encontrados (já corrigidos nos campos)\n" .
+                "- atualizada: Existe versão mais recente ou amendment relevante\n" .
+                "- revogada: Norma revogada ou substituída\n" .
+                "- verificar: Incerteza, recomenda verificação manual\n\n" .
+                "Lista atual:\n{$legJson}";
+
+            $payload = [
+                'model' => 'gpt-4o-mini',
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemMsg],
+                    ['role' => 'user', 'content' => $userMsg],
+                ],
+                'max_tokens' => 4000,
+                'temperature' => 0.2,
+            ];
+
+            $ch = curl_init('https://api.openai.com/v1/chat/completions');
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $apiKey],
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 120,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr = curl_error($ch);
+            curl_close($ch);
+
+            if ($curlErr) jsonError('Erro de ligação à API: ' . $curlErr);
+
+            $result = json_decode($response, true);
+            if ($httpCode !== 200 || !isset($result['choices'][0]['message']['content'])) {
+                $errMsg = $result['error']['message'] ?? 'Erro desconhecido da API OpenAI.';
+                jsonError('OpenAI: ' . $errMsg);
+            }
+
+            $aiContent = trim($result['choices'][0]['message']['content']);
+            if (preg_match('/\[.*\]/s', $aiContent, $m)) {
+                $aiContent = $m[0];
+            }
+            $sugestoes = json_decode($aiContent, true);
+            if (!is_array($sugestoes)) {
+                jsonError('Resposta da IA inválida. Tente novamente.');
+            }
+
+            jsonSuccess('Verificação concluída.', ['sugestoes' => $sugestoes]);
+            break;
+
+        case 'aplicar_sugestao_leg':
+            if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+            $lid = (int)($_POST['id'] ?? 0);
+            $status = trim($_POST['status'] ?? '');
+            $norma = trim($_POST['legislacao_norma'] ?? '');
+            $rolhas = trim($_POST['rolhas_aplicaveis'] ?? '');
+            $resumo = trim($_POST['resumo'] ?? '');
+            $notas = trim($_POST['notas'] ?? '');
+
+            if ($lid <= 0 || $norma === '') jsonError('Dados inválidos.');
+
+            $stmtA = $db->prepare('SELECT * FROM legislacao_banco WHERE id = ?');
+            $stmtA->execute([$lid]);
+            $atual = $stmtA->fetch();
+            if (!$atual) jsonError('Legislação não encontrada.');
+
+            $dadosAnteriores = json_encode([
+                'legislacao_norma' => $atual['legislacao_norma'],
+                'rolhas_aplicaveis' => $atual['rolhas_aplicaveis'],
+                'resumo' => $atual['resumo'],
+                'ativo' => $atual['ativo']
+            ], JSON_UNESCAPED_UNICODE);
+
+            if ($status === 'revogada') {
+                $db->prepare('UPDATE legislacao_banco SET ativo = 0 WHERE id = ?')->execute([$lid]);
+                $dadosNovos = json_encode(['ativo' => 0], JSON_UNESCAPED_UNICODE);
+                $acao = 'desativada';
+            } elseif ($status === 'atualizada') {
+                $db->prepare('UPDATE legislacao_banco SET ativo = 0 WHERE id = ?')->execute([$lid]);
+                $db->prepare('INSERT INTO legislacao_banco (legislacao_norma, rolhas_aplicaveis, resumo, ativo) VALUES (?, ?, ?, 1)')
+                   ->execute([$norma, $rolhas, $resumo]);
+                $newId = (int)$db->lastInsertId();
+                $dadosNovos = json_encode([
+                    'novo_id' => $newId, 'legislacao_norma' => $norma,
+                    'rolhas_aplicaveis' => $rolhas, 'resumo' => $resumo
+                ], JSON_UNESCAPED_UNICODE);
+                $acao = 'atualizada';
+            } else {
+                $db->prepare('UPDATE legislacao_banco SET legislacao_norma = ?, rolhas_aplicaveis = ?, resumo = ? WHERE id = ?')
+                   ->execute([$norma, $rolhas, $resumo, $lid]);
+                $dadosNovos = json_encode([
+                    'legislacao_norma' => $norma, 'rolhas_aplicaveis' => $rolhas, 'resumo' => $resumo
+                ], JSON_UNESCAPED_UNICODE);
+                $acao = 'corrigida';
+            }
+
+            $db->prepare('INSERT INTO legislacao_log (legislacao_id, acao, dados_anteriores, dados_novos, notas, alterado_por) VALUES (?, ?, ?, ?, ?, ?)')
+               ->execute([$lid, $acao, $dadosAnteriores, $dadosNovos, $notas, $user['id']]);
+
+            jsonSuccess('Alteração aplicada.', ['acao' => $acao]);
+            break;
+
+        case 'chat_legislacao':
+            if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+            $pergunta = trim($_POST['pergunta'] ?? '');
+            if ($pergunta === '') jsonError('Escreva uma pergunta.');
+
+            $apiKey = getConfiguracao('openai_api_key', '');
+            if (!$apiKey) jsonError('Chave OpenAI não configurada.');
+
+            $legs = $db->query('SELECT legislacao_norma, rolhas_aplicaveis, resumo, ativo FROM legislacao_banco ORDER BY ativo DESC, legislacao_norma')->fetchAll();
+            $legJson = json_encode($legs, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+            $systemMsg = "És um especialista em legislação europeia de materiais em contacto com alimentos, focado na indústria de rolhas de cortiça. Responde em português de Portugal, de forma clara e concisa. NÃO inventes normas que não existam.\n\nBase de legislação atual do sistema:\n{$legJson}";
+
+            $payload = [
+                'model' => 'gpt-4o-mini',
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemMsg],
+                    ['role' => 'user', 'content' => $pergunta],
+                ],
+                'max_tokens' => 2000,
+                'temperature' => 0.4,
+            ];
+
+            $ch = curl_init('https://api.openai.com/v1/chat/completions');
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $apiKey],
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 60,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr = curl_error($ch);
+            curl_close($ch);
+
+            if ($curlErr) jsonError('Erro de ligação: ' . $curlErr);
+
+            $result = json_decode($response, true);
+            if ($httpCode !== 200 || !isset($result['choices'][0]['message']['content'])) {
+                $errMsg = $result['error']['message'] ?? 'Erro desconhecido.';
+                jsonError('OpenAI: ' . $errMsg);
+            }
+
+            jsonSuccess('OK', ['resposta' => $result['choices'][0]['message']['content']]);
+            break;
+
+        case 'get_legislacao_log':
+            if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+            $stmt = $db->query('SELECT l.*, u.nome as utilizador_nome FROM legislacao_log l LEFT JOIN utilizadores u ON l.alterado_por = u.id ORDER BY l.criado_em DESC LIMIT 100');
+            jsonSuccess('OK', ['log' => $stmt->fetchAll()]);
             break;
 
         // AÇÃO DESCONHECIDA
