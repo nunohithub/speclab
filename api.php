@@ -1749,7 +1749,7 @@ try {
             if (isset($_GET['all']) && isSuperAdmin()) {
                 $stmt = $db->query('SELECT * FROM ensaios_banco ORDER BY ordem, categoria, ensaio');
             } else {
-                $stmt = $db->query('SELECT id, categoria, ensaio, metodo, nivel_especial, exemplo FROM ensaios_banco WHERE ativo = 1 ORDER BY ordem, categoria, ensaio');
+                $stmt = $db->query('SELECT id, categoria, ensaio, metodo, nivel_especial, nqa, exemplo FROM ensaios_banco WHERE ativo = 1 ORDER BY ordem, categoria, ensaio');
             }
             jsonSuccess('OK', ['ensaios' => $stmt->fetchAll()]);
             break;
@@ -1761,16 +1761,17 @@ try {
             $ens = trim($_POST['ensaio'] ?? '');
             $met = trim($_POST['metodo'] ?? '');
             $niv = trim($_POST['nivel_especial'] ?? '');
+            $nqa = trim($_POST['nqa'] ?? '');
             $ex = trim($_POST['exemplo'] ?? '');
             $ativoE = (int)($_POST['ativo'] ?? 1);
             if (!$cat || !$ens) jsonError('Categoria e ensaio são obrigatórios.');
             if ($eid > 0) {
-                $stmt = $db->prepare('UPDATE ensaios_banco SET categoria = ?, ensaio = ?, metodo = ?, nivel_especial = ?, exemplo = ?, ativo = ? WHERE id = ?');
-                $stmt->execute([$cat, $ens, $met, $niv, $ex, $ativoE, $eid]);
+                $stmt = $db->prepare('UPDATE ensaios_banco SET categoria = ?, ensaio = ?, metodo = ?, nivel_especial = ?, nqa = ?, exemplo = ?, ativo = ? WHERE id = ?');
+                $stmt->execute([$cat, $ens, $met, $niv, $nqa, $ex, $ativoE, $eid]);
             } else {
                 $maxOrdem = $db->query('SELECT COALESCE(MAX(ordem),0)+1 FROM ensaios_banco')->fetchColumn();
-                $stmt = $db->prepare('INSERT INTO ensaios_banco (categoria, ensaio, metodo, nivel_especial, exemplo, ativo, ordem) VALUES (?, ?, ?, ?, ?, ?, ?)');
-                $stmt->execute([$cat, $ens, $met, $niv, $ex, $ativoE, $maxOrdem]);
+                $stmt = $db->prepare('INSERT INTO ensaios_banco (categoria, ensaio, metodo, nivel_especial, nqa, exemplo, ativo, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+                $stmt->execute([$cat, $ens, $met, $niv, $nqa, $ex, $ativoE, $maxOrdem]);
             }
             jsonSuccess('Ensaio guardado.');
             break;

@@ -85,13 +85,14 @@ function getEspecificacaoCompleta(PDO $db, int $id): ?array {
 function getCategoriasPadrao(): array {
     try {
         $db = getDB();
-        $rows = $db->query('SELECT categoria, ensaio, metodo, nivel_especial, exemplo FROM ensaios_banco WHERE ativo = 1 ORDER BY ordem, categoria, ensaio')->fetchAll();
+        $rows = $db->query('SELECT categoria, ensaio, metodo, nivel_especial, nqa, exemplo FROM ensaios_banco WHERE ativo = 1 ORDER BY ordem, categoria, ensaio')->fetchAll();
         $result = [];
         foreach ($rows as $row) {
             $result[$row['categoria']][] = [
                 'ensaio' => $row['ensaio'],
                 'metodo' => $row['metodo'],
                 'nivel_especial' => $row['nivel_especial'] ?? '',
+                'nqa' => $row['nqa'] ?? '',
                 'exemplo' => $row['exemplo'],
             ];
         }

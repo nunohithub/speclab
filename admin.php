@@ -1461,8 +1461,8 @@ $activeNav = $tab;
             </div>
             <div class="card">
                 <table>
-                    <thead><tr><th>Categoria</th><th>Ensaio</th><th>Método/Norma</th><th title="Nível Especial de Inspeção">NEI</th><th>Valor Referência</th><th>Estado</th><th>Ações</th></tr></thead>
-                    <tbody id="ensaioRows"><tr><td colspan="7" class="muted" style="text-align:center; padding:20px;">A carregar...</td></tr></tbody>
+                    <thead><tr><th>Categoria</th><th>Ensaio</th><th>Método/Norma</th><th title="Nível Especial de Inspeção">NEI</th><th title="Nível de Qualidade Aceitável">NQA</th><th>Valor Referência</th><th>Estado</th><th>Ações</th></tr></thead>
+                    <tbody id="ensaioRows"><tr><td colspan="8" class="muted" style="text-align:center; padding:20px;">A carregar...</td></tr></tbody>
                 </table>
             </div>
 
@@ -1480,9 +1480,10 @@ $activeNav = $tab;
                         </div>
                         <div class="form-row">
                             <div class="form-group"><label>Método / Norma</label><input type="text" id="ens_metodo" placeholder="Ex: ISO 9727-1"></div>
-                            <div class="form-group"><label>NEI <span style="font-weight:normal; color:#667; font-size:12px;">(Nível Especial de Inspeção)</span></label><input type="text" id="ens_nivel_especial" placeholder="Ex: S-2, S-3"></div>
+                            <div class="form-group"><label>NEI <span style="font-weight:normal; color:#667; font-size:12px;">(Nível Especial de Inspeção)</span></label><input type="text" id="ens_nivel_especial" placeholder="Ex: S-2, S-4"></div>
                         </div>
                         <div class="form-row">
+                            <div class="form-group"><label>NQA <span style="font-weight:normal; color:#667; font-size:12px;">(Nível de Qualidade Aceitável)</span></label><input type="text" id="ens_nqa" placeholder="Ex: 2,5"></div>
                             <div class="form-group"><label>Valor de Referência</label><input type="text" id="ens_exemplo" placeholder="Ex: ±0.7 mm"></div>
                         </div>
                         <div class="form-group"><label><input type="checkbox" id="ens_ativo" checked> Ativo</label></div>
@@ -1504,7 +1505,7 @@ $activeNav = $tab;
                     if (!data.success) return;
                     var rows = data.data.ensaios || [];
                     var tbody = document.getElementById('ensaioRows');
-                    if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
+                    if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
                     var html = '', cats = new Set(), lastCat = '';
                     rows.forEach(function(r) {
                         cats.add(r.categoria);
@@ -1515,6 +1516,7 @@ $activeNav = $tab;
                         html += '<tr' + rs + '><td>' + catLabel + '</td><td>' + escE(r.ensaio) + '</td>';
                         html += '<td class="muted" style="font-size:12px;">' + escE(r.metodo || '') + '</td>';
                         html += '<td class="muted" style="font-size:12px;">' + escE(r.nivel_especial || '') + '</td>';
+                        html += '<td class="muted" style="font-size:12px;">' + escE(r.nqa || '') + '</td>';
                         html += '<td class="muted" style="font-size:12px;">' + escE(r.exemplo || '') + '</td>';
                         html += '<td>' + (inativo ? '<span class="pill pill-error">Inativo</span>' : '<span class="pill pill-success">Ativo</span>') + '</td>';
                         html += '<td><button class="btn btn-ghost btn-sm" onclick=\'editEnsaio(' + JSON.stringify(r).replace(/'/g,"&#39;") + ')\'>Editar</button> ';
@@ -1532,6 +1534,7 @@ $activeNav = $tab;
                 document.getElementById('ens_ensaio').value = '';
                 document.getElementById('ens_metodo').value = '';
                 document.getElementById('ens_nivel_especial').value = '';
+                document.getElementById('ens_nqa').value = '';
                 document.getElementById('ens_exemplo').value = '';
                 document.getElementById('ens_ativo').checked = true;
             }
@@ -1542,6 +1545,7 @@ $activeNav = $tab;
                 document.getElementById('ens_ensaio').value = r.ensaio || '';
                 document.getElementById('ens_metodo').value = r.metodo || '';
                 document.getElementById('ens_nivel_especial').value = r.nivel_especial || '';
+                document.getElementById('ens_nqa').value = r.nqa || '';
                 document.getElementById('ens_exemplo').value = r.exemplo || '';
                 document.getElementById('ens_ativo').checked = r.ativo != 0;
                 document.getElementById('ensaioModal').style.display = 'flex';
@@ -1554,6 +1558,7 @@ $activeNav = $tab;
                 fd.append('ensaio', document.getElementById('ens_ensaio').value);
                 fd.append('metodo', document.getElementById('ens_metodo').value);
                 fd.append('nivel_especial', document.getElementById('ens_nivel_especial').value);
+                fd.append('nqa', document.getElementById('ens_nqa').value);
                 fd.append('exemplo', document.getElementById('ens_exemplo').value);
                 fd.append('ativo', document.getElementById('ens_ativo').checked ? '1' : '0');
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
@@ -1580,8 +1585,8 @@ $activeNav = $tab;
             <div class="flex-between mb-md"><h2>Banco de Ensaios</h2></div>
             <div class="card">
                 <table>
-                    <thead><tr><th>Categoria</th><th>Ensaio</th><th>Método/Norma</th><th title="Nível Especial de Inspeção">NEI</th><th>Valor Referência</th></tr></thead>
-                    <tbody id="ensaioRowsRO"><tr><td colspan="5" class="muted" style="text-align:center; padding:20px;">A carregar...</td></tr></tbody>
+                    <thead><tr><th>Categoria</th><th>Ensaio</th><th>Método/Norma</th><th title="Nível Especial de Inspeção">NEI</th><th title="Nível de Qualidade Aceitável">NQA</th><th>Valor Referência</th></tr></thead>
+                    <tbody id="ensaioRowsRO"><tr><td colspan="6" class="muted" style="text-align:center; padding:20px;">A carregar...</td></tr></tbody>
                 </table>
             </div>
             <script>
@@ -1592,7 +1597,7 @@ $activeNav = $tab;
                 if (!data.success) return;
                 var rows = data.data.ensaios || [];
                 var tbody = document.getElementById('ensaioRowsRO');
-                if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
+                if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
                 var html = '', lastCat = '';
                 rows.forEach(function(r) {
                     var catLabel = r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>';
@@ -1600,6 +1605,7 @@ $activeNav = $tab;
                     html += '<tr><td>' + catLabel + '</td><td>' + escE(r.ensaio) + '</td>';
                     html += '<td class="muted" style="font-size:12px;">' + escE(r.metodo || '') + '</td>';
                     html += '<td class="muted" style="font-size:12px;">' + escE(r.nivel_especial || '') + '</td>';
+                    html += '<td class="muted" style="font-size:12px;">' + escE(r.nqa || '') + '</td>';
                     html += '<td class="muted" style="font-size:12px;">' + escE(r.exemplo || '') + '</td></tr>';
                 });
                 tbody.innerHTML = html;

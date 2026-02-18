@@ -1549,7 +1549,7 @@ $pageSubtitle = 'Editor de Especificação';
                         </div>
                         <?php foreach ($params as $p): ?>
                             <label class="ensaio-check-item">
-                                <input type="checkbox" name="sel_ensaio" data-cat="<?= sanitize($categoria) ?>" data-ensaio="<?= sanitize($p['ensaio']) ?>" data-norma="<?= sanitize($p['metodo']) ?>" data-nivel-especial="<?= sanitize($p['nivel_especial'] ?? '') ?>" data-spec="<?= sanitize($p['exemplo']) ?>">
+                                <input type="checkbox" name="sel_ensaio" data-cat="<?= sanitize($categoria) ?>" data-ensaio="<?= sanitize($p['ensaio']) ?>" data-norma="<?= sanitize($p['metodo']) ?>" data-nivel-especial="<?= sanitize($p['nivel_especial'] ?? '') ?>" data-nqa="<?= sanitize($p['nqa'] ?? '') ?>" data-spec="<?= sanitize($p['exemplo']) ?>">
                                 <div class="ensaio-info">
                                     <div class="ensaio-name"><?= sanitize($p['ensaio']) ?></div>
                                     <div class="ensaio-detail"><?= sanitize($p['metodo']) ?> &mdash; <?= sanitize($p['exemplo']) ?></div>
@@ -2485,7 +2485,7 @@ $pageSubtitle = 'Editor de Especificação';
                 especificacao: cb.getAttribute('data-spec') || '',
                 norma: cb.getAttribute('data-norma') || '',
                 nivel_especial: cb.getAttribute('data-nivel-especial') || '',
-                nqa: ''
+                nqa: cb.getAttribute('data-nqa') || ''
             });
         });
 
