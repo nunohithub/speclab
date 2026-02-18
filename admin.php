@@ -1017,18 +1017,20 @@ $activeNav = $tab;
             </div>
 
             <!-- Legislação Modal -->
-            <div class="modal-overlay" id="legModal" style="display:none;">
-                <div class="modal" style="max-width:700px;">
+            <div id="legModal" class="modal-overlay" style="display:none;">
+                <div class="modal-box modal-box-lg">
                     <div class="modal-header">
                         <h3 id="legModalTitle">Nova Legislação</h3>
                         <button class="modal-close" onclick="document.getElementById('legModal').style.display='none';">&times;</button>
                     </div>
-                    <input type="hidden" id="leg_id" value="0">
-                    <div class="form-group"><label>Legislação / Norma</label><input type="text" id="leg_norma" placeholder="Ex: Reg. (CE) 1935/2004"></div>
-                    <div class="form-group"><label>Rolhas a que se aplica</label><textarea id="leg_rolhas" rows="2" placeholder="Ex: Todas: natural, colmatada..."></textarea></div>
-                    <div class="form-group"><label>Resumo do que estabelece</label><textarea id="leg_resumo" rows="3" placeholder="Resumo da legislação..."></textarea></div>
-                    <div class="form-group"><label><input type="checkbox" id="leg_ativo" checked> Ativa</label></div>
-                    <div class="mt-md">
+                    <div class="modal-body">
+                        <input type="hidden" id="leg_id" value="0">
+                        <div class="form-group"><label>Legislação / Norma</label><input type="text" id="leg_norma" placeholder="Ex: Reg. (CE) 1935/2004"></div>
+                        <div class="form-group"><label>Rolhas a que se aplica</label><textarea id="leg_rolhas" rows="2" placeholder="Ex: Todas: natural, colmatada..."></textarea></div>
+                        <div class="form-group"><label>Resumo do que estabelece</label><textarea id="leg_resumo" rows="3" placeholder="Resumo da legislação..."></textarea></div>
+                        <div class="form-group"><label><input type="checkbox" id="leg_ativo" checked> Ativa</label></div>
+                    </div>
+                    <div class="modal-footer">
                         <button class="btn btn-primary" onclick="guardarLeg()">Guardar</button>
                         <button class="btn btn-secondary" onclick="document.getElementById('legModal').style.display='none';">Cancelar</button>
                     </div>
