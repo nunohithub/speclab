@@ -1048,21 +1048,21 @@ $pageSubtitle = 'Editor de Especificação';
                                     $ensaiosRaw = json_decode($sec['conteudo'] ?? '[]', true);
                                     if (isset($ensaiosRaw['rows'])) {
                                         $ensaiosData = $ensaiosRaw['rows'];
-                                        $colWidths = $ensaiosRaw['colWidths'] ?? [20, 25, 20, 18, 12];
+                                        $colWidths = $ensaiosRaw['colWidths'] ?? [20, 22, 18, 13, 13, 10];
                                         $mergesData = $ensaiosRaw['merges'] ?? [];
                                     } else {
                                         $ensaiosData = is_array($ensaiosRaw) ? $ensaiosRaw : [];
-                                        $colWidths = [20, 25, 20, 18, 12];
+                                        $colWidths = [20, 22, 18, 13, 13, 10];
                                         $mergesData = [];
                                     }
-                                    // Converter para formato 4 colunas
-                                    $colShift = (count($colWidths) >= 5) ? 1 : 0;
-                                    $editorCw = ($colShift === 1) ? array_slice($colWidths, 1, 4) : array_slice($colWidths, 0, 4);
-                                    if (count($editorCw) < 4) $editorCw = [30, 25, 22, 15];
+                                    // Converter para formato 5 colunas editor
+                                    $colShift = (count($colWidths) >= 6) ? 1 : 0;
+                                    $editorCw = ($colShift === 1) ? array_slice($colWidths, 1, 5) : array_slice($colWidths, 0, 5);
+                                    if (count($editorCw) < 5) $editorCw = [26, 22, 18, 15, 14];
                                     $editorMerges = [];
                                     foreach ($mergesData as $m) {
                                         $nc = ($m['col'] ?? 0) - $colShift;
-                                        if ($nc >= 0 && $nc <= 3) {
+                                        if ($nc >= 0 && $nc <= 4) {
                                             $editorMerges[] = ['col' => $nc, 'row' => $m['row'], 'span' => $m['span'], 'hAlign' => $m['hAlign'] ?? 'center', 'vAlign' => $m['vAlign'] ?? 'middle'];
                                         }
                                     }
@@ -1086,7 +1086,8 @@ $pageSubtitle = 'Editor de Especificação';
                                                     <th style="width:<?= $editorCw[0] ?>%">Ensaio</th>
                                                     <th style="width:<?= $editorCw[1] ?>%">Especificação</th>
                                                     <th style="width:<?= $editorCw[2] ?>%">Norma</th>
-                                                    <th style="width:<?= $editorCw[3] ?>%">NQA</th>
+                                                    <th style="width:<?= $editorCw[3] ?>%" title="Nível Especial de Inspeção">NEI</th>
+                                                    <th style="width:<?= $editorCw[4] ?>%" title="Nível de Qualidade Aceitável">NQA</th>
                                                     <th style="width:5%"></th>
                                                 </tr>
                                             </thead>
@@ -1097,13 +1098,14 @@ $pageSubtitle = 'Editor de Especificação';
                                                         $prevCat = $cat;
                                                 ?>
                                                 <tr class="ensaio-cat-row">
-                                                    <td colspan="5"><input type="text" value="<?= sanitize($cat) ?>" data-field="cat-header" class="cat-header-input" placeholder="Categoria"><button class="remove-btn cat-remove-btn" onclick="removerCategoriaEnsaio(this)" title="Remover categoria">&times;</button></td>
+                                                    <td colspan="6"><input type="text" value="<?= sanitize($cat) ?>" data-field="cat-header" class="cat-header-input" placeholder="Categoria"><button class="remove-btn cat-remove-btn" onclick="removerCategoriaEnsaio(this)" title="Remover categoria">&times;</button></td>
                                                 </tr>
                                                 <?php endif; ?>
                                                 <tr>
                                                     <td><input type="text" value="<?= sanitize($ens['ensaio'] ?? '') ?>" data-field="ensaio"></td>
                                                     <td><input type="text" value="<?= sanitize($ens['especificacao'] ?? '') ?>" data-field="especificacao"></td>
                                                     <td><input type="text" value="<?= sanitize($ens['norma'] ?? '') ?>" data-field="norma"></td>
+                                                    <td><input type="text" value="<?= sanitize($ens['nivel_especial'] ?? '') ?>" data-field="nivel_especial"></td>
                                                     <td><input type="text" value="<?= sanitize($ens['nqa'] ?? '') ?>" data-field="nqa"></td>
                                                     <td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>
                                                 </tr>
@@ -1547,7 +1549,7 @@ $pageSubtitle = 'Editor de Especificação';
                         </div>
                         <?php foreach ($params as $p): ?>
                             <label class="ensaio-check-item">
-                                <input type="checkbox" name="sel_ensaio" data-cat="<?= sanitize($categoria) ?>" data-ensaio="<?= sanitize($p['ensaio']) ?>" data-norma="<?= sanitize($p['metodo']) ?>" data-spec="<?= sanitize($p['exemplo']) ?>">
+                                <input type="checkbox" name="sel_ensaio" data-cat="<?= sanitize($categoria) ?>" data-ensaio="<?= sanitize($p['ensaio']) ?>" data-norma="<?= sanitize($p['metodo']) ?>" data-nivel-especial="<?= sanitize($p['nivel_especial'] ?? '') ?>" data-spec="<?= sanitize($p['exemplo']) ?>">
                                 <div class="ensaio-info">
                                     <div class="ensaio-name"><?= sanitize($p['ensaio']) ?></div>
                                     <div class="ensaio-detail"><?= sanitize($p['metodo']) ?> &mdash; <?= sanitize($p['exemplo']) ?></div>
@@ -1736,10 +1738,11 @@ $pageSubtitle = 'Editor de Especificação';
             '<div class="seccao-ensaios-wrap">' +
                 '<table class="seccao-ensaios-table">' +
                     '<thead><tr>' +
-                        '<th style="width:30%">Ensaio</th>' +
-                        '<th style="width:25%">Especificação</th>' +
-                        '<th style="width:22%">Norma</th>' +
-                        '<th style="width:15%">NQA</th>' +
+                        '<th style="width:26%">Ensaio</th>' +
+                        '<th style="width:22%">Especificação</th>' +
+                        '<th style="width:18%">Norma</th>' +
+                        '<th style="width:15%" title="Nível Especial de Inspeção">NEI</th>' +
+                        '<th style="width:14%" title="Nível de Qualidade Aceitável">NQA</th>' +
                         '<th style="width:5%"></th>' +
                     '</tr></thead>' +
                     '<tbody class="ensaios-tbody">';
@@ -1752,7 +1755,7 @@ $pageSubtitle = 'Editor de Especificação';
                     tableHtml += criarEnsaioCatRowHtml(cat);
                     prevCat = cat;
                 }
-                tableHtml += criarEnsaioRowHtml(ens.categoria || '', ens.ensaio || '', ens.especificacao || '', ens.norma || '', ens.nqa || '');
+                tableHtml += criarEnsaioRowHtml(ens.categoria || '', ens.ensaio || '', ens.especificacao || '', ens.norma || '', ens.nivel_especial || '', ens.nqa || '');
             });
         }
 
@@ -1772,14 +1775,15 @@ $pageSubtitle = 'Editor de Especificação';
     }
 
     function criarEnsaioCatRowHtml(cat) {
-        return '<tr class="ensaio-cat-row"><td colspan="5"><input type="text" value="' + escapeHtml(cat) + '" data-field="cat-header" class="cat-header-input" placeholder="Categoria"><button class="remove-btn cat-remove-btn" onclick="removerCategoriaEnsaio(this)" title="Remover categoria">&times;</button></td></tr>';
+        return '<tr class="ensaio-cat-row"><td colspan="6"><input type="text" value="' + escapeHtml(cat) + '" data-field="cat-header" class="cat-header-input" placeholder="Categoria"><button class="remove-btn cat-remove-btn" onclick="removerCategoriaEnsaio(this)" title="Remover categoria">&times;</button></td></tr>';
     }
 
-    function criarEnsaioRowHtml(cat, ensaio, spec, norma, nqa) {
+    function criarEnsaioRowHtml(cat, ensaio, spec, norma, nivelEspecial, nqa) {
         return '<tr>' +
             '<td><input type="text" value="' + escapeHtml(ensaio) + '" data-field="ensaio"></td>' +
             '<td><input type="text" value="' + escapeHtml(spec) + '" data-field="especificacao"></td>' +
             '<td><input type="text" value="' + escapeHtml(norma) + '" data-field="norma"></td>' +
+            '<td><input type="text" value="' + escapeHtml(nivelEspecial) + '" data-field="nivel_especial"></td>' +
             '<td><input type="text" value="' + escapeHtml(nqa) + '" data-field="nqa"></td>' +
             '<td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>' +
         '</tr>';
@@ -1844,7 +1848,7 @@ $pageSubtitle = 'Editor de Especificação';
                     insertAfter = next;
                     next = next.nextElementSibling;
                 }
-                tempDiv.innerHTML = '<table><tbody>' + criarEnsaioRowHtml(cat, ens.ensaio || '', ens.especificacao || '', ens.norma || '', ens.nqa || '') + '</tbody></table>';
+                tempDiv.innerHTML = '<table><tbody>' + criarEnsaioRowHtml(cat, ens.ensaio || '', ens.especificacao || '', ens.norma || '', ens.nivel_especial || '', ens.nqa || '') + '</tbody></table>';
                 var newTr = tempDiv.querySelector('tr');
                 insertAfter.parentNode.insertBefore(newTr, insertAfter.nextSibling);
             } else {
@@ -1855,7 +1859,7 @@ $pageSubtitle = 'Editor de Especificação';
                     tbody.appendChild(catTr);
                     existingCats[cat] = catTr;
                 }
-                tempDiv.innerHTML = '<table><tbody>' + criarEnsaioRowHtml(cat, ens.ensaio || '', ens.especificacao || '', ens.norma || '', ens.nqa || '') + '</tbody></table>';
+                tempDiv.innerHTML = '<table><tbody>' + criarEnsaioRowHtml(cat, ens.ensaio || '', ens.especificacao || '', ens.norma || '', ens.nivel_especial || '', ens.nqa || '') + '</tbody></table>';
                 var newTr2 = tempDiv.querySelector('tr');
                 tbody.appendChild(newTr2);
             }
@@ -1965,6 +1969,7 @@ $pageSubtitle = 'Editor de Especificação';
             '<td><input type="text" value="" data-field="ensaio" placeholder="Ensaio"></td>' +
             '<td><input type="text" value="" data-field="especificacao" placeholder="Valor"></td>' +
             '<td><input type="text" value="" data-field="norma" placeholder="Norma"></td>' +
+            '<td><input type="text" value="" data-field="nivel_especial" placeholder="NEI"></td>' +
             '<td><input type="text" value="" data-field="nqa" placeholder="NQA"></td>' +
             '<td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>';
         tbody.appendChild(tr);
@@ -2042,10 +2047,10 @@ $pageSubtitle = 'Editor de Especificação';
     // MERGE DE CÉLULAS (juntar células) - com rowspan real
     // ============================================================
 
-    // Mapeamento campo <-> coluna (4 colunas: Ensaio, Espec, Norma, NQA)
-    var fieldToCol = { ensaio: 0, especificacao: 1, norma: 2, nqa: 3 };
-    var colToField = ['ensaio', 'especificacao', 'norma', 'nqa'];
-    var colPlaceholders = { ensaio: 'Ensaio', especificacao: 'Valor', norma: 'Norma', nqa: 'NQA' };
+    // Mapeamento campo <-> coluna (5 colunas: Ensaio, Espec, Norma, NEI, NQA)
+    var fieldToCol = { ensaio: 0, especificacao: 1, norma: 2, nivel_especial: 3, nqa: 4 };
+    var colToField = ['ensaio', 'especificacao', 'norma', 'nivel_especial', 'nqa'];
+    var colPlaceholders = { ensaio: 'Ensaio', especificacao: 'Valor', norma: 'Norma', nivel_especial: 'NEI', nqa: 'NQA' };
 
     // Obter apenas as data rows (excluir .ensaio-cat-row)
     function getDataRows(tbody) {
@@ -2479,6 +2484,7 @@ $pageSubtitle = 'Editor de Especificação';
                 ensaio: cb.getAttribute('data-ensaio') || '',
                 especificacao: cb.getAttribute('data-spec') || '',
                 norma: cb.getAttribute('data-norma') || '',
+                nivel_especial: cb.getAttribute('data-nivel-especial') || '',
                 nqa: ''
             });
         });
@@ -3056,7 +3062,7 @@ $pageSubtitle = 'Editor de Especificação';
                             var catInput = tr.querySelector('input[data-field="cat-header"]');
                             currentCat = catInput ? catInput.value : '';
                         } else {
-                            var row = { categoria: currentCat, ensaio: '', especificacao: '', norma: '', nqa: '' };
+                            var row = { categoria: currentCat, ensaio: '', especificacao: '', norma: '', nivel_especial: '', nqa: '' };
                             tr.querySelectorAll('input[data-field]').forEach(function(input) {
                                 var field = input.getAttribute('data-field');
                                 if (row.hasOwnProperty(field)) row[field] = input.value;

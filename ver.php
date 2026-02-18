@@ -208,29 +208,29 @@ function san(string $s): string {
                             $ensaiosRaw = json_decode($sec['conteudo'] ?? '[]', true);
                             if (isset($ensaiosRaw['rows'])) {
                                 $ensaiosData = $ensaiosRaw['rows'];
-                                $colWidths = $ensaiosRaw['colWidths'] ?? [20, 25, 20, 18, 12];
+                                $colWidths = $ensaiosRaw['colWidths'] ?? [20, 22, 18, 13, 13, 10];
                                 $merges = $ensaiosRaw['merges'] ?? [];
                             } else {
                                 $ensaiosData = is_array($ensaiosRaw) ? $ensaiosRaw : [];
-                                $colWidths = [20, 25, 20, 18, 12];
+                                $colWidths = [20, 22, 18, 13, 13, 10];
                                 $merges = [];
                             }
-                            // Compat: 5 colWidths = formato antigo (Cat+4cols), 4 = novo
-                            if (count($colWidths) >= 5) {
-                                $outCw = array_slice($colWidths, 1, 4);
+                            // Compat: 6 colWidths = formato com Cat+5cols
+                            if (count($colWidths) >= 6) {
+                                $outCw = array_slice($colWidths, 1, 5);
                                 $colShift = 1;
                             } else {
-                                $outCw = array_slice($colWidths, 0, 4);
+                                $outCw = array_slice($colWidths, 0, 5);
                                 $colShift = 0;
                             }
-                            if (count($outCw) < 4) $outCw = [30, 25, 22, 15];
+                            if (count($outCw) < 5) $outCw = [26, 22, 18, 15, 14];
                             $cwSum = array_sum($outCw) ?: 1;
                             $cwPct = array_map(function($v) use ($cwSum) { return round($v / $cwSum * 100, 1); }, $outCw);
                             // Mapas de merge (col shift: ignorar Categoria)
                             $hiddenCells = []; $spanCells = []; $alignCells = []; $rowInMerge = [];
                             foreach ($merges as $m) {
                                 $nc = $m['col'] - $colShift;
-                                if ($nc < 0 || $nc > 3) continue;
+                                if ($nc < 0 || $nc > 4) continue;
                                 $k = $m['row'] . '_' . $nc;
                                 $spanCells[$k] = $m['span'];
                                 $alignCells[$k] = ['h' => $m['hAlign'] ?? 'center', 'v' => $m['vAlign'] ?? 'middle'];
@@ -256,16 +256,17 @@ function san(string $s): string {
                                         <th style="width:<?= $cwPct[0] ?>%">Ensaio / Controlo</th>
                                         <th style="width:<?= $cwPct[1] ?>%">Especificação</th>
                                         <th style="width:<?= $cwPct[2] ?>%">Norma</th>
-                                        <th style="width:<?= $cwPct[3] ?>%">NQA</th>
+                                        <th style="width:<?= $cwPct[3] ?>%" title="Nível Especial de Inspeção">NEI</th>
+                                        <th style="width:<?= $cwPct[4] ?>%" title="Nível de Qualidade Aceitável">NQA</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php
-                                    $fields = ['ensaio','especificacao','norma','nqa'];
+                                    $fields = ['ensaio','especificacao','norma','nivel_especial','nqa'];
                                     foreach ($ensaiosData as $rIdx => $ens):
                                         if (isset($catHeaders[$rIdx])):
                                     ?>
-                                    <tr class="cat-header"><td colspan="4"><?= san($catHeaders[$rIdx]) ?></td></tr>
+                                    <tr class="cat-header"><td colspan="5"><?= san($catHeaders[$rIdx]) ?></td></tr>
                                     <?php endif; ?>
                                     <tr>
                                         <?php foreach ($fields as $cIdx => $field):
@@ -284,6 +285,7 @@ function san(string $s): string {
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
+                            <p style="font-size:11px; color:#888; margin:3px 0 0 0;">NEI — Nível Especial de Inspeção &nbsp;|&nbsp; NQA — Nível de Qualidade Aceitável &nbsp;(NP 2922)</p>
                             <?php endif; ?>
                         <?php else: ?>
                             <div class="content"><?php

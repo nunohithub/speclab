@@ -247,11 +247,15 @@ if ($useMpdf) {
             if ($secTipo === 'ficheiros') {
                 if ($ficheirosPos === 'local' && !empty($validFiles)) {
                     $ficheirosRenderedPdf = true;
-                    // Escrever HTML acumulado até aqui
+                    // Flush HTML acumulado (sem título — será overlay na 1ª página de anexo)
                     $mpdf->WriteHTML($html);
                     $html = '';
+                    // Preparar título para overlay
+                    $ficTitulo = ($i + 1) . '. ' . san($sec['titulo'] ?? 'Ficheiros Anexos');
+                    $ficTituloHtml = '<div style="background:#fff; padding:2mm 10mm; font-size:' . $tamTitulos . 'pt; font-weight:bold; color:' . san($corTitulos) . '; border-bottom:1px solid ' . san($corLinhas) . ';">' . $ficTitulo . '</div>';
                     // Header vazio ANTES do AddPage (header aplica-se ao abrir página)
                     $mpdf->SetHTMLHeader('');
+                    $ficFirstPage = true;
                     // Importar páginas PDF anexo (A4 completo, sem header/footer)
                     foreach ($validFiles as $f) {
                         $fExt = strtolower(pathinfo($f['nome_original'], PATHINFO_EXTENSION));
@@ -261,16 +265,21 @@ if ($useMpdf) {
                                 $pageCount = $mpdf->setSourceFile($filepath);
                                 for ($p = 1; $p <= $pageCount; $p++) {
                                     $tplId = $mpdf->importPage($p);
-                                    // AddPage fecha pág anterior (footer actual) e abre nova (header actual = vazio)
                                     $mpdf->AddPageByArray([
                                         'margin-left' => 0, 'margin-right' => 0,
                                         'margin-top' => 0, 'margin-bottom' => 0,
                                         'margin-header' => 0, 'margin-footer' => 0,
                                     ]);
-                                    // Footer vazio DEPOIS do AddPage (footer aplica-se ao fechar página)
                                     $mpdf->SetHTMLFooter('');
                                     $mpdf->SetPageTemplate('');
-                                    $mpdf->useTemplate($tplId, 0, 0, 210, 297);
+                                    if ($ficFirstPage) {
+                                        // 1ª página: título overlay no topo + PDF deslocado 12mm para baixo
+                                        $mpdf->WriteFixedPosHTML($ficTituloHtml, 0, 0, 210, 12, 'hidden');
+                                        $mpdf->useTemplate($tplId, 0, 12, 210, 285);
+                                        $ficFirstPage = false;
+                                    } else {
+                                        $mpdf->useTemplate($tplId, 0, 0, 210, 297);
+                                    }
                                 }
                             } catch (Exception $e) {}
                         }
@@ -293,27 +302,27 @@ if ($useMpdf) {
                 $ensaiosRaw = json_decode($sec['conteudo'] ?? '[]', true);
                 if (isset($ensaiosRaw['rows'])) {
                     $ensaiosData = $ensaiosRaw['rows'];
-                    $colWidths = $ensaiosRaw['colWidths'] ?? [20, 25, 20, 18, 12];
+                    $colWidths = $ensaiosRaw['colWidths'] ?? [20, 22, 18, 13, 13, 10];
                     $merges = $ensaiosRaw['merges'] ?? [];
                 } else {
                     $ensaiosData = is_array($ensaiosRaw) ? $ensaiosRaw : [];
-                    $colWidths = [20, 25, 20, 18, 12];
+                    $colWidths = [20, 22, 18, 13, 13, 10];
                     $merges = [];
                 }
-                if (count($colWidths) >= 5) {
-                    $outCw = array_slice($colWidths, 1, 4);
+                if (count($colWidths) >= 6) {
+                    $outCw = array_slice($colWidths, 1, 5);
                     $colShift = 1;
                 } else {
-                    $outCw = array_slice($colWidths, 0, 4);
+                    $outCw = array_slice($colWidths, 0, 5);
                     $colShift = 0;
                 }
-                if (count($outCw) < 4) $outCw = [30, 25, 22, 15];
+                if (count($outCw) < 5) $outCw = [26, 22, 18, 15, 14];
                 $cwSum = array_sum($outCw) ?: 1;
                 $cwPct = array_map(function($v) use ($cwSum) { return round($v / $cwSum * 100, 1); }, $outCw);
                 $hiddenCells = []; $spanCells = []; $alignCells = []; $rowInMerge = [];
                 foreach ($merges as $m) {
                     $nc = $m['col'] - $colShift;
-                    if ($nc < 0 || $nc > 3) continue;
+                    if ($nc < 0 || $nc > 4) continue;
                     $k = $m['row'] . '_' . $nc;
                     $spanCells[$k] = $m['span'];
                     $alignCells[$k] = ['h' => $m['hAlign'] ?? 'center', 'v' => $m['vAlign'] ?? 'middle'];
@@ -331,33 +340,55 @@ if ($useMpdf) {
                     }
                 }
                 if (!empty($ensaiosData)) {
-                    $headers = ['Ensaio / Controlo','Especificação','Norma','NQA'];
-                    $fields = ['ensaio','especificacao','norma','nqa'];
+                    $headers = ['Ensaio / Controlo','Especificação','Norma','NEI','NQA'];
+                    $fields = ['ensaio','especificacao','norma','nivel_especial','nqa'];
                     $secTitulo = san($sec['titulo']);
-                    $html .= '<table class="params" repeat_header="1" style="width:100%; border-collapse:collapse; font-size:9pt; margin-top:6px;">';
-                    $html .= '<thead>';
-                    $html .= '<tr><td colspan="4" style="padding:3px 0 5px; font-size:' . $tamTitulos . 'pt; font-weight:bold; color:' . san($corTitulos) . '; border-bottom:1px solid ' . san($corLinhas) . ';">' . ($i + 1) . '. ' . $secTitulo . '</td></tr>';
-                    $html .= '<tr>';
-                    foreach ($headers as $hi => $hName) {
-                        $html .= '<th style="width:' . $cwPct[$hi] . '%; padding:6px 8px; text-align:left; font-weight:600; background-color:' . $corPrimaria . '; color:white;">' . $hName . '</th>';
-                    }
-                    $html .= '</tr></thead><tbody>';
+                    $colspanN = count($headers);
+                    // Agrupar linhas por categoria
+                    $groups = []; $curCat = null; $curRows = [];
                     foreach ($ensaiosData as $rIdx => $ens) {
-                        if (isset($catHeaders[$rIdx])) {
-                            $html .= '<tr class="cat"><td colspan="4" style="background-color:' . $corPrimariaLight . '; font-weight:600; padding:5px 8px; color:' . $corPrimariaDark . '; text-align:center; border-bottom:1px solid #d1d5db;">' . san($catHeaders[$rIdx]) . '</td></tr>';
+                        if (isset($catHeaders[$rIdx]) && !empty($curRows)) {
+                            $groups[] = ['cat' => $curCat, 'rows' => $curRows];
+                            $curRows = [];
                         }
-                        $html .= '<tr>';
-                        foreach ($fields as $cIdx => $field) {
-                            $key = $rIdx . '_' . $cIdx;
-                            if (isset($hiddenCells[$key])) continue;
-                            $rs = isset($spanCells[$key]) ? ' rowspan="' . $spanCells[$key] . '"' : '';
-                            $ms = isset($alignCells[$key]) ? ' vertical-align:' . $alignCells[$key]['v'] . '; text-align:' . $alignCells[$key]['h'] . ';' : '';
-                            $fw = ($field === 'especificacao') ? ' font-weight:bold;' : '';
-                            $html .= '<td' . $rs . ' style="padding:4px 8px; border-bottom:1px solid #e5e7eb;' . $fw . $ms . '">' . san($ens[$field] ?? '') . '</td>';
-                        }
-                        $html .= '</tr>';
+                        if (isset($catHeaders[$rIdx])) $curCat = $catHeaders[$rIdx];
+                        $curRows[] = ['rIdx' => $rIdx, 'data' => $ens];
                     }
-                    $html .= '</tbody></table>';
+                    if (!empty($curRows)) $groups[] = ['cat' => $curCat, 'rows' => $curRows];
+                    // Gerar thead colunas
+                    $theadCols = '<tr>';
+                    foreach ($headers as $hi => $hName) {
+                        $theadCols .= '<th style="width:' . $cwPct[$hi] . '%; padding:6px 8px; text-align:left; font-weight:600; background-color:' . $corPrimaria . '; color:white;">' . $hName . '</th>';
+                    }
+                    $theadCols .= '</tr>';
+                    // Título dentro do thead da 1ª tabela (para não separar)
+                    $theadTitle = '<tr><td colspan="' . $colspanN . '" style="padding:3px 0 5px; font-size:' . $tamTitulos . 'pt; font-weight:bold; color:' . san($corTitulos) . '; border-bottom:1px solid ' . san($corLinhas) . ';">' . ($i + 1) . '. ' . $secTitulo . '</td></tr>';
+                    // Uma tabela por categoria
+                    foreach ($groups as $gIdx => $group) {
+                        $mt = $gIdx === 0 ? '6px' : '0';
+                        $html .= '<table class="params" repeat_header="1" style="width:100%; border-collapse:collapse; font-size:9pt; margin-top:' . $mt . ';">';
+                        $html .= '<thead>' . ($gIdx === 0 ? $theadTitle : '') . $theadCols;
+                        if ($group['cat']) {
+                            $html .= '<tr><td colspan="' . $colspanN . '" style="background-color:' . $corPrimariaLight . '; font-weight:600; padding:5px 8px; color:' . $corPrimariaDark . '; text-align:center; border-bottom:1px solid #d1d5db;">' . san($group['cat']) . '</td></tr>';
+                        }
+                        $html .= '</thead><tbody>';
+                        foreach ($group['rows'] as $row) {
+                            $rIdx = $row['rIdx'];
+                            $ens = $row['data'];
+                            $html .= '<tr>';
+                            foreach ($fields as $cIdx => $field) {
+                                $key = $rIdx . '_' . $cIdx;
+                                if (isset($hiddenCells[$key])) continue;
+                                $rs = isset($spanCells[$key]) ? ' rowspan="' . $spanCells[$key] . '"' : '';
+                                $ms = isset($alignCells[$key]) ? ' vertical-align:' . $alignCells[$key]['v'] . '; text-align:' . $alignCells[$key]['h'] . ';' : '';
+                                $fw = ($field === 'especificacao') ? ' font-weight:bold;' : '';
+                                $html .= '<td' . $rs . ' style="padding:4px 8px; border-bottom:1px solid #e5e7eb;' . $fw . $ms . '">' . san($ens[$field] ?? '') . '</td>';
+                            }
+                            $html .= '</tr>';
+                        }
+                        $html .= '</tbody></table>';
+                    }
+                    $html .= '<p style="font-size:7pt; color:#888; margin:2px 0 0 0;">NEI — Nível Especial de Inspeção &nbsp;|&nbsp; NQA — Nível de Qualidade Aceitável &nbsp;(NP 2922)</p>';
                 }
             } else {
                 $html .= '<div class="section"><h2>' . ($i + 1) . '. ' . san($sec['titulo']) . '</h2>';
@@ -620,27 +651,27 @@ $tamNome    = (int)$cv['tamanho_nome'];
                     $ensaiosRaw = json_decode($sec['conteudo'] ?? '[]', true);
                     if (isset($ensaiosRaw['rows'])) {
                         $ensaiosData = $ensaiosRaw['rows'];
-                        $colWidths = $ensaiosRaw['colWidths'] ?? [20, 25, 20, 18, 12];
+                        $colWidths = $ensaiosRaw['colWidths'] ?? [20, 22, 18, 13, 13, 10];
                         $merges = $ensaiosRaw['merges'] ?? [];
                     } else {
                         $ensaiosData = is_array($ensaiosRaw) ? $ensaiosRaw : [];
-                        $colWidths = [20, 25, 20, 18, 12];
+                        $colWidths = [20, 22, 18, 13, 13, 10];
                         $merges = [];
                     }
-                    if (count($colWidths) >= 5) {
-                        $outCw = array_slice($colWidths, 1, 4);
+                    if (count($colWidths) >= 6) {
+                        $outCw = array_slice($colWidths, 1, 5);
                         $colShift = 1;
                     } else {
-                        $outCw = array_slice($colWidths, 0, 4);
+                        $outCw = array_slice($colWidths, 0, 5);
                         $colShift = 0;
                     }
-                    if (count($outCw) < 4) $outCw = [30, 25, 22, 15];
+                    if (count($outCw) < 5) $outCw = [26, 22, 18, 15, 14];
                     $cwSum = array_sum($outCw) ?: 1;
                     $cwPct = array_map(function($v) use ($cwSum) { return round($v / $cwSum * 100, 1); }, $outCw);
                     $hiddenCells = []; $spanCells = []; $alignCells = []; $rowInMerge = [];
                     foreach ($merges as $m) {
                         $nc = $m['col'] - $colShift;
-                        if ($nc < 0 || $nc > 3) continue;
+                        if ($nc < 0 || $nc > 4) continue;
                         $k = $m['row'] . '_' . $nc;
                         $spanCells[$k] = $m['span'];
                         $alignCells[$k] = ['h' => $m['hAlign'] ?? 'center', 'v' => $m['vAlign'] ?? 'middle'];
@@ -657,7 +688,7 @@ $tamNome    = (int)$cv['tamanho_nome'];
                             $displayedCat = $cat;
                         }
                     }
-                    $fields = ['ensaio','especificacao','norma','nqa'];
+                    $fields = ['ensaio','especificacao','norma','nivel_especial','nqa'];
                     ?>
                     <?php if (!empty($ensaiosData)): ?>
                     <table class="doc-table">
@@ -666,14 +697,15 @@ $tamNome    = (int)$cv['tamanho_nome'];
                                 <th style="width:<?= $cwPct[0] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;">Ensaio / Controlo</th>
                                 <th style="width:<?= $cwPct[1] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;">Especificação</th>
                                 <th style="width:<?= $cwPct[2] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;">Norma</th>
-                                <th style="width:<?= $cwPct[3] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;">NQA</th>
+                                <th style="width:<?= $cwPct[3] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;">NEI</th>
+                                <th style="width:<?= $cwPct[4] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;">NQA</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($ensaiosData as $rIdx => $ens):
                                 if (isset($catHeaders[$rIdx])):
                             ?>
-                            <tr><td colspan="4" style="background:<?= $corPrimariaLight ?>; font-weight:600; padding:6px 10px; color:<?= $corPrimariaDark ?>; text-align:center;"><?= san($catHeaders[$rIdx]) ?></td></tr>
+                            <tr><td colspan="5" style="background:<?= $corPrimariaLight ?>; font-weight:600; padding:6px 10px; color:<?= $corPrimariaDark ?>; text-align:center;"><?= san($catHeaders[$rIdx]) ?></td></tr>
                             <?php endif; ?>
                             <tr>
                                 <?php foreach ($fields as $cIdx => $field):
@@ -688,6 +720,7 @@ $tamNome    = (int)$cv['tamanho_nome'];
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                    <p style="font-size:10px; color:#888; margin:2px 0 0 0;">NEI — Nível Especial de Inspeção &nbsp;|&nbsp; NQA — Nível de Qualidade Aceitável &nbsp;(NP 2922)</p>
                     <?php endif; ?>
                 <?php else: ?>
                     <div class="content"><?php
