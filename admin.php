@@ -1335,6 +1335,14 @@ $activeNav = $tab;
                     </div>
                     <div class="form-group"><label>Assinatura do Email</label><textarea name="cfg_email_assinatura" rows="2"><?= sanitize(getConfiguracao('email_assinatura', 'SpecLab - Cadernos de Encargos e Especificações Técnicas')) ?></textarea></div>
 
+                    <hr style="margin: 18px 0; border: none; border-top: 1px solid #e5e7eb;">
+                    <h3 style="color: #2596be; font-size: 15px; margin-bottom: 12px;">Inteligência Artificial (OpenAI)</h3>
+                    <div class="form-group">
+                        <label>Chave API OpenAI</label>
+                        <input type="password" name="cfg_openai_api_key" value="<?= sanitize(getConfiguracao('openai_api_key')) ?>" placeholder="sk-...">
+                        <small class="muted">Usada para assistente IA, verificação de legislação e chat. Obter em platform.openai.com</small>
+                    </div>
+
                     <div class="mt-lg">
                         <button type="submit" class="btn btn-primary">Guardar Configurações</button>
                     </div>
