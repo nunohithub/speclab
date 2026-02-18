@@ -1554,6 +1554,7 @@ try {
         // LEGISLAÇÃO - VERIFICAÇÃO IA
         // ===================================================================
         case 'verificar_legislacao_ai':
+            set_time_limit(120);
             if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
             $apiKey = getConfiguracao('openai_api_key', '');
             if (!$apiKey) jsonError('Chave OpenAI não configurada em Configurações.');
@@ -1684,6 +1685,7 @@ try {
             break;
 
         case 'chat_legislacao':
+            set_time_limit(90);
             if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
             $pergunta = trim($_POST['pergunta'] ?? '');
             if ($pergunta === '') jsonError('Escreva uma pergunta.');

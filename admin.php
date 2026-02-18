@@ -1166,7 +1166,10 @@ $activeNav = $tab;
                 var fd = new FormData();
                 fd.append('action', 'verificar_legislacao_ai');
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
-                .then(r => r.json())
+                .then(function(r) {
+                    if (!r.ok) return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t.substring(0, 300)); });
+                    return r.json();
+                })
                 .then(function(data) {
                     btn.disabled = false;
                     btn.innerHTML = '&#9878; Verificar com IA';
@@ -1195,10 +1198,10 @@ $activeNav = $tab;
                     });
                     content.innerHTML = html;
                 })
-                .catch(function() {
+                .catch(function(err) {
                     btn.disabled = false;
                     btn.innerHTML = '&#9878; Verificar com IA';
-                    content.innerHTML = '<div style="color:#b42318; padding:12px;">Erro de ligação.</div>';
+                    content.innerHTML = '<div style="color:#b42318; padding:12px;">' + esc(err.message || 'Erro de ligação.') + '</div>';
                 });
             }
             function aplicarSugestao(s) {
