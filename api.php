@@ -1564,29 +1564,31 @@ try {
 
             $legJson = json_encode($legs, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
-            $systemMsg = 'És um especialista em legislação europeia de materiais em contacto com alimentos, com foco na indústria de rolhas de cortiça. Responde sempre em português de Portugal.';
+            $systemMsg = 'És um especialista em legislação europeia de materiais em contacto com alimentos, com foco na indústria de rolhas de cortiça. Responde sempre em português de Portugal. Nunca inventas informação — apenas trabalhas com factos verificáveis.';
 
             $userMsg = "Analisa a seguinte lista de legislação europeia relacionada com materiais em contacto com alimentos, especificamente para a indústria de rolhas de cortiça.\n\n" .
                 "REGRAS OBRIGATÓRIAS:\n" .
-                "1. NÃO inventes normas novas. Trabalha APENAS com as normas fornecidas na lista.\n" .
-                "2. Para cada norma, verifica:\n" .
+                "1. NÃO INVENTES NADA. Não inventes normas, números, datas, referências ou informação que não tenhas a certeza que é factual.\n" .
+                "2. Trabalha APENAS com as normas fornecidas na lista. Não adiciones normas novas.\n" .
+                "3. Para cada norma, verifica:\n" .
                 "   a) Se a referência (número, ano, designação) está correta\n" .
                 "   b) Se existem erros de escrita no nome, rolhas aplicáveis ou resumo\n" .
                 "   c) Se a norma ainda está em vigor\n" .
-                "   d) Se foi revogada ou substituída por outra norma\n" .
-                "   e) Se sofreu alterações/amendments significativos desde a data indicada\n" .
-                "3. Se NÃO tens certeza absoluta sobre o estado de uma norma, coloca status \"verificar\"\n" .
+                "   d) Se foi revogada ou substituída\n" .
+                "   e) Se sofreu alterações/amendments significativos\n" .
                 "4. Corrige erros de escrita mantendo o sentido técnico original\n" .
-                "5. Mantém os campos originais inalterados quando não há correção a fazer\n\n" .
-                "Responde APENAS com um array JSON válido (sem markdown, sem blocos de código, sem texto extra).\n" .
+                "5. Mantém os campos EXATAMENTE como estão quando não há correção concreta a fazer\n" .
+                "6. Se não encontraste problemas numa norma, o status é \"ok\". Não uses \"verificar\" como escape.\n" .
+                "7. Usa \"verificar\" APENAS quando tens uma razão concreta de dúvida — e nas notas explica EXATAMENTE o que deve ser verificado e porquê.\n\n" .
+                "Responde APENAS com um array JSON válido (sem markdown, sem blocos de código, sem texto antes ou depois).\n" .
                 "Formato por norma:\n" .
-                "{\"id\": <id>, \"status\": \"ok|corrigir|atualizada|revogada|verificar\", \"legislacao_norma\": \"...\", \"rolhas_aplicaveis\": \"...\", \"resumo\": \"...\", \"notas\": \"explicação das alterações ou 'Sem alterações necessárias'\"}\n\n" .
-                "Significado dos status:\n" .
-                "- ok: Norma correta, em vigor, sem alterações\n" .
-                "- corrigir: Erros de escrita encontrados (já corrigidos nos campos)\n" .
-                "- atualizada: Existe versão mais recente ou amendment relevante\n" .
-                "- revogada: Norma revogada ou substituída\n" .
-                "- verificar: Incerteza, recomenda verificação manual\n\n" .
+                "{\"id\": <id>, \"status\": \"ok|corrigir|atualizada|revogada|verificar\", \"legislacao_norma\": \"...\", \"rolhas_aplicaveis\": \"...\", \"resumo\": \"...\", \"notas\": \"explicação concreta ou 'Sem alterações'\"}\n\n" .
+                "Status:\n" .
+                "- ok: Norma correta e em vigor, nada a alterar\n" .
+                "- corrigir: Erros de escrita corrigidos nos campos (explicar nas notas o que mudou)\n" .
+                "- atualizada: Versão mais recente existe (indicar qual nas notas)\n" .
+                "- revogada: Norma revogada ou substituída (indicar por qual nas notas)\n" .
+                "- verificar: Dúvida concreta e real (explicar nas notas O QUÊ verificar e PORQUÊ)\n\n" .
                 "Lista atual:\n{$legJson}";
 
             $payload = [
@@ -1696,7 +1698,7 @@ try {
             $legs = $db->query('SELECT legislacao_norma, rolhas_aplicaveis, resumo, ativo FROM legislacao_banco ORDER BY ativo DESC, legislacao_norma')->fetchAll();
             $legJson = json_encode($legs, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
-            $systemMsg = "És um especialista em legislação europeia de materiais em contacto com alimentos, focado na indústria de rolhas de cortiça. Responde em português de Portugal, de forma clara e concisa. NÃO inventes normas que não existam.\n\nBase de legislação atual do sistema:\n{$legJson}";
+            $systemMsg = "És um especialista em legislação europeia de materiais em contacto com alimentos, focado na indústria de rolhas de cortiça. Responde em português de Portugal, de forma clara e concisa. REGRA ABSOLUTA: NÃO INVENTES NADA — não inventes normas, números, datas, artigos ou informação que não tenhas a certeza de ser factual. Se não sabes, diz que não sabes.\n\nBase de legislação atual do sistema:\n{$legJson}";
 
             $payload = [
                 'model' => 'gpt-4o-mini',

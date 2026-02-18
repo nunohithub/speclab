@@ -1188,7 +1188,11 @@ $activeNav = $tab;
                         html += '<strong>' + esc(s.legislacao_norma) + '</strong>';
                         html += '</div>';
                         html += '<div class="muted" style="font-size:12px; margin-bottom:8px;">' + esc(s.notas || '') + '</div>';
-                        if (s.status !== 'ok') {
+                        if (s.status === 'verificar') {
+                            html += '<div style="display:flex; gap:6px;">';
+                            html += '<button class="btn btn-ghost btn-sm" onclick="ignorarSugestao(' + s.id + ')">OK, Verificado</button>';
+                            html += '</div>';
+                        } else if (s.status !== 'ok') {
                             html += '<div style="display:flex; gap:6px;">';
                             html += '<button class="btn btn-primary btn-sm" onclick=\'aplicarSugestao(' + JSON.stringify(s).replace(/'/g, "&#39;") + ')\'>Aplicar</button>';
                             html += '<button class="btn btn-ghost btn-sm" onclick="ignorarSugestao(' + s.id + ')">Ignorar</button>';
