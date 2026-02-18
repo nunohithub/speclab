@@ -1041,7 +1041,7 @@ $activeNav = $tab;
                 .then(r => r.json())
                 .then(data => {
                     if (!data.success) return;
-                    var rows = data.legislacao || [];
+                    var rows = (data.data && data.data.legislacao) ? data.data.legislacao : [];
                     var tbody = document.getElementById('legRows');
                     if (rows.length === 0) {
                         tbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center; padding:20px;">Nenhuma legislação registada.</td></tr>';
