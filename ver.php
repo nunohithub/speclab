@@ -146,10 +146,61 @@ function san(string $s): string {
                 <div><span>Criado por:</span> <strong><?= san($data['criado_por_nome'] ?? '-') ?></strong></div>
             </div>
 
+            <?php
+            // No Ver, ficheiros aparecem sempre na posição do editor
+            $ficheirosPos = 'local';
+            $ficheirosRendered = false;
+            // Preparar lista de ficheiros válidos
+            $validFilesVer = [];
+            if (!empty($data['ficheiros'])) {
+                foreach ($data['ficheiros'] as $f) {
+                    if (file_exists(UPLOAD_DIR . $f['nome_servidor'])) {
+                        $validFilesVer[] = $f;
+                    }
+                }
+            }
+            ?>
+
             <?php if (!empty($data['seccoes'])): ?>
                 <?php foreach ($data['seccoes'] as $i => $sec):
                     $secTipo = $sec['tipo'] ?? 'texto';
                 ?>
+                    <?php if ($secTipo === 'ficheiros'): ?>
+                        <?php if ($ficheirosPos === 'local' && !empty($validFilesVer)):
+                            $ficheirosRendered = true; ?>
+                            <div class="doc-section">
+                                <h2><?= ($i + 1) . '. ' . san($sec['titulo']) ?></h2>
+                                <?php foreach ($validFilesVer as $f):
+                                    $ext = strtolower(pathinfo($f['nome_original'], PATHINFO_EXTENSION));
+                                    $isPdf = ($ext === 'pdf');
+                                    $isImage = in_array($ext, ['jpg','jpeg','png','gif','bmp','tif','tiff']);
+                                    $downloadUrl = BASE_PATH . '/download.php?id=' . $f['id'];
+                                    $inlineUrl = $downloadUrl . '&inline=1';
+                                ?>
+                                    <div style="margin-top:12px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
+                                        <div style="padding:8px 12px; background:#f9fafb; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb;">
+                                            <span style="font-weight:600; font-size:13px;">&#128196; <?= san($f['nome_original']) ?> <span style="color:#999; font-weight:normal; font-size:11px;">(<?= formatFileSize($f['tamanho']) ?>)</span></span>
+                                            <a href="<?= $downloadUrl ?>" style="font-size:12px; color:#2563eb; text-decoration:none;">Descarregar</a>
+                                        </div>
+                                        <?php if ($isPdf): ?>
+                                            <iframe src="<?= $inlineUrl ?>#toolbar=0&navpanes=0&view=FitH" style="width:100%; height:600px; border:none;"></iframe>
+                                        <?php elseif ($isImage): ?>
+                                            <div style="padding:12px; text-align:center; max-height:500px; overflow:auto;">
+                                                <img src="<?= $inlineUrl ?>" style="max-width:100%; max-height:480px;" alt="<?= san($f['nome_original']) ?>">
+                                            </div>
+                                        <?php else: ?>
+                                            <div style="padding:20px; text-align:center; color:#666;">
+                                                <p>Pré-visualização não disponível.</p>
+                                                <a href="<?= $downloadUrl ?>" style="color:#2563eb;">Descarregar ficheiro</a>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                        <?php continue; ?>
+                    <?php endif; ?>
+
                     <div class="doc-section">
                         <h2><?= ($i + 1) . '. ' . san($sec['titulo']) ?></h2>
                         <?php if ($secTipo === 'ensaios'): ?>
@@ -312,17 +363,35 @@ function san(string $s): string {
                 </div>
             <?php endif; ?>
 
-            <?php if (!empty($data['ficheiros'])): ?>
+            <?php if (!$ficheirosRendered && !empty($validFilesVer)): ?>
                 <div class="doc-section">
                     <h2>Documentos Anexos</h2>
-                    <div style="margin-top:8px;">
-                        <?php foreach ($data['ficheiros'] as $f): ?>
-                            <a href="<?= BASE_PATH ?>/download.php?id=<?= $f['id'] ?>" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:#f3f4f6; border-radius:6px; font-size:12px; color:#111827; margin:4px 4px 4px 0; text-decoration:none; border:1px solid #e5e7eb;">
-                                &#128196; <?= san($f['nome_original']) ?>
-                                <span style="color:#999; font-size:11px;">(<?= formatFileSize($f['tamanho']) ?>)</span>
-                            </a>
-                        <?php endforeach; ?>
-                    </div>
+                    <?php foreach ($validFilesVer as $f):
+                        $ext = strtolower(pathinfo($f['nome_original'], PATHINFO_EXTENSION));
+                        $isPdf = ($ext === 'pdf');
+                        $isImage = in_array($ext, ['jpg','jpeg','png','gif','bmp','tif','tiff']);
+                        $downloadUrl = BASE_PATH . '/download.php?id=' . $f['id'];
+                        $inlineUrl = $downloadUrl . '&inline=1';
+                    ?>
+                        <div style="margin-top:12px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
+                            <div style="padding:8px 12px; background:#f9fafb; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb;">
+                                <span style="font-weight:600; font-size:13px;">&#128196; <?= san($f['nome_original']) ?> <span style="color:#999; font-weight:normal; font-size:11px;">(<?= formatFileSize($f['tamanho']) ?>)</span></span>
+                                <a href="<?= $downloadUrl ?>" style="font-size:12px; color:#2563eb; text-decoration:none;">Descarregar</a>
+                            </div>
+                            <?php if ($isPdf): ?>
+                                <iframe src="<?= $inlineUrl ?>#toolbar=0&navpanes=0&view=FitH" style="width:100%; height:600px; border:none;"></iframe>
+                            <?php elseif ($isImage): ?>
+                                <div style="padding:12px; text-align:center; max-height:500px; overflow:auto;">
+                                    <img src="<?= $inlineUrl ?>" style="max-width:100%; max-height:480px;" alt="<?= san($f['nome_original']) ?>">
+                                </div>
+                            <?php else: ?>
+                                <div style="padding:20px; text-align:center; color:#666;">
+                                    <p>Pré-visualização não disponível.</p>
+                                    <a href="<?= $downloadUrl ?>" style="color:#2563eb;">Descarregar ficheiro</a>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             <?php endif; ?>
 

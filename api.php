@@ -465,7 +465,8 @@ try {
                     foreach ($seccoes as $i => $s) {
                         $titulo = trim($s['titulo'] ?? '');
                         if ($titulo === '') $titulo = 'Secção ' . ($i + 1);
-                        $tipo = ($s['tipo'] ?? 'texto') === 'ensaios' ? 'ensaios' : 'texto';
+                        $tipoRaw = $s['tipo'] ?? 'texto';
+                        $tipo = in_array($tipoRaw, ['ensaios', 'ficheiros']) ? $tipoRaw : 'texto';
                         $conteudo = $s['conteudo'] ?? '';
                         // Para ensaios, o conteúdo é JSON - não sanitizar como rich text
                         if ($tipo === 'texto') {
@@ -1508,9 +1509,9 @@ try {
         // ===================================================================
         case 'get_legislacao_banco':
             if (isSuperAdmin() && !empty($_GET['all'])) {
-                $stmt = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo, ativo FROM legislacao_banco ORDER BY ativo DESC, legislacao_norma');
+                $stmt = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo, link_url, ativo FROM legislacao_banco ORDER BY ativo DESC, legislacao_norma');
             } else {
-                $stmt = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo FROM legislacao_banco WHERE ativo = 1 ORDER BY legislacao_norma');
+                $stmt = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo, link_url FROM legislacao_banco WHERE ativo = 1 ORDER BY legislacao_norma');
             }
             jsonSuccess('OK', ['legislacao' => $stmt->fetchAll()]);
             break;
@@ -1521,14 +1522,15 @@ try {
             $norma = trim($_POST['legislacao_norma'] ?? '');
             $rolhas = trim($_POST['rolhas_aplicaveis'] ?? '');
             $resumo = trim($_POST['resumo'] ?? '');
+            $linkUrl = trim($_POST['link_url'] ?? '');
             $ativoL = (int)($_POST['ativo'] ?? 1);
             if ($norma === '') jsonError('Introduza a legislação/norma.');
             if ($lid > 0) {
-                $stmt = $db->prepare('UPDATE legislacao_banco SET legislacao_norma = ?, rolhas_aplicaveis = ?, resumo = ?, ativo = ? WHERE id = ?');
-                $stmt->execute([$norma, $rolhas, $resumo, $ativoL, $lid]);
+                $stmt = $db->prepare('UPDATE legislacao_banco SET legislacao_norma = ?, rolhas_aplicaveis = ?, resumo = ?, link_url = ?, ativo = ? WHERE id = ?');
+                $stmt->execute([$norma, $rolhas, $resumo, $linkUrl ?: null, $ativoL, $lid]);
             } else {
-                $stmt = $db->prepare('INSERT INTO legislacao_banco (legislacao_norma, rolhas_aplicaveis, resumo, ativo) VALUES (?, ?, ?, ?)');
-                $stmt->execute([$norma, $rolhas, $resumo, $ativoL]);
+                $stmt = $db->prepare('INSERT INTO legislacao_banco (legislacao_norma, rolhas_aplicaveis, resumo, link_url, ativo) VALUES (?, ?, ?, ?, ?)');
+                $stmt->execute([$norma, $rolhas, $resumo, $linkUrl ?: null, $ativoL]);
                 $lid = $db->lastInsertId();
             }
             jsonSuccess(['id' => $lid, 'msg' => 'Legislação guardada.']);
@@ -1738,6 +1740,47 @@ try {
             if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
             $stmt = $db->query('SELECT l.*, u.nome as utilizador_nome FROM legislacao_log l LEFT JOIN utilizadores u ON l.alterado_por = u.id ORDER BY l.criado_em DESC LIMIT 100');
             jsonSuccess('OK', ['log' => $stmt->fetchAll()]);
+            break;
+
+        // ===================================================================
+        // BANCO DE ENSAIOS
+        // ===================================================================
+        case 'get_ensaios_banco':
+            if (isset($_GET['all']) && isSuperAdmin()) {
+                $stmt = $db->query('SELECT * FROM ensaios_banco ORDER BY ordem, categoria, ensaio');
+            } else {
+                $stmt = $db->query('SELECT id, categoria, ensaio, metodo, exemplo FROM ensaios_banco WHERE ativo = 1 ORDER BY ordem, categoria, ensaio');
+            }
+            jsonSuccess('OK', ['ensaios' => $stmt->fetchAll()]);
+            break;
+
+        case 'save_ensaio_banco':
+            if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+            $eid = (int)($_POST['id'] ?? 0);
+            $cat = trim($_POST['categoria'] ?? '');
+            $ens = trim($_POST['ensaio'] ?? '');
+            $met = trim($_POST['metodo'] ?? '');
+            $ex = trim($_POST['exemplo'] ?? '');
+            $ativoE = (int)($_POST['ativo'] ?? 1);
+            if (!$cat || !$ens) jsonError('Categoria e ensaio são obrigatórios.');
+            if ($eid > 0) {
+                $stmt = $db->prepare('UPDATE ensaios_banco SET categoria = ?, ensaio = ?, metodo = ?, exemplo = ?, ativo = ? WHERE id = ?');
+                $stmt->execute([$cat, $ens, $met, $ex, $ativoE, $eid]);
+            } else {
+                $maxOrdem = $db->query('SELECT COALESCE(MAX(ordem),0)+1 FROM ensaios_banco')->fetchColumn();
+                $stmt = $db->prepare('INSERT INTO ensaios_banco (categoria, ensaio, metodo, exemplo, ativo, ordem) VALUES (?, ?, ?, ?, ?, ?)');
+                $stmt->execute([$cat, $ens, $met, $ex, $ativoE, $maxOrdem]);
+            }
+            jsonSuccess('Ensaio guardado.');
+            break;
+
+        case 'delete_ensaio_banco':
+            if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+            $eid = (int)($_POST['id'] ?? 0);
+            if ($eid > 0) {
+                $db->prepare('DELETE FROM ensaios_banco WHERE id = ?')->execute([$eid]);
+            }
+            jsonSuccess('Ensaio eliminado.');
             break;
 
         // AÇÃO DESCONHECIDA

@@ -55,9 +55,14 @@ if (!file_exists($filepath)) {
 $stmt = $db->prepare('INSERT INTO acessos_log (especificacao_id, ip, user_agent, tipo) VALUES (?, ?, ?, ?)');
 $stmt->execute([$file['especificacao_id'], $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '', 'download']);
 
-// Headers de download
+// Headers - inline para visualização em iframe, attachment para download
+$inline = isset($_GET['inline']);
 header('Content-Type: ' . ($file['tipo_ficheiro'] ?: 'application/octet-stream'));
-header('Content-Disposition: attachment; filename="' . $file['nome_original'] . '"');
+if ($inline) {
+    header('Content-Disposition: inline; filename="' . $file['nome_original'] . '"');
+} else {
+    header('Content-Disposition: attachment; filename="' . $file['nome_original'] . '"');
+}
 header('Content-Length: ' . filesize($filepath));
 header('Cache-Control: no-cache, must-revalidate');
 

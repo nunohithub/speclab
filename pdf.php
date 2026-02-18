@@ -141,7 +141,7 @@ if ($useMpdf) {
     }
     $logoHtml = file_exists($logoPath) ? '<img src="' . $logoPath . '" height="35">' : san($orgNome);
 
-    $mpdf->SetHTMLHeader('
+    $headerHtml = '
         <table width="100%" style="border-bottom: 2pt solid ' . san($corLinhas) . '; margin-bottom: 5mm;">
             <tr>
                 <td width="30%">' . $logoHtml . '</td>
@@ -150,18 +150,17 @@ if ($useMpdf) {
                     <span style="font-size: 8pt; color: #666;">' . san($data['numero']) . ' | Versão ' . san($data['versao']) . '</span>
                 </td>
             </tr>
-        </table>
-    ');
-
-    $mpdf->SetHTMLFooter('
+        </table>';
+    $footerHtml = '
         <table width="100%" style="border-top: 0.5pt solid #ddd; font-size: 8pt; color: #999;">
             <tr>
                 <td width="33%">' . san($orgNome) . '</td>
                 <td width="33%" style="text-align: center;">Página {PAGENO} de {nbpg}</td>
                 <td width="33%" style="text-align: right;">' . san($data['numero']) . '</td>
             </tr>
-        </table>
-    ');
+        </table>';
+    $mpdf->SetHTMLHeader($headerHtml);
+    $mpdf->SetHTMLFooter($footerHtml);
 
     // CSS para PDF
     $css = '
@@ -217,13 +216,80 @@ if ($useMpdf) {
     }
     $html .= '</table></div>';
 
+    // Preparar lista de ficheiros válidos (antes do loop de secções)
+    $validFiles = [];
+    if (!empty($data['ficheiros'])) {
+        foreach ($data['ficheiros'] as $f) {
+            if (file_exists(UPLOAD_DIR . $f['nome_servidor'])) {
+                $validFiles[] = $f;
+            }
+        }
+    }
+
+    // Determinar posição dos ficheiros
+    $ficheirosPos = 'final';
+    $ficheirosRenderedPdf = false;
+    if (!empty($data['seccoes'])) {
+        foreach ($data['seccoes'] as $sec) {
+            if (($sec['tipo'] ?? '') === 'ficheiros') {
+                $ficConf = json_decode($sec['conteudo'] ?? '{}', true);
+                $ficheirosPos = $ficConf['posicao'] ?? 'final';
+            }
+        }
+    }
+
     // Secções dinâmicas (prioridade) ou campos fixos (backward compat)
     if (!empty($data['seccoes'])) {
         foreach ($data['seccoes'] as $i => $sec) {
             $secTipo = $sec['tipo'] ?? 'texto';
-            $html .= '<div class="section"><h2>' . ($i + 1) . '. ' . san($sec['titulo']) . '</h2>';
+
+            // Secção ficheiros
+            if ($secTipo === 'ficheiros') {
+                if ($ficheirosPos === 'local' && !empty($validFiles)) {
+                    $ficheirosRenderedPdf = true;
+                    // Escrever HTML acumulado até aqui
+                    $mpdf->WriteHTML($html);
+                    $html = '';
+                    // Header vazio ANTES do AddPage (header aplica-se ao abrir página)
+                    $mpdf->SetHTMLHeader('');
+                    // Importar páginas PDF anexo (A4 completo, sem header/footer)
+                    foreach ($validFiles as $f) {
+                        $fExt = strtolower(pathinfo($f['nome_original'], PATHINFO_EXTENSION));
+                        if ($fExt === 'pdf') {
+                            $filepath = UPLOAD_DIR . $f['nome_servidor'];
+                            try {
+                                $pageCount = $mpdf->setSourceFile($filepath);
+                                for ($p = 1; $p <= $pageCount; $p++) {
+                                    $tplId = $mpdf->importPage($p);
+                                    // AddPage fecha pág anterior (footer actual) e abre nova (header actual = vazio)
+                                    $mpdf->AddPageByArray([
+                                        'margin-left' => 0, 'margin-right' => 0,
+                                        'margin-top' => 0, 'margin-bottom' => 0,
+                                        'margin-header' => 0, 'margin-footer' => 0,
+                                    ]);
+                                    // Footer vazio DEPOIS do AddPage (footer aplica-se ao fechar página)
+                                    $mpdf->SetHTMLFooter('');
+                                    $mpdf->SetPageTemplate('');
+                                    $mpdf->useTemplate($tplId, 0, 0, 210, 297);
+                                }
+                            } catch (Exception $e) {}
+                        }
+                    }
+                    // Header relatório ANTES do AddPage (para a nova página de relatório)
+                    $mpdf->SetHTMLHeader($headerHtml);
+                    $mpdf->AddPageByArray([
+                        'margin-left' => 15, 'margin-right' => 15,
+                        'margin-top' => 30, 'margin-bottom' => 20,
+                        'margin-header' => 10, 'margin-footer' => 10,
+                    ]);
+                    // Footer relatório DEPOIS do AddPage (para esta página)
+                    $mpdf->SetHTMLFooter($footerHtml);
+                }
+                continue;
+            }
 
             if ($secTipo === 'ensaios') {
+                $html .= '<div class="section">';
                 $ensaiosRaw = json_decode($sec['conteudo'] ?? '[]', true);
                 if (isset($ensaiosRaw['rows'])) {
                     $ensaiosData = $ensaiosRaw['rows'];
@@ -267,8 +333,11 @@ if ($useMpdf) {
                 if (!empty($ensaiosData)) {
                     $headers = ['Ensaio / Controlo','Especificação','Norma','NQA'];
                     $fields = ['ensaio','especificacao','norma','nqa'];
-                    $html .= '<table class="params" style="width:100%; border-collapse:collapse; font-size:9pt; margin-top:6px;">';
-                    $html .= '<thead><tr>';
+                    $secTitulo = san($sec['titulo']);
+                    $html .= '<table class="params" repeat_header="1" style="width:100%; border-collapse:collapse; font-size:9pt; margin-top:6px;">';
+                    $html .= '<thead>';
+                    $html .= '<tr><td colspan="4" style="padding:3px 0 5px; font-size:' . $tamTitulos . 'pt; font-weight:bold; color:' . san($corTitulos) . '; border-bottom:1px solid ' . san($corLinhas) . ';">' . ($i + 1) . '. ' . $secTitulo . '</td></tr>';
+                    $html .= '<tr>';
                     foreach ($headers as $hi => $hName) {
                         $html .= '<th style="width:' . $cwPct[$hi] . '%; padding:6px 8px; text-align:left; font-weight:600; background-color:' . $corPrimaria . '; color:white;">' . $hName . '</th>';
                     }
@@ -291,6 +360,7 @@ if ($useMpdf) {
                     $html .= '</tbody></table>';
                 }
             } else {
+                $html .= '<div class="section"><h2>' . ($i + 1) . '. ' . san($sec['titulo']) . '</h2>';
                 $secContent = $sec['conteudo'] ?? '';
                 if (strip_tags($secContent) === $secContent) {
                     $secContent = nl2br(san($secContent));
@@ -354,33 +424,13 @@ if ($useMpdf) {
         $html .= '</tbody></table></div>';
     }
 
-    // Files list
-    if (!empty($data['ficheiros'])) {
+    // Files list at end (only if not rendered inline)
+    if (!$ficheirosRenderedPdf && !empty($validFiles)) {
         $html .= '<div class="section"><h2>Documentos Anexos</h2><div class="file-list">';
-        foreach ($data['ficheiros'] as $f) {
+        foreach ($validFiles as $f) {
             $html .= '<div class="file-item">&#8226; ' . san($f['nome_original']) . ' (' . formatFileSize($f['tamanho']) . ')</div>';
         }
         $html .= '</div></div>';
-
-        // Embed PDF attachments as pages
-        foreach ($data['ficheiros'] as $f) {
-            $ext = strtolower(pathinfo($f['nome_original'], PATHINFO_EXTENSION));
-            if ($ext === 'pdf') {
-                $filepath = UPLOAD_DIR . $f['nome_servidor'];
-                if (file_exists($filepath)) {
-                    try {
-                        $pageCount = $mpdf->setSourceFile($filepath);
-                        for ($i = 1; $i <= $pageCount; $i++) {
-                            $mpdf->AddPage();
-                            $tplId = $mpdf->importPage($i);
-                            $mpdf->useTemplate($tplId);
-                        }
-                    } catch (Exception $e) {
-                        // Skip if PDF import fails
-                    }
-                }
-            }
-        }
     }
 
     // Signature block
@@ -391,6 +441,34 @@ if ($useMpdf) {
     $html .= '</tr></table></div>';
 
     $mpdf->WriteHTML($html);
+
+    // Anexos no final (só quando posição = final)
+    if (!$ficheirosRenderedPdf && !empty($validFiles)) {
+        // Header vazio ANTES do AddPage (aplica-se ao abrir)
+        $mpdf->SetHTMLHeader('');
+        foreach ($validFiles as $f) {
+            $ext = strtolower(pathinfo($f['nome_original'], PATHINFO_EXTENSION));
+            if ($ext === 'pdf') {
+                $filepath = UPLOAD_DIR . $f['nome_servidor'];
+                try {
+                    $mpdf->SetPageTemplate('');
+                    $pageCount = $mpdf->setSourceFile($filepath);
+                    for ($p = 1; $p <= $pageCount; $p++) {
+                        $tplId = $mpdf->importPage($p);
+                        $mpdf->AddPageByArray([
+                            'margin-left' => 0, 'margin-right' => 0,
+                            'margin-top' => 0, 'margin-bottom' => 0,
+                            'margin-header' => 0, 'margin-footer' => 0,
+                        ]);
+                        // Footer vazio DEPOIS do AddPage (aplica-se ao fechar)
+                        $mpdf->SetHTMLFooter('');
+                        $mpdf->SetPageTemplate('');
+                        $mpdf->useTemplate($tplId, 0, 0, 210, 297);
+                    }
+                } catch (Exception $e) {}
+            }
+        }
+    }
 
     // PDF Protection
     $protegido = !empty($data['pdf_protegido']);
@@ -422,7 +500,7 @@ if ($useMpdf) {
     }
 
     $filename = 'Caderno_Encargos_' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $data['numero']) . '.pdf';
-    $mpdf->Output($filename, \Mpdf\Output\Destination::INLINE);
+    $mpdf->Output($filename, \Mpdf\Output\Destination::DOWNLOAD);
     exit;
 }
 
@@ -533,6 +611,7 @@ $tamNome    = (int)$cv['tamanho_nome'];
     <?php if (!empty($data['seccoes'])): ?>
         <?php foreach ($data['seccoes'] as $i => $sec):
             $secTipo = $sec['tipo'] ?? 'texto';
+            if ($secTipo === 'ficheiros') continue;
         ?>
             <div class="section">
                 <h2><?= ($i + 1) . '. ' . san($sec['titulo']) ?></h2>
@@ -687,24 +766,32 @@ $tamNome    = (int)$cv['tamanho_nome'];
         </div>
     <?php endif; ?>
 
-    <?php if (!empty($data['ficheiros'])): ?>
+    <?php
+    $validFilesFallback = [];
+    if (!empty($data['ficheiros'])) {
+        foreach ($data['ficheiros'] as $f) {
+            if (file_exists(UPLOAD_DIR . $f['nome_servidor'])) {
+                $validFilesFallback[] = $f;
+            }
+        }
+    }
+    if (!empty($validFilesFallback)): ?>
         <div class="section">
             <h2>Documentos Anexos</h2>
-            <?php foreach ($data['ficheiros'] as $f): ?>
+            <?php foreach ($validFilesFallback as $f): ?>
                 <div style="padding:2px 0; font-size:9pt;">
                     &#8226; <?= san($f['nome_original']) ?> (<?= formatFileSize($f['tamanho']) ?>)
                 </div>
             <?php endforeach; ?>
         </div>
 
-        <!-- Embed PDF attachments -->
-        <?php foreach ($data['ficheiros'] as $f):
+        <?php foreach ($validFilesFallback as $f):
             $ext = strtolower(pathinfo($f['nome_original'], PATHINFO_EXTENSION));
             if ($ext === 'pdf'):
         ?>
             <div class="embed-section">
                 <h3>Anexo: <?= san($f['nome_original']) ?></h3>
-                <iframe class="embed-frame" src="<?= BASE_PATH ?>/download.php?id=<?= $f['id'] ?><?= $code ? '&code=' . urlencode($code) : '' ?>#toolbar=0" type="application/pdf"></iframe>
+                <iframe class="embed-frame" src="<?= BASE_PATH ?>/download.php?id=<?= $f['id'] ?>&inline=1<?= $code ? '&code=' . urlencode($code) : '' ?>" type="application/pdf"></iframe>
             </div>
         <?php endif; endforeach; ?>
     <?php endif; ?>

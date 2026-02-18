@@ -83,44 +83,21 @@ function getEspecificacaoCompleta(PDO $db, int $id): ?array {
  * Obter categorias de parâmetros padrão baseadas nos cadernos de encargo analisados
  */
 function getCategoriasPadrao(): array {
-    return [
-        'Físico-Mecânico' => [
-            ['ensaio' => 'Comprimento', 'metodo' => 'ISO 9727-1', 'exemplo' => '±0.7 mm'],
-            ['ensaio' => 'Diâmetro', 'metodo' => 'ISO 9727-1', 'exemplo' => '±0.5 mm'],
-            ['ensaio' => 'Ovalidade', 'metodo' => 'ISO 9727-1', 'exemplo' => '≤0.5 mm'],
-            ['ensaio' => 'Massa volúmica aparente', 'metodo' => 'ISO 9727-3', 'exemplo' => '130-270 kg/m³'],
-            ['ensaio' => 'Humidade', 'metodo' => 'ISO 9727-3', 'exemplo' => '5-8%'],
-            ['ensaio' => 'Força de extração', 'metodo' => 'ISO 9727-5', 'exemplo' => '15-40 daN'],
-            ['ensaio' => 'Estanquicidade líquida', 'metodo' => 'ISO 9727-6', 'exemplo' => '100% ≥1.5 bar'],
-            ['ensaio' => 'Recuperação elástica', 'metodo' => 'ISO 9727-7', 'exemplo' => '≥96%'],
-            ['ensaio' => 'Capilaridade', 'metodo' => 'Método interno', 'exemplo' => '0 mm'],
-        ],
-        'Químico' => [
-            ['ensaio' => 'Resíduos de peróxidos', 'metodo' => 'Método interno', 'exemplo' => '≤0.2 mg/rolha'],
-            ['ensaio' => 'Resíduos sólidos totais', 'metodo' => 'Método interno', 'exemplo' => '≤1.0 mg/rolha'],
-            ['ensaio' => 'Absorção', 'metodo' => 'Método interno', 'exemplo' => '≤10-40%'],
-        ],
-        'Microbiologia' => [
-            ['ensaio' => 'Bactérias totais', 'metodo' => 'NP ISO 10718', 'exemplo' => '≤4 UFC'],
-            ['ensaio' => 'Leveduras', 'metodo' => 'NP ISO 10718', 'exemplo' => '≤4 UFC'],
-            ['ensaio' => 'Fungos', 'metodo' => 'NP ISO 10718', 'exemplo' => '≤4 UFC'],
-        ],
-        'Sensorial' => [
-            ['ensaio' => 'Análise de odor', 'metodo' => 'ISO 22308', 'exemplo' => 'i≤1'],
-            ['ensaio' => '2,4,6-TCA', 'metodo' => 'ISO 20752', 'exemplo' => '≤0.5-1.5 ng/L'],
-            ['ensaio' => 'Aromas desagradáveis', 'metodo' => 'ISO 22308', 'exemplo' => '<1%'],
-        ],
-        'Cromatografia' => [
-            ['ensaio' => 'GC-SPME (compostos voláteis)', 'metodo' => 'ISO 20752', 'exemplo' => 'Ver limite'],
-            ['ensaio' => 'Geosmina', 'metodo' => 'Método interno', 'exemplo' => 'Deteção'],
-            ['ensaio' => 'Guaiacol', 'metodo' => 'Método interno', 'exemplo' => 'Deteção'],
-            ['ensaio' => '2-MIB', 'metodo' => 'Método interno', 'exemplo' => 'Deteção'],
-        ],
-        'Visual' => [
-            ['ensaio' => 'Classe visual', 'metodo' => 'ISO 16419', 'exemplo' => 'Extra a 4º'],
-            ['ensaio' => 'Defeitos (%)', 'metodo' => 'ISO 16419', 'exemplo' => '6-12%'],
-        ],
-    ];
+    try {
+        $db = getDB();
+        $rows = $db->query('SELECT categoria, ensaio, metodo, exemplo FROM ensaios_banco WHERE ativo = 1 ORDER BY ordem, categoria, ensaio')->fetchAll();
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row['categoria']][] = [
+                'ensaio' => $row['ensaio'],
+                'metodo' => $row['metodo'],
+                'exemplo' => $row['exemplo'],
+            ];
+        }
+        return $result;
+    } catch (Exception $e) {
+        return [];
+    }
 }
 
 /**

@@ -176,22 +176,25 @@ $pageSubtitle = 'Editor de Especificação';
         .save-indicator.error .save-dot { background: var(--color-error); }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
+        .sticky-header {
+            position: sticky;
+            top: 49px;
+            z-index: 40;
+            background: var(--color-bg, #f3f4f6);
+        }
         .editor-toolbar {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: var(--spacing-sm);
-            margin-bottom: var(--spacing-md);
             flex-wrap: wrap;
-            position: sticky;
-            top: 0;
-            background: var(--color-bg, #f3f4f6);
-            z-index: 40;
             padding: var(--spacing-sm) 0;
             border-bottom: 1px solid var(--color-border, #e5e7eb);
         }
         .editor-toolbar .left { display: flex; align-items: center; gap: var(--spacing-sm); }
         .editor-toolbar .right { display: flex; align-items: center; gap: var(--spacing-sm); }
+        .sticky-header .tabs { background: var(--color-bg, #f3f4f6); margin-bottom: 0; padding-bottom: 0; }
+        .sticky-header { box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: var(--spacing-lg); }
 
         .template-grid {
             display: grid;
@@ -803,7 +806,8 @@ $pageSubtitle = 'Editor de Especificação';
 
     <!-- EDITOR TOOLBAR -->
     <div class="container">
-        <div class="editor-toolbar no-print">
+        <div class="sticky-header no-print">
+        <div class="editor-toolbar">
             <div class="left">
                 <a href="<?= BASE_PATH ?>/dashboard.php" class="btn btn-ghost btn-sm" title="Voltar ao Dashboard">&larr; Voltar</a>
                 <h2><?= $isNew ? 'Nova Especificação' : 'Editar Especificação' ?></h2>
@@ -830,16 +834,14 @@ $pageSubtitle = 'Editor de Especificação';
         </div>
 
         <!-- TABS NAVIGATION -->
-        <div class="tabs no-print" id="mainTabs">
+        <div class="tabs" id="mainTabs">
             <button class="tab active" data-tab="dados-gerais">Dados Gerais</button>
             <button class="tab" data-tab="conteudo">Conteúdo</button>
-            <button class="tab" data-tab="parametros">Ensaios</button>
             <button class="tab" data-tab="classes-defeitos">Classes e Defeitos</button>
-            <button class="tab" data-tab="legislacao">Legislação</button>
-            <button class="tab" data-tab="ficheiros">Ficheiros</button>
             <button class="tab" data-tab="partilha">Partilha</button>
             <button class="tab" data-tab="configuracoes">Configurações</button>
         </div>
+        </div><!-- /.sticky-header -->
 
         <!-- CONTENT GRID WITH SIDEBAR -->
         <div class="content-grid with-sidebar">
@@ -1004,7 +1006,44 @@ $pageSubtitle = 'Editor de Especificação';
                                     </div>
                                     <textarea id="seccao_<?= $i ?>" class="seccao-editor" rows="6" placeholder="Conteúdo da secção..."><?= $sec['conteudo'] ?? '' ?></textarea>
                                 </div>
-                                <?php else: ?>
+                                <?php elseif ($secTipo === 'ficheiros'): ?>
+                                <?php
+                                    $ficConf = json_decode($sec['conteudo'] ?? '{}', true);
+                                    $ficPosicao = $ficConf['posicao'] ?? 'final';
+                                ?>
+                                <div class="seccao-block" data-seccao-idx="<?= $i ?>" data-tipo="ficheiros" id="ficheirosSection">
+                                    <div class="seccao-header">
+                                        <span class="seccao-numero"><?= $i + 1 ?>.</span>
+                                        <input type="text" class="seccao-titulo" value="<?= sanitize($sec['titulo'] ?? 'Ficheiros Anexos') ?>" placeholder="Título">
+                                        <span class="pill pill-info" style="font-size:10px; padding:2px 8px;">Ficheiros</span>
+                                        <div class="seccao-actions">
+                                            <button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, -1)" title="Mover acima">&#9650;</button>
+                                            <button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, 1)" title="Mover abaixo">&#9660;</button>
+                                            <button class="btn btn-ghost btn-sm seccao-remove-btn" onclick="removerSeccao(this)" title="Remover secção">&times;</button>
+                                        </div>
+                                    </div>
+                                    <div style="padding: var(--spacing-md);">
+                                        <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                                            <label style="font-size:12px; font-weight:600; color:#374151;">No PDF:</label>
+                                            <select id="ficheiros_posicao" style="font-size:12px; padding:4px 8px; border:1px solid var(--color-border); border-radius:4px;">
+                                                <option value="local" <?= $ficPosicao === 'local' ? 'selected' : '' ?>>Mostrar neste local</option>
+                                                <option value="final" <?= $ficPosicao === 'final' ? 'selected' : '' ?>>Mostrar no final do documento</option>
+                                            </select>
+                                        </div>
+                                        <div class="upload-zone" id="uploadZone" style="cursor:pointer; padding:20px; border:2px dashed var(--color-border); border-radius:8px; text-align:center;">
+                                            <div class="icon">&#128206;</div>
+                                            <p><strong>Arraste ficheiros ou clique para selecionar</strong></p>
+                                            <p class="muted" style="font-size:12px;">Máx. 50MB. Formatos: PDF, DOC, XLS, JPG, PNG</p>
+                                            <input type="file" id="fileInput" multiple style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.bmp,.tif,.tiff,.csv,.txt">
+                                        </div>
+                                        <div id="uploadProgress" class="hidden" style="margin-top:8px;">
+                                            <div class="flex-between"><span class="muted" id="uploadFileName">A enviar...</span><span class="muted" id="uploadPercent">0%</span></div>
+                                            <div class="progress-bar-container"><div class="progress-bar-fill" id="uploadBar" style="width:0%"></div></div>
+                                        </div>
+                                        <ul class="file-list" id="fileList" style="margin-top:8px;"></ul>
+                                    </div>
+                                </div>
+                                <?php elseif ($secTipo === 'ensaios'): ?>
                                 <?php
                                     $ensaiosRaw = json_decode($sec['conteudo'] ?? '[]', true);
                                     if (isset($ensaiosRaw['rows'])) {
@@ -1095,76 +1134,12 @@ $pageSubtitle = 'Editor de Especificação';
                             <button class="btn btn-primary btn-sm" onclick="adicionarSeccao()">&#128196; + Secção</button>
                             <button class="btn btn-secondary btn-sm" onclick="abrirSelectorEnsaios()">&#9881; + Ensaios</button>
                             <button class="btn btn-secondary btn-sm" onclick="abrirSelectorLegConteudo()">&#9878; + Legislação</button>
+                            <button class="btn btn-secondary btn-sm" onclick="adicionarSeccaoFicheiros()">&#128206; + Ficheiros</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- TAB 3: PARAMETROS -->
-                <div class="tab-panel" id="panel-parametros">
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">Ensaios</span>
-                            <div class="flex gap-sm">
-                                <button class="btn btn-secondary btn-sm" onclick="abrirModalTemplates()">Adicionar de Template</button>
-                                <button class="btn btn-primary btn-sm" onclick="adicionarParametro()">+ Adicionar</button>
-                            </div>
-                        </div>
-
-                        <div class="param-table" id="paramTable">
-                            <div class="param-row header">
-                                <span>Categoria</span>
-                                <span>Ensaio</span>
-                                <span>Especificação</span>
-                                <span>Norma</span>
-                                <span>NQA</span>
-                                <span></span>
-                            </div>
-                            <div id="paramRows">
-                                <?php
-                                // Se nova spec sem parâmetros, pré-carregar do template
-                                $ensaiosParaMostrar = $espec['parametros'];
-                                if (empty($ensaiosParaMostrar) && $isNew) {
-                                    $ordem = 0;
-                                    foreach ($categoriasPadrao as $cat => $params) {
-                                        foreach ($params as $p) {
-                                            $ensaiosParaMostrar[] = [
-                                                'id' => '',
-                                                'categoria' => $cat,
-                                                'ensaio' => $p['ensaio'],
-                                                'valor_especificado' => $p['exemplo'],
-                                                'metodo' => $p['metodo'],
-                                                'amostra_nqa' => '',
-                                            ];
-                                            $ordem++;
-                                        }
-                                    }
-                                }
-                                ?>
-                                <?php foreach ($ensaiosParaMostrar as $i => $param): ?>
-                                    <div class="param-row" data-param-id="<?= $param['id'] ?? '' ?>">
-                                        <input type="text" name="param_categoria[]" value="<?= sanitize($param['categoria'] ?? '') ?>" placeholder="Categoria" class="param-field">
-                                        <input type="text" name="param_ensaio[]" value="<?= sanitize($param['ensaio'] ?? '') ?>" placeholder="Nome do ensaio" class="param-field">
-                                        <input type="text" name="param_especificacao[]" value="<?= sanitize($param['valor_especificado'] ?? $param['especificacao_valor'] ?? '') ?>" placeholder="Valor / Limites" class="param-field">
-                                        <input type="text" name="param_metodo[]" value="<?= sanitize($param['metodo'] ?? '') ?>" placeholder="Norma / Método" class="param-field">
-                                        <input type="text" name="param_amostra[]" value="<?= sanitize($param['amostra_nqa'] ?? '') ?>" placeholder="NQA" class="param-field">
-                                        <button class="remove-btn" onclick="removerLinha(this)" title="Remover">&times;</button>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-
-                        <?php if (empty($ensaiosParaMostrar)): ?>
-                            <div class="empty-state" id="paramEmpty" style="padding: var(--spacing-xl);">
-                                <div class="icon">&#9881;</div>
-                                <h3>Sem ensaios definidos</h3>
-                                <p class="muted">Adicione ensaios manualmente ou use os templates predefinidos.</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-
-                </div>
-
-                <!-- TAB 4: CLASSES E DEFEITOS -->
+                <!-- TAB 3: CLASSES E DEFEITOS -->
                 <div class="tab-panel" id="panel-classes-defeitos">
                     <!-- Classes Visuais -->
                     <div class="card">
@@ -1290,103 +1265,7 @@ $pageSubtitle = 'Editor de Especificação';
                     </div>
                 </div>
 
-                <!-- TAB: LEGISLAÇÃO -->
-                <div class="tab-panel" id="panel-legislacao">
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">Legislação Aplicável</span>
-                            <span class="muted">Legislação e normas associadas a esta especificação</span>
-                        </div>
-                        <table class="legislacao-table" style="width:100%; border-collapse:collapse;">
-                            <thead>
-                                <tr>
-                                    <th style="padding:8px 10px; text-align:left; font-size:13px; border-bottom:2px solid var(--color-border);">Legislação / Norma</th>
-                                    <th style="padding:8px 10px; text-align:left; font-size:13px; border-bottom:2px solid var(--color-border);">Rolhas a que se aplica</th>
-                                    <th style="padding:8px 10px; text-align:left; font-size:13px; border-bottom:2px solid var(--color-border);">Resumo</th>
-                                    <th style="padding:8px 10px; width:40px; border-bottom:2px solid var(--color-border);"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="legislacaoRows">
-                                <?php
-                                $legData = [];
-                                if (!empty($espec['legislacao_json'])) {
-                                    $legParsed = json_decode($espec['legislacao_json'], true);
-                                    if (is_array($legParsed)) $legData = $legParsed;
-                                }
-                                if (empty($legData)): ?>
-                                    <tr id="legEmpty"><td colspan="4" class="muted" style="text-align:center; padding:20px;">Nenhuma legislação adicionada. Use o botão abaixo para adicionar.</td></tr>
-                                <?php else:
-                                    foreach ($legData as $leg): ?>
-                                    <tr class="leg-row">
-                                        <td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="<?= sanitize($leg['legislacao_norma'] ?? '') ?>" data-field="leg_norma" style="width:100%; border:none; background:transparent; font-weight:600; font-size:13px;"></td>
-                                        <td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="<?= sanitize($leg['rolhas_aplicaveis'] ?? '') ?>" data-field="leg_rolhas" style="width:100%; border:none; background:transparent; font-size:12px; color:var(--color-muted);"></td>
-                                        <td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="<?= sanitize($leg['resumo'] ?? '') ?>" data-field="leg_resumo" style="width:100%; border:none; background:transparent; font-size:12px; color:var(--color-muted);"></td>
-                                        <td style="padding:6px 10px; border-bottom:1px solid var(--color-border); text-align:center;"><button class="remove-btn" onclick="removerLegRow(this)" title="Remover">&times;</button></td>
-                                    </tr>
-                                    <?php endforeach;
-                                endif; ?>
-                            </tbody>
-                        </table>
-                        <div style="padding:var(--spacing-sm) var(--spacing-md); border-top:1px solid var(--color-border); display:flex; gap:var(--spacing-sm);">
-                            <button class="btn btn-secondary btn-sm" onclick="abrirSelectorLegislacao()">+ Adicionar do Banco</button>
-                            <button class="btn btn-ghost btn-sm" onclick="adicionarLegManual()">+ Linha Manual</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TAB 5: FICHEIROS -->
-                <div class="tab-panel" id="panel-ficheiros">
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">Ficheiros Anexos</span>
-                            <span class="muted">Imagens, documentos, certificados</span>
-                        </div>
-
-                        <div class="upload-zone" id="uploadZone">
-                            <div class="icon">&#128206;</div>
-                            <p><strong>Arraste ficheiros para aqui</strong></p>
-                            <p>ou clique para selecionar</p>
-                            <p class="muted" style="margin-top: var(--spacing-sm);">Máx. 50MB por ficheiro. Formatos: PDF, DOC, XLS, JPG, PNG</p>
-                            <input type="file" id="fileInput" multiple style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.bmp,.tif,.tiff,.csv,.txt">
-                        </div>
-
-                        <div id="uploadProgress" class="hidden" style="margin-top: var(--spacing-md);">
-                            <div class="flex-between">
-                                <span class="muted" id="uploadFileName">A enviar...</span>
-                                <span class="muted" id="uploadPercent">0%</span>
-                            </div>
-                            <div class="progress-bar-container">
-                                <div class="progress-bar-fill" id="uploadBar" style="width: 0%"></div>
-                            </div>
-                        </div>
-
-                        <ul class="file-list" id="fileList">
-                            <?php if (!empty($espec['ficheiros'])): ?>
-                                <?php foreach ($espec['ficheiros'] as $f): ?>
-                                    <li class="file-item" data-file-id="<?= $f['id'] ?>">
-                                        <span class="file-name" title="<?= sanitize($f['nome_original']) ?>">
-                                            <?= sanitize($f['nome_original']) ?>
-                                        </span>
-                                        <span class="file-size"><?= formatFileSize($f['tamanho'] ?? 0) ?></span>
-                                        <span class="muted"><?= formatDate($f['uploaded_at'] ?? '') ?></span>
-                                        <div class="flex gap-sm" style="margin-left: var(--spacing-md);">
-                                            <a href="<?= BASE_PATH ?>/api.php?action=download_ficheiro&id=<?= $f['id'] ?>" class="btn btn-ghost btn-sm" title="Descarregar">&#11015;</a>
-                                            <button class="btn btn-danger btn-sm" onclick="removerFicheiro(<?= $f['id'] ?>)" title="Remover">&times;</button>
-                                        </div>
-                                    </li>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </ul>
-
-                        <?php if (empty($espec['ficheiros'])): ?>
-                            <div class="empty-state" id="fileEmpty" style="padding: var(--spacing-lg);">
-                                <p class="muted">Nenhum ficheiro anexo.</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <!-- TAB 6: PARTILHA -->
+                <!-- TAB: PARTILHA -->
                 <div class="tab-panel" id="panel-partilha">
                     <div class="card">
                         <div class="card-header">
@@ -1644,40 +1523,6 @@ $pageSubtitle = 'Editor de Especificação';
         </div>
     </div>
 
-    <!-- MODAL: TEMPLATES DE PARAMETROS -->
-    <div class="modal-overlay hidden" id="modalTemplates">
-        <div class="modal-box modal-box-lg">
-            <div class="modal-header">
-                <h3>Adicionar Parâmetros de Template</h3>
-                <button class="modal-close" onclick="fecharModalTemplates()">&times;</button>
-            </div>
-            <p class="muted mb-md">Selecione os parâmetros que deseja adicionar:</p>
-            <div class="template-grid" id="templateGrid">
-                <?php foreach ($categoriasPadrao as $categoria => $params): ?>
-                    <div style="grid-column: 1 / -1;">
-                        <div class="category-header">
-                            <?= sanitize($categoria) ?>
-                            <button class="btn btn-sm" style="background:rgba(255,255,255,0.2); color:white; border:none; padding:2px 8px; font-size:11px;" onclick="selecionarCategoria('<?= sanitize($categoria) ?>')">Selecionar todos</button>
-                        </div>
-                    </div>
-                    <?php foreach ($params as $p): ?>
-                        <label class="template-item">
-                            <input type="checkbox" name="template_param" value="<?= sanitize($categoria) ?>|<?= sanitize($p['ensaio']) ?>|<?= sanitize($p['metodo']) ?>|<?= sanitize($p['exemplo']) ?>">
-                            <div class="info">
-                                <div class="name"><?= sanitize($p['ensaio']) ?></div>
-                                <div class="method"><?= sanitize($p['metodo']) ?> - <?= sanitize($p['exemplo']) ?></div>
-                            </div>
-                        </label>
-                    <?php endforeach; ?>
-                <?php endforeach; ?>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="fecharModalTemplates()">Cancelar</button>
-                <button class="btn btn-primary" onclick="adicionarTemplatesSelecionados()">Adicionar Selecionados</button>
-            </div>
-        </div>
-    </div>
-
     <!-- BOTÃO FLUTUANTE MERGE -->
     <div class="merge-float-actions" id="mergeFloatActions">
         <button class="btn btn-primary btn-sm" onclick="executarMerge()">Juntar</button>
@@ -1691,22 +1536,9 @@ $pageSubtitle = 'Editor de Especificação';
                 <h3>Selecionar Ensaios</h3>
                 <button class="modal-close" onclick="fecharSelectorEnsaios()">&times;</button>
             </div>
-            <p class="muted mb-md">Escolha os ensaios para incluir nesta secção. Pode selecionar do banco de ensaios ou do template.</p>
+            <p class="muted mb-md">Escolha os ensaios do banco para incluir nesta secção.</p>
 
-            <!-- Tabs: Banco / Template -->
-            <div style="display:flex; gap:8px; margin-bottom: var(--spacing-md);">
-                <button class="btn btn-sm btn-primary" id="tabEnsaiosBanco" onclick="switchEnsaiosTab('banco')">Banco de Ensaios</button>
-                <button class="btn btn-sm btn-secondary" id="tabEnsaiosTemplate" onclick="switchEnsaiosTab('template')">Template Padrão</button>
-            </div>
-
-            <div class="ensaios-selector-grid" id="ensaiosBancoGrid">
-                <!-- Populado via JS com os ensaios do tab Ensaios -->
-                <div class="empty-state" style="padding: var(--spacing-md);">
-                    <p class="muted">Os ensaios definidos no tab "Ensaios" aparecerão aqui.</p>
-                </div>
-            </div>
-
-            <div class="ensaios-selector-grid" id="ensaiosTemplateGrid" style="display:none;">
+            <div class="ensaios-selector-grid" id="ensaiosTemplateGrid">
                 <?php foreach ($categoriasPadrao as $categoria => $params): ?>
                     <div class="ensaios-cat-group">
                         <div class="ensaios-cat-title">
@@ -1813,6 +1645,7 @@ $pageSubtitle = 'Editor de Especificação';
             language_url: '',
             branding: false,
             promotion: false,
+            statusbar: false,
             plugins: 'lists link table code wordcount paste lineheight',
             toolbar: 'fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright | lineheight bullist numlist | table link',
             toolbar_mode: 'floating',
@@ -2610,7 +2443,6 @@ $pageSubtitle = 'Editor de Especificação';
     function abrirSelectorEnsaios() {
         selectorMode = 'new';
         selectorTargetBlock = null;
-        popularBancoEnsaios();
         limparCheckboxesSelector();
         document.getElementById('modalSelectorEnsaios').classList.remove('hidden');
     }
@@ -2618,7 +2450,6 @@ $pageSubtitle = 'Editor de Especificação';
     function abrirSelectorEnsaiosParaSeccao(btn) {
         selectorMode = 'add';
         selectorTargetBlock = btn.closest('.seccao-block');
-        popularBancoEnsaios();
         limparCheckboxesSelector();
         document.getElementById('modalSelectorEnsaios').classList.remove('hidden');
     }
@@ -2633,67 +2464,6 @@ $pageSubtitle = 'Editor de Especificação';
         });
     }
 
-    function switchEnsaiosTab(tab) {
-        var bancoGrid = document.getElementById('ensaiosBancoGrid');
-        var templateGrid = document.getElementById('ensaiosTemplateGrid');
-        var tabBanco = document.getElementById('tabEnsaiosBanco');
-        var tabTemplate = document.getElementById('tabEnsaiosTemplate');
-
-        if (tab === 'banco') {
-            bancoGrid.style.display = '';
-            templateGrid.style.display = 'none';
-            tabBanco.className = 'btn btn-sm btn-primary';
-            tabTemplate.className = 'btn btn-sm btn-secondary';
-        } else {
-            bancoGrid.style.display = 'none';
-            templateGrid.style.display = '';
-            tabBanco.className = 'btn btn-sm btn-secondary';
-            tabTemplate.className = 'btn btn-sm btn-primary';
-        }
-    }
-
-    function popularBancoEnsaios() {
-        var grid = document.getElementById('ensaiosBancoGrid');
-        var rows = document.querySelectorAll('#paramRows .param-row');
-
-        if (rows.length === 0) {
-            grid.innerHTML = '<div class="empty-state" style="padding: var(--spacing-md);"><p class="muted">Nenhum ensaio no banco. Defina ensaios no tab "Ensaios" primeiro, ou use o Template Padrão.</p></div>';
-            return;
-        }
-
-        // Group by category
-        var cats = {};
-        rows.forEach(function(row) {
-            var inputs = row.querySelectorAll('input');
-            if (inputs.length >= 5 && inputs[1].value.trim()) {
-                var cat = inputs[0].value.trim() || 'Sem categoria';
-                if (!cats[cat]) cats[cat] = [];
-                cats[cat].push({
-                    ensaio: inputs[1].value,
-                    especificacao: inputs[2].value,
-                    norma: inputs[3].value,
-                    nqa: inputs[4].value
-                });
-            }
-        });
-
-        var html = '';
-        Object.keys(cats).forEach(function(cat) {
-            html += '<div class="ensaios-cat-group">';
-            html += '<div class="ensaios-cat-title">' + escapeHtml(cat) + '<button onclick="toggleCatEnsaiosBanco(this, \'' + escapeHtml(cat).replace(/'/g, "\\'") + '\')">Todos</button></div>';
-            cats[cat].forEach(function(ens) {
-                html += '<label class="ensaio-check-item">';
-                html += '<input type="checkbox" name="sel_ensaio_banco" data-cat="' + escapeHtml(cat) + '" data-ensaio="' + escapeHtml(ens.ensaio) + '" data-norma="' + escapeHtml(ens.norma) + '" data-spec="' + escapeHtml(ens.especificacao) + '" data-nqa="' + escapeHtml(ens.nqa) + '">';
-                html += '<div class="ensaio-info"><div class="ensaio-name">' + escapeHtml(ens.ensaio) + '</div>';
-                html += '<div class="ensaio-detail">' + escapeHtml(ens.norma) + ' &mdash; ' + escapeHtml(ens.especificacao) + '</div></div>';
-                html += '</label>';
-            });
-            html += '</div>';
-        });
-
-        grid.innerHTML = html;
-    }
-
     function toggleCatEnsaios(btn, cat) {
         var grid = document.getElementById('ensaiosTemplateGrid');
         var checks = grid.querySelectorAll('input[data-cat="' + cat + '"]');
@@ -2701,28 +2471,8 @@ $pageSubtitle = 'Editor de Especificação';
         checks.forEach(function(c) { c.checked = !allChecked; });
     }
 
-    function toggleCatEnsaiosBanco(btn, cat) {
-        var grid = document.getElementById('ensaiosBancoGrid');
-        var checks = grid.querySelectorAll('input[data-cat="' + cat + '"]');
-        var allChecked = Array.from(checks).every(function(c) { return c.checked; });
-        checks.forEach(function(c) { c.checked = !allChecked; });
-    }
-
     function confirmarSelectorEnsaios() {
         var ensaios = [];
-
-        // Collect from banco
-        document.querySelectorAll('#ensaiosBancoGrid input[name="sel_ensaio_banco"]:checked').forEach(function(cb) {
-            ensaios.push({
-                categoria: cb.getAttribute('data-cat') || '',
-                ensaio: cb.getAttribute('data-ensaio') || '',
-                especificacao: cb.getAttribute('data-spec') || '',
-                norma: cb.getAttribute('data-norma') || '',
-                nqa: cb.getAttribute('data-nqa') || ''
-            });
-        });
-
-        // Collect from template
         document.querySelectorAll('#ensaiosTemplateGrid input[name="sel_ensaio"]:checked').forEach(function(cb) {
             ensaios.push({
                 categoria: cb.getAttribute('data-cat') || '',
@@ -3200,40 +2950,7 @@ $pageSubtitle = 'Editor de Especificação';
     // ============================================================
     // LEGISLAÇÃO - Funções
     // ============================================================
-    var legSelectorMode = 'tab'; // 'tab' = adicionar ao tab legislação, 'conteudo' = criar secção texto
-
-    function adicionarLegManual() {
-        var tbody = document.getElementById('legislacaoRows');
-        var empty = document.getElementById('legEmpty');
-        if (empty) empty.remove();
-        var tr = document.createElement('tr');
-        tr.className = 'leg-row';
-        tr.innerHTML = '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="" data-field="leg_norma" style="width:100%; border:none; background:transparent; font-weight:600; font-size:13px;" placeholder="Legislação / Norma"></td>' +
-            '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="" data-field="leg_rolhas" style="width:100%; border:none; background:transparent; font-size:12px; color:var(--color-muted);" placeholder="Rolhas a que se aplica"></td>' +
-            '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="" data-field="leg_resumo" style="width:100%; border:none; background:transparent; font-size:12px; color:var(--color-muted);" placeholder="Resumo"></td>' +
-            '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border); text-align:center;"><button class="remove-btn" onclick="removerLegRow(this)" title="Remover">&times;</button></td>';
-        tbody.appendChild(tr);
-        marcarAlterado();
-    }
-
-    function removerLegRow(btn) {
-        var tr = btn.closest('tr');
-        tr.remove();
-        var tbody = document.getElementById('legislacaoRows');
-        if (tbody.querySelectorAll('.leg-row').length === 0) {
-            tbody.innerHTML = '<tr id="legEmpty"><td colspan="4" class="muted" style="text-align:center; padding:20px;">Nenhuma legislação adicionada.</td></tr>';
-        }
-        marcarAlterado();
-    }
-
-    function abrirSelectorLegislacao() {
-        legSelectorMode = 'tab';
-        popularSelectorLeg();
-        document.getElementById('modalSelectorLeg').classList.remove('hidden');
-    }
-
     function abrirSelectorLegConteudo() {
-        legSelectorMode = 'conteudo';
         popularSelectorLeg();
         document.getElementById('modalSelectorLeg').classList.remove('hidden');
     }
@@ -3251,10 +2968,15 @@ $pageSubtitle = 'Editor de Especificação';
             }
             var html = '';
             legs.forEach(function(leg) {
+                var linkHtml = '';
+                if (leg.link_url) {
+                    var legFullUrl = leg.link_url.startsWith('/') ? '<?= BASE_PATH ?>' + leg.link_url : leg.link_url;
+                    linkHtml = ' <a href="' + escapeHtml(legFullUrl) + '" target="_blank" onclick="event.stopPropagation();" title="Ver documento" style="color:var(--primary-color,#2563eb); font-size:13px; text-decoration:none;">&#128279;</a>';
+                }
                 html += '<label class="ensaio-check-item" style="display:flex; gap:8px; padding:8px 10px; border-bottom:1px solid var(--color-border); cursor:pointer;">' +
-                    '<input type="checkbox" name="sel_leg" data-norma="' + escapeHtml(leg.legislacao_norma) + '" data-rolhas="' + escapeHtml(leg.rolhas_aplicaveis || '') + '" data-resumo="' + escapeHtml(leg.resumo || '') + '">' +
+                    '<input type="checkbox" name="sel_leg" data-norma="' + escapeHtml(leg.legislacao_norma) + '" data-rolhas="' + escapeHtml(leg.rolhas_aplicaveis || '') + '" data-resumo="' + escapeHtml(leg.resumo || '') + '" data-link_url="' + escapeHtml(leg.link_url || '') + '">' +
                     '<div style="flex:1;">' +
-                    '<div style="font-weight:600; font-size:13px;">' + escapeHtml(leg.legislacao_norma) + '</div>' +
+                    '<div style="font-weight:600; font-size:13px;">' + escapeHtml(leg.legislacao_norma) + linkHtml + '</div>' +
                     '<div style="font-size:11px; color:var(--color-muted);">' + escapeHtml(leg.rolhas_aplicaveis || '') + '</div>' +
                     '</div></label>';
             });
@@ -3266,29 +2988,12 @@ $pageSubtitle = 'Editor de Especificação';
         var checks = document.querySelectorAll('#legSelectorGrid input[name="sel_leg"]:checked');
         if (checks.length === 0) { alert('Selecione pelo menos uma legislação.'); return; }
 
-        if (legSelectorMode === 'tab') {
-            // Adicionar ao tab Legislação como linhas editáveis
-            var tbody = document.getElementById('legislacaoRows');
-            var empty = document.getElementById('legEmpty');
-            if (empty) empty.remove();
-            checks.forEach(function(cb) {
-                var tr = document.createElement('tr');
-                tr.className = 'leg-row';
-                tr.innerHTML = '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="' + escapeHtml(cb.getAttribute('data-norma')) + '" data-field="leg_norma" style="width:100%; border:none; background:transparent; font-weight:600; font-size:13px;"></td>' +
-                    '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="' + escapeHtml(cb.getAttribute('data-rolhas')) + '" data-field="leg_rolhas" style="width:100%; border:none; background:transparent; font-size:12px; color:var(--color-muted);"></td>' +
-                    '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border);"><input type="text" value="' + escapeHtml(cb.getAttribute('data-resumo')) + '" data-field="leg_resumo" style="width:100%; border:none; background:transparent; font-size:12px; color:var(--color-muted);"></td>' +
-                    '<td style="padding:6px 10px; border-bottom:1px solid var(--color-border); text-align:center;"><button class="remove-btn" onclick="removerLegRow(this)" title="Remover">&times;</button></td>';
-                tbody.appendChild(tr);
-            });
-        } else {
-            // Criar nova secção de texto com bullet points
-            var ul = '<ul>';
-            checks.forEach(function(cb) {
-                ul += '<li>' + escapeHtml(cb.getAttribute('data-norma')) + '</li>';
-            });
-            ul += '</ul>';
-            adicionarSeccaoTexto('Legislação Aplicável', ul);
-        }
+        var ul = '<ul>';
+        checks.forEach(function(cb) {
+            ul += '<li>' + escapeHtml(cb.getAttribute('data-norma')) + '</li>';
+        });
+        ul += '</ul>';
+        adicionarSeccaoTexto('Legislação Aplicável', ul);
 
         document.getElementById('modalSelectorLeg').classList.add('hidden');
         marcarAlterado();
@@ -3303,24 +3008,6 @@ $pageSubtitle = 'Editor de Especificação';
         if (empty) empty.remove();
         initSeccaoEditor(result.editorId);
         renumerarSeccoes();
-    }
-
-    function recolherLegislacao() {
-        var rows = document.querySelectorAll('#legislacaoRows .leg-row');
-        var arr = [];
-        rows.forEach(function(tr) {
-            var norma = tr.querySelector('input[data-field="leg_norma"]');
-            var rolhas = tr.querySelector('input[data-field="leg_rolhas"]');
-            var resumo = tr.querySelector('input[data-field="leg_resumo"]');
-            if (norma && norma.value.trim()) {
-                arr.push({
-                    legislacao_norma: norma.value.trim(),
-                    rolhas_aplicaveis: rolhas ? rolhas.value.trim() : '',
-                    resumo: resumo ? resumo.value.trim() : ''
-                });
-            }
-        });
-        return arr;
     }
 
     function recolherDados() {
@@ -3340,7 +3027,6 @@ $pageSubtitle = 'Editor de Especificação';
             senha_publica: document.getElementById('senha_publica').value,
             codigo_acesso: document.getElementById('codigo_acesso').value,
             config_visual: JSON.stringify(recolherConfigVisual()),
-            legislacao_json: JSON.stringify(recolherLegislacao()),
             seccoes: [],
             parametros: [],
             classes: [],
@@ -3401,6 +3087,9 @@ $pageSubtitle = 'Editor de Especificação';
                     colWidths.push(parseFloat(ths[ci].style.width) || 0);
                 }
                 conteudo = JSON.stringify({ colWidths: colWidths, rows: ensaiosArr, merges: merges });
+            } else if (tipo === 'ficheiros') {
+                var posSelect = block.querySelector('#ficheiros_posicao');
+                conteudo = JSON.stringify({ posicao: posSelect ? posSelect.value : 'final' });
             } else {
                 var editorEl = block.querySelector('.seccao-editor');
                 if (editorEl) {
@@ -3414,21 +3103,6 @@ $pageSubtitle = 'Editor de Especificação';
                 tipo: tipo,
                 ordem: i
             });
-        });
-
-        // Parâmetros
-        document.querySelectorAll('#paramRows .param-row').forEach(function(row) {
-            var inputs = row.querySelectorAll('input');
-            if (inputs.length >= 5) {
-                data.parametros.push({
-                    id: row.getAttribute('data-param-id') || '',
-                    categoria: inputs[0].value,
-                    ensaio: inputs[1].value,
-                    valor_especificado: inputs[2].value,
-                    metodo: inputs[3].value,
-                    amostra_nqa: inputs[4].value
-                });
-            }
         });
 
         // Classes
@@ -3496,30 +3170,6 @@ $pageSubtitle = 'Editor de Especificação';
 
                 // 2. Save parameters, classes, defeitos in parallel
                 var promises = [];
-
-                if (data.parametros.length > 0 || document.querySelectorAll('#paramRows .param-row').length === 0) {
-                    var paramPayload = {
-                        action: 'save_parametros',
-                        especificacao_id: especId,
-                        parametros: data.parametros.map(function(p) {
-                            return {
-                                categoria: p.categoria,
-                                ensaio: p.ensaio,
-                                especificacao_valor: p.valor_especificado || p.especificacao_valor || '',
-                                metodo: p.metodo,
-                                amostra_nqa: p.amostra_nqa,
-                                ordem: p.ordem || 0
-                            };
-                        })
-                    };
-                    promises.push(
-                        fetch(BASE_PATH + '/api.php', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(paramPayload)
-                        }).then(function(r) { return r.json(); })
-                    );
-                }
 
                 if (data.classes.length > 0 || document.querySelectorAll('#classRows .class-row').length === 0) {
                     promises.push(
@@ -3642,48 +3292,6 @@ $pageSubtitle = 'Editor de Especificação';
     }
 
     // ============================================================
-    // PARAMETROS - ADICIONAR / REMOVER
-    // ============================================================
-    function criarLinhaParametro(categoria, ensaio, especificacao, metodo, amostra) {
-        categoria = categoria || '';
-        ensaio = ensaio || '';
-        especificacao = especificacao || '';
-        metodo = metodo || '';
-        amostra = amostra || '';
-
-        var row = document.createElement('div');
-        row.className = 'param-row';
-        row.setAttribute('data-param-id', '');
-
-        row.innerHTML =
-            '<input type="text" name="param_categoria[]" value="' + escapeHtml(categoria) + '" placeholder="Categoria" class="param-field">' +
-            '<input type="text" name="param_ensaio[]" value="' + escapeHtml(ensaio) + '" placeholder="Nome do ensaio" class="param-field">' +
-            '<input type="text" name="param_especificacao[]" value="' + escapeHtml(especificacao) + '" placeholder="Valor / Limites" class="param-field">' +
-            '<input type="text" name="param_metodo[]" value="' + escapeHtml(metodo) + '" placeholder="Norma / Método" class="param-field">' +
-            '<input type="text" name="param_amostra[]" value="' + escapeHtml(amostra) + '" placeholder="NQA" class="param-field">' +
-            '<button class="remove-btn" onclick="removerLinha(this)" title="Remover">&times;</button>';
-
-        row.querySelectorAll('input, select').forEach(function(el) {
-            el.addEventListener('input', marcarAlterado);
-            el.addEventListener('change', marcarAlterado);
-        });
-
-        return row;
-    }
-
-    function adicionarParametro() {
-        var container = document.getElementById('paramRows');
-        var row = criarLinhaParametro();
-        container.appendChild(row);
-
-        var empty = document.getElementById('paramEmpty');
-        if (empty) empty.remove();
-
-        marcarAlterado();
-        row.querySelector('input').focus();
-    }
-
-    // ============================================================
     // CLASSES - ADICIONAR / REMOVER
     // ============================================================
     function criarLinhaClasse(nome, defeitos, descricao) {
@@ -3802,107 +3410,6 @@ $pageSubtitle = 'Editor de Especificação';
     }
 
     // ============================================================
-    // MODAL TEMPLATES
-    // ============================================================
-    function abrirModalTemplates() {
-        document.getElementById('modalTemplates').classList.remove('hidden');
-        // Desmarcar todos
-        document.querySelectorAll('#templateGrid input[type="checkbox"]').forEach(function(cb) {
-            cb.checked = false;
-        });
-    }
-
-    function fecharModalTemplates() {
-        document.getElementById('modalTemplates').classList.add('hidden');
-    }
-
-    function selecionarCategoria(categoria) {
-        document.querySelectorAll('#templateGrid input[type="checkbox"]').forEach(function(cb) {
-            if (cb.value.indexOf(categoria + '|') === 0) {
-                cb.checked = !cb.checked;
-            }
-        });
-    }
-
-    function adicionarTemplatesSelecionados() {
-        var container = document.getElementById('paramRows');
-        var count = 0;
-
-        document.querySelectorAll('#templateGrid input[type="checkbox"]:checked').forEach(function(cb) {
-            var parts = cb.value.split('|');
-            if (parts.length >= 4) {
-                var row = criarLinhaParametro(parts[0], parts[1], parts[3], parts[2], '');
-                container.appendChild(row);
-                count++;
-            }
-        });
-
-        var empty = document.getElementById('paramEmpty');
-        if (empty) empty.remove();
-
-        fecharModalTemplates();
-        marcarAlterado();
-
-        if (count > 0) {
-            showToast(count + ' parâmetro(s) adicionado(s).', 'success');
-        } else {
-            showToast('Nenhum parâmetro selecionado.', 'warning');
-        }
-    }
-
-    // ============================================================
-    // PRODUCT TEMPLATE AUTO-LOAD (multi-produto)
-    // ============================================================
-    function loadProductTemplates(produtoId) {
-        fetch(BASE_PATH + '/api.php?action=load_product_templates&produto_id=' + produtoId)
-        .then(function(r) { return r.json(); })
-        .then(function(result) {
-            if (result.success && result.data && result.data.length > 0) {
-                var existingRows = document.querySelectorAll('#paramRows .param-row').length;
-                var msg = 'O produto selecionado tem ' + result.data.length + ' parâmetro(s) pré-definido(s).';
-                if (existingRows > 0) {
-                    msg += '\nJá existem ' + existingRows + ' parâmetro(s) definidos.';
-                    msg += '\nDeseja adicionar os templates do produto?';
-                } else {
-                    msg += '\nDeseja carregar estes parâmetros?';
-                }
-
-                if (confirm(msg)) {
-                    var container = document.getElementById('paramRows');
-                    result.data.forEach(function(t) {
-                        var row = criarLinhaParametro(
-                            t.categoria || '',
-                            t.ensaio || '',
-                            t.especificacao_valor || '',
-                            t.metodo || '',
-                            t.amostra_nqa || ''
-                        );
-                        container.appendChild(row);
-                    });
-
-                    var empty = document.getElementById('paramEmpty');
-                    if (empty) empty.remove();
-
-                    marcarAlterado();
-                    showToast(result.data.length + ' parâmetro(s) do produto carregado(s).', 'success');
-                }
-            }
-        })
-        .catch(function(err) {
-            console.error('Erro ao verificar templates do produto:', err);
-        });
-    }
-
-    // Observar mudanças nos checkboxes de produto
-    document.querySelectorAll('#produtosWrap input[type="checkbox"]').forEach(function(cb) {
-        cb.addEventListener('change', function() {
-            if (this.checked) {
-                loadProductTemplates(this.value);
-            }
-        });
-    });
-
-    // ============================================================
     // MODAL ALERT
     // ============================================================
     var alertCallback = null;
@@ -3924,52 +3431,87 @@ $pageSubtitle = 'Editor de Especificação';
     }
 
     // ============================================================
-    // FICHEIROS - UPLOAD
+    // FICHEIROS - Secção no conteúdo
     // ============================================================
-    var uploadZone = document.getElementById('uploadZone');
-    var fileInput = document.getElementById('fileInput');
-
-    uploadZone.addEventListener('click', function() {
-        fileInput.click();
-    });
-
-    uploadZone.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        uploadZone.classList.add('dragover');
-    });
-
-    uploadZone.addEventListener('dragleave', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        uploadZone.classList.remove('dragover');
-    });
-
-    uploadZone.addEventListener('drop', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        uploadZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length > 0) {
-            enviarFicheiros(e.dataTransfer.files);
+    function adicionarSeccaoFicheiros() {
+        // Evitar duplicados
+        if (document.getElementById('ficheirosSection')) {
+            showToast('Já existe uma secção de ficheiros.', 'warning');
+            return;
         }
-    });
+        criarSeccaoFicheiros();
+    }
 
-    fileInput.addEventListener('change', function() {
-        if (this.files.length > 0) {
-            enviarFicheiros(this.files);
-            this.value = '';
-        }
-    });
+    function criarSeccaoFicheiros() {
+        var container = document.getElementById('seccoesContainer');
+        var block = document.createElement('div');
+        block.className = 'seccao-block';
+        block.id = 'ficheirosSection';
+        block.setAttribute('data-tipo', 'ficheiros');
+
+        block.innerHTML =
+            '<div class="seccao-header">' +
+                '<span class="seccao-numero"></span>' +
+                '<input type="text" class="seccao-titulo" value="Ficheiros Anexos" placeholder="Título">' +
+                '<span class="pill pill-info" style="font-size:10px; padding:2px 8px;">Ficheiros</span>' +
+                '<div class="seccao-actions">' +
+                    '<button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, -1)" title="Mover acima">&#9650;</button>' +
+                    '<button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, 1)" title="Mover abaixo">&#9660;</button>' +
+                    '<button class="btn btn-ghost btn-sm seccao-remove-btn" onclick="removerSeccao(this)" title="Remover secção">&times;</button>' +
+                '</div>' +
+            '</div>' +
+            '<div style="padding: var(--spacing-md);">' +
+                '<div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">' +
+                    '<label style="font-size:12px; font-weight:600; color:#374151;">No PDF:</label>' +
+                    '<select id="ficheiros_posicao" style="font-size:12px; padding:4px 8px; border:1px solid var(--color-border); border-radius:4px;">' +
+                        '<option value="local">Mostrar neste local</option>' +
+                        '<option value="final">Mostrar no final do documento</option>' +
+                    '</select>' +
+                '</div>' +
+                '<div class="upload-zone" id="uploadZone" style="cursor:pointer; padding:20px; border:2px dashed var(--color-border); border-radius:8px; text-align:center;">' +
+                    '<div class="icon">&#128206;</div>' +
+                    '<p><strong>Arraste ficheiros ou clique para selecionar</strong></p>' +
+                    '<p class="muted" style="font-size:12px;">Máx. 50MB. Formatos: PDF, DOC, XLS, JPG, PNG</p>' +
+                    '<input type="file" id="fileInput" multiple style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.bmp,.tif,.tiff,.csv,.txt">' +
+                '</div>' +
+                '<div id="uploadProgress" class="hidden" style="margin-top:8px;">' +
+                    '<div class="flex-between"><span class="muted" id="uploadFileName">A enviar...</span><span class="muted" id="uploadPercent">0%</span></div>' +
+                    '<div class="progress-bar-container"><div class="progress-bar-fill" id="uploadBar" style="width:0%"></div></div>' +
+                '</div>' +
+                '<ul class="file-list" id="fileList" style="margin-top:8px;"></ul>' +
+            '</div>';
+
+        container.appendChild(block);
+        var empty = document.getElementById('seccoesEmpty');
+        if (empty) empty.remove();
+        renumerarSeccoes();
+        initUploadListeners();
+        marcarAlterado();
+    }
+
+    function initUploadListeners() {
+        var uploadZone = document.getElementById('uploadZone');
+        var fileInput = document.getElementById('fileInput');
+        if (!uploadZone || !fileInput) return;
+
+        uploadZone.addEventListener('click', function() { fileInput.click(); });
+        uploadZone.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); uploadZone.classList.add('dragover'); });
+        uploadZone.addEventListener('dragleave', function(e) { e.preventDefault(); e.stopPropagation(); uploadZone.classList.remove('dragover'); });
+        uploadZone.addEventListener('drop', function(e) {
+            e.preventDefault(); e.stopPropagation(); uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) enviarFicheiros(e.dataTransfer.files);
+        });
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) { enviarFicheiros(this.files); this.value = ''; }
+        });
+    }
 
     function enviarFicheiros(files) {
         if (especId === 0) {
             showToast('Guarde a especificação antes de anexar ficheiros.', 'warning');
             return;
         }
-
-        for (var i = 0; i < files.length; i++) {
-            enviarFicheiro(files[i]);
-        }
+        for (var i = 0; i < files.length; i++) enviarFicheiro(files[i]);
     }
 
     function enviarFicheiro(file) {
@@ -4004,13 +3546,13 @@ $pageSubtitle = 'Editor de Especificação';
             try {
                 var result = JSON.parse(xhr.responseText);
                 if (result.success) {
-                    adicionarFicheiroLista(result.ficheiro);
+                    adicionarFicheiroLista(result.data);
                     showToast('Ficheiro "' + file.name + '" enviado.', 'success');
 
                     var empty = document.getElementById('fileEmpty');
                     if (empty) empty.remove();
                 } else {
-                    showToast(result.message || 'Erro ao enviar ficheiro.', 'error');
+                    showToast(result.error || result.message || 'Erro ao enviar ficheiro.', 'error');
                 }
             } catch (e) {
                 showToast('Erro ao processar resposta do servidor.', 'error');
@@ -4031,11 +3573,11 @@ $pageSubtitle = 'Editor de Especificação';
         li.className = 'file-item';
         li.setAttribute('data-file-id', ficheiro.id);
         li.innerHTML =
-            '<span class="file-name" title="' + escapeHtml(ficheiro.nome_original) + '">' + escapeHtml(ficheiro.nome_original) + '</span>' +
+            '<span class="file-name" title="' + escapeHtml(ficheiro.nome_original) + '">&#128196; ' + escapeHtml(ficheiro.nome_original) + '</span>' +
             '<span class="file-size">' + formatFileSize(ficheiro.tamanho) + '</span>' +
             '<span class="muted">' + (ficheiro.data || 'Agora') + '</span>' +
-            '<div class="flex gap-sm" style="margin-left: var(--spacing-md);">' +
-                '<a href="' + BASE_PATH + '/api.php?action=download_ficheiro&id=' + ficheiro.id + '" class="btn btn-ghost btn-sm" title="Descarregar">&#11015;</a>' +
+            '<div class="flex gap-sm" style="margin-left:auto;">' +
+                '<a href="' + BASE_PATH + '/download.php?id=' + ficheiro.id + '" class="btn btn-ghost btn-sm" title="Descarregar">&#11015;</a>' +
                 '<button class="btn btn-danger btn-sm" onclick="removerFicheiro(' + ficheiro.id + ')" title="Remover">&times;</button>' +
             '</div>';
         list.appendChild(li);
@@ -4305,6 +3847,21 @@ $pageSubtitle = 'Editor de Especificação';
                     sectionsHtml += '</tbody></table>';
                     }
                 }
+            } else if (tipo === 'ficheiros') {
+                // Mostrar lista de ficheiros no preview
+                var fileList = block.querySelector('#fileList');
+                var fileItems = fileList ? fileList.querySelectorAll('.file-item') : [];
+                sectionsHtml += '<h4 style="color:' + configVisual.cor_titulos + '; border-bottom-color:' + configVisual.cor_linhas + '; font-size:' + configVisual.tamanho_titulos + 'pt;">' + (i + 1) + '. ' + escapeHtml(titulo) + '</h4>';
+                if (fileItems.length > 0) {
+                    sectionsHtml += '<div style="font-size:9px; margin-bottom:8px;">';
+                    fileItems.forEach(function(fi) {
+                        var fname = fi.querySelector('.file-name');
+                        sectionsHtml += '<div style="padding:2px 0;">&#128196; ' + (fname ? escapeHtml(fname.textContent) : 'Ficheiro') + '</div>';
+                    });
+                    sectionsHtml += '</div>';
+                } else {
+                    sectionsHtml += '<div style="font-size:9px; color:#999; margin-bottom:8px;">Sem ficheiros anexados</div>';
+                }
             } else {
                 var editorEl = block.querySelector('.seccao-editor');
                 if (editorEl) {
@@ -4392,6 +3949,47 @@ $pageSubtitle = 'Editor de Especificação';
             previewTimer = setTimeout(atualizarPreview, 200);
         });
     });
+
+    // Carregar ficheiros existentes na secção
+    <?php
+    $temSeccaoFicheiros = false;
+    if (!empty($espec['seccoes'])) {
+        foreach ($espec['seccoes'] as $sec) {
+            if (($sec['tipo'] ?? '') === 'ficheiros') $temSeccaoFicheiros = true;
+        }
+    }
+    ?>
+    <?php if (!empty($espec['ficheiros'])): ?>
+    (function() {
+        <?php if (!$temSeccaoFicheiros): ?>
+        // Sem secção ficheiros guardada - criar automaticamente
+        criarSeccaoFicheiros();
+        <?php else: ?>
+        // Secção ficheiros já renderizada pelo PHP - apenas init listeners
+        initUploadListeners();
+        <?php endif; ?>
+        var list = document.getElementById('fileList');
+        <?php foreach ($espec['ficheiros'] as $f): ?>
+        (function() {
+            var li = document.createElement('li');
+            li.className = 'file-item';
+            li.setAttribute('data-file-id', '<?= $f['id'] ?>');
+            li.innerHTML =
+                '<span class="file-name" title="<?= sanitize($f['nome_original']) ?>">&#128196; <?= sanitize($f['nome_original']) ?></span>' +
+                '<span class="file-size"><?= formatFileSize($f['tamanho'] ?? 0) ?></span>' +
+                '<span class="muted"><?= formatDate($f['uploaded_at'] ?? '') ?></span>' +
+                '<div class="flex gap-sm" style="margin-left:auto;">' +
+                    '<a href="<?= BASE_PATH ?>/download.php?id=<?= $f['id'] ?>" class="btn btn-ghost btn-sm" title="Descarregar">&#11015;</a>' +
+                    '<button class="btn btn-danger btn-sm" onclick="removerFicheiro(<?= $f['id'] ?>)" title="Remover">&times;</button>' +
+                '</div>';
+            list.appendChild(li);
+        })();
+        <?php endforeach; ?>
+        isDirty = false;
+        // Atualizar preview após popular ficheiros
+        if (typeof atualizarPreview === 'function') atualizarPreview();
+    })();
+    <?php endif; ?>
 
     // Avisar antes de sair se houver alterações pendentes
     window.addEventListener('beforeunload', function(e) {

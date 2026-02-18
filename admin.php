@@ -5,12 +5,16 @@
  */
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
-requireAdmin();
+// Legislacao e Ensaios tabs são acessíveis a todos os utilizadores autenticados
+$tab = $_GET['tab'] ?? 'utilizadores';
+if (in_array($tab, ['legislacao', 'ensaios'])) {
+    requireLogin();
+} else {
+    requireAdmin();
+}
 
 $user = getCurrentUser();
 $db = getDB();
-
-$tab = $_GET['tab'] ?? 'utilizadores';
 $msg = $_GET['msg'] ?? '';
 
 $isSuperAdminUser = isSuperAdmin();
@@ -1068,6 +1072,7 @@ $activeNav = $tab;
                         <div class="form-group"><label>Legislação / Norma</label><input type="text" id="leg_norma" placeholder="Ex: Reg. (CE) 1935/2004"></div>
                         <div class="form-group"><label>Rolhas a que se aplica</label><textarea id="leg_rolhas" rows="2" placeholder="Ex: Todas: natural, colmatada..."></textarea></div>
                         <div class="form-group"><label>Resumo do que estabelece</label><textarea id="leg_resumo" rows="3" placeholder="Resumo da legislação..."></textarea></div>
+                        <div class="form-group"><label>Link URL <span style="font-weight:normal; color:#667; font-size:12px;">(URL externo ou caminho do ficheiro no servidor)</span></label><input type="text" id="leg_link_url" placeholder="Ex: https://eur-lex.europa.eu/... ou /uploads/legislacao/doc.pdf"></div>
                         <div class="form-group"><label><input type="checkbox" id="leg_ativo" checked> Ativa</label></div>
                     </div>
                     <div class="modal-footer">
@@ -1076,6 +1081,53 @@ $activeNav = $tab;
                     </div>
                 </div>
             </div>
+
+            <!-- Modal Visualização Documento Legislação -->
+            <div id="legDocModal" class="modal-overlay" style="display:none;">
+                <div class="modal-box" style="width:90%; max-width:1100px; height:85vh; display:flex; flex-direction:column;">
+                    <div class="modal-header">
+                        <h3 id="legDocTitle" style="flex:1; margin-right:12px;"></h3>
+                        <button class="btn btn-ghost btn-sm" id="legDocOpenBtn" onclick="" style="margin-right:8px; font-size:12px;">Abrir em nova janela</button>
+                        <button class="modal-close" onclick="fecharLegDoc();">&times;</button>
+                    </div>
+                    <div id="legDocResumo" style="padding:8px 16px; font-size:13px; color:#555; border-bottom:1px solid #e5e7eb; max-height:60px; overflow:auto;"></div>
+                    <div id="legDocContent" style="flex:1; overflow:hidden; position:relative;">
+                        <iframe id="legDocIframe" style="width:100%; height:100%; border:none; display:none;"></iframe>
+                        <div id="legDocFallback" style="display:none; padding:40px; text-align:center;">
+                            <p style="font-size:15px; color:#555; margin-bottom:16px;">Este site bloqueia a visualização integrada.</p>
+                            <a id="legDocFallbackLink" href="#" target="_blank" class="btn btn-primary">Abrir documento em nova janela</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+            function abrirLegDoc(url, nome, resumo) {
+                var fullUrl = url.startsWith('/') ? '<?= BASE_PATH ?>' + url : url;
+                var isPdf = url.toLowerCase().endsWith('.pdf');
+                var isLocal = url.startsWith('/');
+                document.getElementById('legDocTitle').textContent = nome;
+                document.getElementById('legDocResumo').textContent = resumo || '';
+                document.getElementById('legDocOpenBtn').onclick = function() { window.open(fullUrl, '_blank'); };
+                var iframe = document.getElementById('legDocIframe');
+                var fallback = document.getElementById('legDocFallback');
+                document.getElementById('legDocFallbackLink').href = fullUrl;
+                if (isPdf || isLocal) {
+                    iframe.style.display = 'block';
+                    fallback.style.display = 'none';
+                    iframe.src = fullUrl;
+                } else {
+                    iframe.style.display = 'none';
+                    iframe.src = '';
+                    fallback.style.display = 'block';
+                }
+                document.getElementById('legDocModal').style.display = 'flex';
+            }
+            function fecharLegDoc() {
+                document.getElementById('legDocModal').style.display = 'none';
+                document.getElementById('legDocIframe').src = '';
+            }
+            </script>
 
             <script>
             function carregarLeg() {
@@ -1094,7 +1146,11 @@ $activeNav = $tab;
                         var inativa = r.ativo !== undefined && (r.ativo == 0 || r.ativo === '0');
                         var rowStyle = inativa ? ' style="opacity:0.5; text-decoration:line-through;"' : '';
                         html += '<tr' + rowStyle + '>';
-                        html += '<td><strong>' + esc(r.legislacao_norma) + '</strong></td>';
+                        html += '<td><strong>' + esc(r.legislacao_norma) + '</strong>';
+                        if (r.link_url) {
+                            html += ' <a href="#" onclick="abrirLegDoc(\'' + esc(r.link_url).replace(/'/g,"&#39;") + '\', \'' + esc(r.legislacao_norma).replace(/'/g,"&#39;") + '\', \'' + esc(r.resumo || '').replace(/'/g,"&#39;") + '\'); return false;" title="Ver documento" style="color:var(--primary-color,#2563eb); margin-left:6px; font-size:15px;">&#128279;</a>';
+                        }
+                        html += '</td>';
                         html += '<td class="muted" style="font-size:12px; max-width:250px;">' + esc(r.rolhas_aplicaveis || '') + '</td>';
                         html += '<td class="muted" style="font-size:12px; max-width:350px;">' + esc(r.resumo || '') + '</td>';
                         html += '<td>' + (inativa ? '<span class="pill pill-error">Inativa</span>' : '<span class="pill pill-success">Ativa</span>') + '</td>';
@@ -1117,6 +1173,7 @@ $activeNav = $tab;
                 document.getElementById('leg_norma').value = '';
                 document.getElementById('leg_rolhas').value = '';
                 document.getElementById('leg_resumo').value = '';
+                document.getElementById('leg_link_url').value = '';
                 document.getElementById('leg_ativo').checked = true;
             }
             function editLeg(r) {
@@ -1125,6 +1182,7 @@ $activeNav = $tab;
                 document.getElementById('leg_norma').value = r.legislacao_norma || '';
                 document.getElementById('leg_rolhas').value = r.rolhas_aplicaveis || '';
                 document.getElementById('leg_resumo').value = r.resumo || '';
+                document.getElementById('leg_link_url').value = r.link_url || '';
                 document.getElementById('leg_ativo').checked = r.ativo != 0;
                 document.getElementById('legModal').style.display = 'flex';
             }
@@ -1135,6 +1193,7 @@ $activeNav = $tab;
                 fd.append('legislacao_norma', document.getElementById('leg_norma').value);
                 fd.append('rolhas_aplicaveis', document.getElementById('leg_rolhas').value);
                 fd.append('resumo', document.getElementById('leg_resumo').value);
+                fd.append('link_url', document.getElementById('leg_link_url').value);
                 fd.append('ativo', document.getElementById('leg_ativo').checked ? '1' : '0');
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
                 .then(r => r.json())
@@ -1303,6 +1362,240 @@ $activeNav = $tab;
             }
 
             carregarLeg();
+            </script>
+
+        <!-- LEGISLAÇÃO (org_admin / user - read-only) -->
+        <?php elseif ($tab === 'legislacao' && !$isSuperAdminUser): ?>
+            <div class="flex-between mb-md">
+                <h2>Legislação Aplicável</h2>
+            </div>
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Legislação / Norma</th>
+                            <th>Rolhas a que se aplica</th>
+                            <th>Resumo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="legRowsRO">
+                        <tr><td colspan="3" class="muted" style="text-align:center; padding:20px;">A carregar...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Modal Visualização Documento -->
+            <div id="legDocModal" class="modal-overlay" style="display:none;">
+                <div class="modal-box" style="width:90%; max-width:1100px; height:85vh; display:flex; flex-direction:column;">
+                    <div class="modal-header">
+                        <h3 id="legDocTitle" style="flex:1; margin-right:12px;"></h3>
+                        <button class="btn btn-ghost btn-sm" id="legDocOpenBtn" onclick="" style="margin-right:8px; font-size:12px;">Abrir em nova janela</button>
+                        <button class="modal-close" onclick="fecharLegDoc();">&times;</button>
+                    </div>
+                    <div id="legDocResumo" style="padding:8px 16px; font-size:13px; color:#555; border-bottom:1px solid #e5e7eb; max-height:60px; overflow:auto;"></div>
+                    <div id="legDocContent" style="flex:1; overflow:hidden; position:relative;">
+                        <iframe id="legDocIframe" style="width:100%; height:100%; border:none; display:none;"></iframe>
+                        <div id="legDocFallback" style="display:none; padding:40px; text-align:center;">
+                            <p style="font-size:15px; color:#555; margin-bottom:16px;">Este site bloqueia a visualização integrada.</p>
+                            <a id="legDocFallbackLink" href="#" target="_blank" class="btn btn-primary">Abrir documento em nova janela</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+            function abrirLegDoc(url, nome, resumo) {
+                var fullUrl = url.startsWith('/') ? '<?= BASE_PATH ?>' + url : url;
+                var isPdf = url.toLowerCase().endsWith('.pdf');
+                var isLocal = url.startsWith('/');
+                document.getElementById('legDocTitle').textContent = nome;
+                document.getElementById('legDocResumo').textContent = resumo || '';
+                document.getElementById('legDocOpenBtn').onclick = function() { window.open(fullUrl, '_blank'); };
+                var iframe = document.getElementById('legDocIframe');
+                var fallback = document.getElementById('legDocFallback');
+                document.getElementById('legDocFallbackLink').href = fullUrl;
+                if (isPdf || isLocal) {
+                    iframe.style.display = 'block'; fallback.style.display = 'none'; iframe.src = fullUrl;
+                } else {
+                    iframe.style.display = 'none'; iframe.src = ''; fallback.style.display = 'block';
+                }
+                document.getElementById('legDocModal').style.display = 'flex';
+            }
+            function fecharLegDoc() {
+                document.getElementById('legDocModal').style.display = 'none';
+                document.getElementById('legDocIframe').src = '';
+            }
+            function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+            fetch('<?= BASE_PATH ?>/api.php?action=get_legislacao_banco')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                var rows = (data.data && data.data.legislacao) ? data.data.legislacao : [];
+                var tbody = document.getElementById('legRowsRO');
+                if (rows.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="muted" style="text-align:center; padding:20px;">Nenhuma legislação registada.</td></tr>';
+                    return;
+                }
+                var html = '';
+                rows.forEach(function(r) {
+                    html += '<tr>';
+                    html += '<td><strong>' + esc(r.legislacao_norma) + '</strong>';
+                    if (r.link_url) {
+                        html += ' <a href="#" onclick="abrirLegDoc(\'' + esc(r.link_url).replace(/'/g,"&#39;") + '\', \'' + esc(r.legislacao_norma).replace(/'/g,"&#39;") + '\', \'' + esc(r.resumo || '').replace(/'/g,"&#39;") + '\'); return false;" title="Ver documento" style="color:var(--primary-color,#2563eb); margin-left:6px; font-size:15px;">&#128279;</a>';
+                    }
+                    html += '</td>';
+                    html += '<td class="muted" style="font-size:12px; max-width:250px;">' + esc(r.rolhas_aplicaveis || '') + '</td>';
+                    html += '<td class="muted" style="font-size:12px; max-width:350px;">' + esc(r.resumo || '') + '</td>';
+                    html += '</tr>';
+                });
+                tbody.innerHTML = html;
+            });
+            </script>
+
+        <!-- ENSAIOS (super_admin - editável) -->
+        <?php elseif ($tab === 'ensaios' && $isSuperAdminUser): ?>
+            <div class="flex-between mb-md">
+                <h2>Banco de Ensaios</h2>
+                <button class="btn btn-primary" onclick="document.getElementById('ensaioModal').style.display='flex'; resetEnsaioForm();">+ Novo Ensaio</button>
+            </div>
+            <div class="card">
+                <table>
+                    <thead><tr><th>Categoria</th><th>Ensaio</th><th>Método/Norma</th><th>Valor Referência</th><th>Estado</th><th>Ações</th></tr></thead>
+                    <tbody id="ensaioRows"><tr><td colspan="6" class="muted" style="text-align:center; padding:20px;">A carregar...</td></tr></tbody>
+                </table>
+            </div>
+
+            <div id="ensaioModal" class="modal-overlay" style="display:none;">
+                <div class="modal-box modal-box-lg">
+                    <div class="modal-header">
+                        <h3 id="ensaioModalTitle">Novo Ensaio</h3>
+                        <button class="modal-close" onclick="document.getElementById('ensaioModal').style.display='none';">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="ens_id" value="0">
+                        <div class="form-row">
+                            <div class="form-group"><label>Categoria</label><input type="text" id="ens_categoria" placeholder="Ex: Físico-Mecânico" list="ensCatList"></div>
+                            <div class="form-group"><label>Ensaio</label><input type="text" id="ens_ensaio" placeholder="Ex: Comprimento"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Método / Norma</label><input type="text" id="ens_metodo" placeholder="Ex: ISO 9727-1"></div>
+                            <div class="form-group"><label>Valor de Referência</label><input type="text" id="ens_exemplo" placeholder="Ex: ±0.7 mm"></div>
+                        </div>
+                        <div class="form-group"><label><input type="checkbox" id="ens_ativo" checked> Ativo</label></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" onclick="guardarEnsaio()">Guardar</button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('ensaioModal').style.display='none';">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+            <datalist id="ensCatList"></datalist>
+
+            <script>
+            function escE(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+            function carregarEnsaios() {
+                fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_banco&all=1')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) return;
+                    var rows = data.data.ensaios || [];
+                    var tbody = document.getElementById('ensaioRows');
+                    if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
+                    var html = '', cats = new Set(), lastCat = '';
+                    rows.forEach(function(r) {
+                        cats.add(r.categoria);
+                        var inativo = r.ativo == 0;
+                        var rs = inativo ? ' style="opacity:0.5;"' : '';
+                        var catLabel = r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>';
+                        lastCat = r.categoria;
+                        html += '<tr' + rs + '><td>' + catLabel + '</td><td>' + escE(r.ensaio) + '</td>';
+                        html += '<td class="muted" style="font-size:12px;">' + escE(r.metodo || '') + '</td>';
+                        html += '<td class="muted" style="font-size:12px;">' + escE(r.exemplo || '') + '</td>';
+                        html += '<td>' + (inativo ? '<span class="pill pill-error">Inativo</span>' : '<span class="pill pill-success">Ativo</span>') + '</td>';
+                        html += '<td><button class="btn btn-ghost btn-sm" onclick=\'editEnsaio(' + JSON.stringify(r).replace(/'/g,"&#39;") + ')\'>Editar</button> ';
+                        html += '<button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarEnsaio(' + r.id + ')">Eliminar</button></td></tr>';
+                    });
+                    tbody.innerHTML = html;
+                    var dl = document.getElementById('ensCatList'); dl.innerHTML = '';
+                    cats.forEach(function(c) { var o = document.createElement('option'); o.value = c; dl.appendChild(o); });
+                });
+            }
+            function resetEnsaioForm() {
+                document.getElementById('ensaioModalTitle').textContent = 'Novo Ensaio';
+                document.getElementById('ens_id').value = '0';
+                document.getElementById('ens_categoria').value = '';
+                document.getElementById('ens_ensaio').value = '';
+                document.getElementById('ens_metodo').value = '';
+                document.getElementById('ens_exemplo').value = '';
+                document.getElementById('ens_ativo').checked = true;
+            }
+            function editEnsaio(r) {
+                document.getElementById('ensaioModalTitle').textContent = 'Editar Ensaio';
+                document.getElementById('ens_id').value = r.id;
+                document.getElementById('ens_categoria').value = r.categoria || '';
+                document.getElementById('ens_ensaio').value = r.ensaio || '';
+                document.getElementById('ens_metodo').value = r.metodo || '';
+                document.getElementById('ens_exemplo').value = r.exemplo || '';
+                document.getElementById('ens_ativo').checked = r.ativo != 0;
+                document.getElementById('ensaioModal').style.display = 'flex';
+            }
+            function guardarEnsaio() {
+                var fd = new FormData();
+                fd.append('action', 'save_ensaio_banco');
+                fd.append('id', document.getElementById('ens_id').value);
+                fd.append('categoria', document.getElementById('ens_categoria').value);
+                fd.append('ensaio', document.getElementById('ens_ensaio').value);
+                fd.append('metodo', document.getElementById('ens_metodo').value);
+                fd.append('exemplo', document.getElementById('ens_exemplo').value);
+                fd.append('ativo', document.getElementById('ens_ativo').checked ? '1' : '0');
+                fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) { document.getElementById('ensaioModal').style.display = 'none'; carregarEnsaios(); }
+                    else alert(data.error || 'Erro ao guardar.');
+                });
+            }
+            function eliminarEnsaio(id) {
+                if (!confirm('Eliminar este ensaio?')) return;
+                var fd = new FormData();
+                fd.append('action', 'delete_ensaio_banco');
+                fd.append('id', id);
+                fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => { if (data.success) carregarEnsaios(); else alert(data.error || 'Erro.'); });
+            }
+            carregarEnsaios();
+            </script>
+
+        <!-- ENSAIOS (org_admin / user - read-only) -->
+        <?php elseif ($tab === 'ensaios' && !$isSuperAdminUser): ?>
+            <div class="flex-between mb-md"><h2>Banco de Ensaios</h2></div>
+            <div class="card">
+                <table>
+                    <thead><tr><th>Categoria</th><th>Ensaio</th><th>Método/Norma</th><th>Valor Referência</th></tr></thead>
+                    <tbody id="ensaioRowsRO"><tr><td colspan="4" class="muted" style="text-align:center; padding:20px;">A carregar...</td></tr></tbody>
+                </table>
+            </div>
+            <script>
+            function escE(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+            fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_banco')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                var rows = data.data.ensaios || [];
+                var tbody = document.getElementById('ensaioRowsRO');
+                if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
+                var html = '', lastCat = '';
+                rows.forEach(function(r) {
+                    var catLabel = r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>';
+                    lastCat = r.categoria;
+                    html += '<tr><td>' + catLabel + '</td><td>' + escE(r.ensaio) + '</td>';
+                    html += '<td class="muted" style="font-size:12px;">' + escE(r.metodo || '') + '</td>';
+                    html += '<td class="muted" style="font-size:12px;">' + escE(r.exemplo || '') + '</td></tr>';
+                });
+                tbody.innerHTML = html;
+            });
             </script>
 
         <!-- CONFIGURAÇÕES -->
