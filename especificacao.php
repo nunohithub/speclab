@@ -14,11 +14,11 @@ $orgId = $user['org_id'];
 
 // Carregar listas para selects (scoped por org)
 if (isSuperAdmin()) {
-    $produtos = $db->query("SELECT id, nome, tipo FROM produtos WHERE ativo = 1 ORDER BY nome")->fetchAll();
+    $produtos = $db->query("SELECT id, nome FROM produtos WHERE ativo = 1 ORDER BY nome")->fetchAll();
     $clientes = $db->query("SELECT id, nome, sigla FROM clientes WHERE ativo = 1 ORDER BY nome")->fetchAll();
     $fornecedores = $db->query("SELECT id, nome, sigla FROM fornecedores WHERE ativo = 1 ORDER BY nome")->fetchAll();
 } else {
-    $stmt = $db->prepare("SELECT id, nome, tipo FROM produtos WHERE ativo = 1 AND (organizacao_id IS NULL OR organizacao_id = ?) ORDER BY nome");
+    $stmt = $db->prepare("SELECT id, nome FROM produtos WHERE ativo = 1 AND (organizacao_id IS NULL OR organizacao_id = ?) ORDER BY nome");
     $stmt->execute([$orgId]);
     $produtos = $stmt->fetchAll();
 
@@ -71,7 +71,7 @@ if ($isNew) {
         'fornecedor_ids' => [],
         'cliente_id' => '',
         'produto_nome' => '',
-        'produto_tipo' => '',
+        'produto_tipo' => null,
         'cliente_nome' => '',
         'cliente_sigla' => '',
         'fornecedor_nome' => '',
@@ -982,7 +982,7 @@ $pageSubtitle = 'Editor de Especificação';
                                         ?>
                                         <label class="multi-select-item">
                                             <input type="checkbox" name="produto_ids[]" value="<?= $p['id'] ?>" <?= $checked ?> onchange="updateMultiLabel('produtosWrap'); marcarAlterado();">
-                                            <?= sanitize($p['nome']) ?> (<?= sanitize($p['tipo']) ?>)
+                                            <?= sanitize($p['nome']) ?>
                                         </label>
                                         <?php endforeach; ?>
                                     </div>

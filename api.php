@@ -1014,7 +1014,6 @@ try {
             requireAdminApi($user);
             $id        = (int)($_POST['id'] ?? 0);
             $nome      = sanitize($_POST['nome'] ?? '');
-            $tipo      = sanitize($_POST['tipo'] ?? '');
             $descricao = sanitize($_POST['descricao'] ?? '');
 
             if ($nome === '') {
@@ -1030,10 +1029,10 @@ try {
             if ($id === 0) {
                 // Criar novo produto
                 $stmt = $db->prepare('
-                    INSERT INTO produtos (nome, tipo, descricao, organizacao_id, ativo, created_at)
-                    VALUES (?, ?, ?, ?, 1, NOW())
+                    INSERT INTO produtos (nome, descricao, organizacao_id, ativo, created_at)
+                    VALUES (?, ?, ?, 1, NOW())
                 ');
-                $stmt->execute([$nome, $tipo, $descricao, $produtoOrgId]);
+                $stmt->execute([$nome, $descricao, $produtoOrgId]);
                 $newId = (int)$db->lastInsertId();
 
                 jsonSuccess('Produto criado com sucesso.', ['id' => $newId]);
@@ -1041,8 +1040,8 @@ try {
                 // Atualizar produto existente
                 verifyProdutoAccess($db, $id, $user);
 
-                $updateFields = 'nome = ?, tipo = ?, descricao = ?';
-                $updateParams = [$nome, $tipo, $descricao];
+                $updateFields = 'nome = ?, descricao = ?';
+                $updateParams = [$nome, $descricao];
 
                 // Super admin pode alterar se é global
                 if (isSuperAdmin()) {

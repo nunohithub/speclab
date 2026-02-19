@@ -33,7 +33,7 @@ function getEspecificacaoCompleta(PDO $db, int $id): ?array {
     $espec['produtos_lista'] = $stmt->fetchAll();
     $nomesProd = array_column($espec['produtos_lista'], 'nome');
     $espec['produto_nome'] = $nomesProd ? implode(', ', $nomesProd) : null;
-    $espec['produto_tipo'] = count($espec['produtos_lista']) === 1 ? $espec['produtos_lista'][0]['tipo'] : null;
+    $espec['produto_tipo'] = null;
     $espec['produto_ids'] = array_column($espec['produtos_lista'], 'id');
 
     // Fornecedores (muitos-para-muitos)

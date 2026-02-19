@@ -175,7 +175,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'save_produto') {
         $pid = (int)($_POST['produto_id'] ?? 0);
         $nome = trim($_POST['nome'] ?? '');
-        $tipo = trim($_POST['tipo'] ?? '');
         $descricao = trim($_POST['descricao'] ?? '');
 
         // Determinar organizacao_id
@@ -195,11 +194,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     exit;
                 }
             }
-            $db->prepare('UPDATE produtos SET nome=?, tipo=?, descricao=?, organizacao_id=? WHERE id=?')
-                ->execute([$nome, $tipo, $descricao, $produtoOrgId, $pid]);
+            $db->prepare('UPDATE produtos SET nome=?, descricao=?, organizacao_id=? WHERE id=?')
+                ->execute([$nome, $descricao, $produtoOrgId, $pid]);
         } else {
-            $db->prepare('INSERT INTO produtos (nome, tipo, descricao, organizacao_id) VALUES (?, ?, ?, ?)')
-                ->execute([$nome, $tipo, $descricao, $produtoOrgId]);
+            $db->prepare('INSERT INTO produtos (nome, descricao, organizacao_id) VALUES (?, ?, ?)')
+                ->execute([$nome, $descricao, $produtoOrgId]);
         }
         header('Location: ' . BASE_PATH . '/admin.php?tab=produtos&msg=Produto+guardado');
         exit;
@@ -1059,7 +1058,6 @@ $activeNav = $tab;
                     <thead>
                         <tr>
                             <th>Nome</th>
-                            <th>Tipo</th>
                             <th>Descrição</th>
                             <?php if ($isSuperAdminUser): ?><th>Organização</th><?php endif; ?>
                             <th>Estado</th>
@@ -1070,7 +1068,6 @@ $activeNav = $tab;
                     <?php foreach ($produtos as $p): ?>
                         <tr>
                             <td><strong><?= sanitize($p['nome']) ?></strong></td>
-                            <td><span class="pill pill-primary"><?= sanitize($p['tipo'] ?? '') ?></span></td>
                             <td class="muted"><?= sanitize($p['descricao'] ?? '') ?></td>
                             <?php if ($isSuperAdminUser): ?>
                                 <td>
@@ -1114,7 +1111,6 @@ $activeNav = $tab;
                         <?php endif; ?>
 
                         <div class="form-group"><label>Nome</label><input type="text" name="nome" id="pr_nome" required></div>
-                        <div class="form-group"><label>Tipo</label><input type="text" name="tipo" id="pr_tipo" placeholder="Ex: Natural, Micro, Colmatada..."></div>
                         <div class="form-group"><label>Descrição</label><textarea name="descricao" id="pr_descricao" rows="3"></textarea></div>
 
                         <?php if ($isSuperAdminUser): ?>
@@ -2954,7 +2950,6 @@ $activeNav = $tab;
         document.getElementById('produtoModalTitle').textContent = 'Novo Produto';
         document.getElementById('produto_id').value = '0';
         document.getElementById('pr_nome').value = '';
-        document.getElementById('pr_tipo').value = '';
         document.getElementById('pr_descricao').value = '';
         if (isSuperAdmin) {
             var globalCb = document.getElementById('pr_global');
@@ -2971,7 +2966,6 @@ $activeNav = $tab;
         document.getElementById('produtoModalTitle').textContent = 'Editar Produto';
         document.getElementById('produto_id').value = p.id;
         document.getElementById('pr_nome').value = p.nome;
-        document.getElementById('pr_tipo').value = p.tipo || '';
         document.getElementById('pr_descricao').value = p.descricao || '';
         if (isSuperAdmin) {
             var isGlobal = !p.organizacao_id;

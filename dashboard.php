@@ -111,12 +111,12 @@ $especificacoes = $stmt->fetchAll();
 
 // Listas para filtros (scoped)
 if ($isSA) {
-    $produtos = $db->query("SELECT id, nome, tipo FROM produtos WHERE ativo = 1 ORDER BY nome")->fetchAll();
+    $produtos = $db->query("SELECT id, nome FROM produtos WHERE ativo = 1 ORDER BY nome")->fetchAll();
     $clientes = $db->query("SELECT id, nome, sigla FROM clientes WHERE ativo = 1 ORDER BY nome")->fetchAll();
     $fornecedores = $db->query("SELECT id, nome, sigla FROM fornecedores WHERE ativo = 1 ORDER BY nome")->fetchAll();
     $organizacoes = $db->query("SELECT id, nome FROM organizacoes WHERE ativo = 1 ORDER BY nome")->fetchAll();
 } else {
-    $stmt = $db->prepare("SELECT id, nome, tipo FROM produtos WHERE ativo = 1 AND (organizacao_id IS NULL OR organizacao_id = ?) ORDER BY nome");
+    $stmt = $db->prepare("SELECT id, nome FROM produtos WHERE ativo = 1 AND (organizacao_id IS NULL OR organizacao_id = ?) ORDER BY nome");
     $stmt->execute([$orgId]);
     $produtos = $stmt->fetchAll();
 
