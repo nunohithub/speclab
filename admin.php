@@ -1459,12 +1459,31 @@ $activeNav = $tab;
                 <h2>Banco de Ensaios</h2>
                 <button class="btn btn-primary" onclick="document.getElementById('ensaioModal').style.display='flex'; resetEnsaioForm();">+ Novo Ensaio</button>
             </div>
-            <div class="card">
-                <table>
+            <p class="muted" style="font-size:12px; margin-bottom:8px;">Dica: <strong>Cmd+click</strong> (Mac) ou <strong>Ctrl+click</strong> em 2 células da mesma coluna para fundir.</p>
+            <div class="card" style="overflow:visible;">
+                <table id="bancoEnsaiosTable">
                     <thead><tr><th>Categoria</th><th>Ensaio</th><th>Método/Norma</th><th title="Nível Especial de Inspeção">NEI</th><th title="Nível de Qualidade Aceitável">NQA</th><th>Valor Referência</th><th>Estado</th><th>Ações</th></tr></thead>
                     <tbody id="ensaioRows"><tr><td colspan="8" class="muted" style="text-align:center; padding:20px;">A carregar...</td></tr></tbody>
                 </table>
             </div>
+            <div id="bancoMergeFloat" style="display:none; position:fixed; z-index:999; background:#fff; border:1px solid #d1d5db; border-radius:6px; padding:4px 8px; box-shadow:0 2px 8px rgba(0,0,0,.15);">
+                <button class="btn btn-primary btn-sm" onclick="executarBancoMerge()">Fundir</button>
+                <button class="btn btn-ghost btn-sm" onclick="limparBancoSel()">Cancelar</button>
+            </div>
+            <style>
+            #bancoEnsaiosTable td.bm-selected { background:#dbeafe !important; outline:2px solid #3b82f6; }
+            #bancoEnsaiosTable td.bm-master { position:relative; background:#f0f9ff; }
+            #bancoEnsaiosTable td.bm-master .bm-tools { display:none; position:absolute; top:2px; right:2px; gap:2px; }
+            #bancoEnsaiosTable td.bm-master:hover .bm-tools { display:flex; }
+            .bm-tools button { font-size:10px; padding:1px 4px; border:1px solid #d1d5db; border-radius:3px; background:#fff; cursor:pointer; line-height:1.2; }
+            .bm-tools button:hover { background:#f3f4f6; }
+            .bm-tools .bm-unmerge:hover { background:#fee2e2; color:#b42318; }
+            #bancoEnsaiosTable { table-layout:fixed; width:100%; }
+            #bancoEnsaiosTable th { position:relative; overflow:hidden; text-overflow:ellipsis; }
+            #bancoEnsaiosTable td { overflow:hidden; text-overflow:ellipsis; }
+            #bancoEnsaiosTable th .bcr-handle { position:absolute; right:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:2; }
+            #bancoEnsaiosTable th .bcr-handle:hover, #bancoEnsaiosTable th .bcr-handle.active { background:rgba(0,0,0,0.1); }
+            </style>
 
             <div id="ensaioModal" class="modal-overlay" style="display:none;">
                 <div class="modal-box modal-box-lg">
@@ -1498,35 +1517,251 @@ $activeNav = $tab;
 
             <script>
             function escE(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+            var bancoRows = [], bancoMerges = [], bancoColWidths = null;
+            var bmSel = { col: null, start: null, end: null }; // merge selection
+            var defaultColWidths = [12, 16, 14, 6, 10, 14, 8, 12]; // 8 colunas (%)
+
             function carregarEnsaios() {
-                fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_banco&all=1')
-                .then(r => r.json())
-                .then(data => {
-                    if (!data.success) return;
-                    var rows = data.data.ensaios || [];
-                    var tbody = document.getElementById('ensaioRows');
-                    if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
-                    var html = '', cats = new Set(), lastCat = '';
-                    rows.forEach(function(r) {
-                        cats.add(r.categoria);
-                        var inativo = r.ativo == 0;
-                        var rs = inativo ? ' style="opacity:0.5;"' : '';
-                        var catLabel = r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>';
-                        lastCat = r.categoria;
-                        html += '<tr' + rs + '><td>' + catLabel + '</td><td>' + escE(r.ensaio) + '</td>';
-                        html += '<td class="muted" style="font-size:12px;">' + escE(r.metodo || '') + '</td>';
-                        html += '<td class="muted" style="font-size:12px;">' + escE(r.nivel_especial || '') + '</td>';
-                        html += '<td class="muted" style="font-size:12px;">' + escE(r.nqa || '') + '</td>';
-                        html += '<td class="muted" style="font-size:12px;">' + escE(r.exemplo || '') + '</td>';
-                        html += '<td>' + (inativo ? '<span class="pill pill-error">Inativo</span>' : '<span class="pill pill-success">Ativo</span>') + '</td>';
-                        html += '<td><button class="btn btn-ghost btn-sm" onclick=\'editEnsaio(' + JSON.stringify(r).replace(/'/g,"&#39;") + ')\'>Editar</button> ';
-                        html += '<button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarEnsaio(' + r.id + ')">Eliminar</button></td></tr>';
-                    });
-                    tbody.innerHTML = html;
-                    var dl = document.getElementById('ensCatList'); dl.innerHTML = '';
-                    cats.forEach(function(c) { var o = document.createElement('option'); o.value = c; dl.appendChild(o); });
+                Promise.all([
+                    fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_banco&all=1').then(function(r){return r.json();}),
+                    fetch('<?= BASE_PATH ?>/api.php?action=get_banco_merges').then(function(r){return r.json();})
+                ]).then(function(res) {
+                    bancoRows = (res[0].data && res[0].data.ensaios) || [];
+                    var mData = (res[1].data && res[1].data.merges) || [];
+                    // merges pode ser objeto {merges:[], colWidths:[]} ou array legado
+                    if (Array.isArray(mData)) {
+                        bancoMerges = mData;
+                    } else {
+                        bancoMerges = mData.merges || [];
+                        bancoColWidths = mData.colWidths || null;
+                    }
+                    renderBancoTable();
                 });
             }
+
+            function renderBancoTable() {
+                var tbody = document.getElementById('ensaioRows');
+                if (bancoRows.length === 0) { tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
+                // Build merge maps
+                var hidden = {}, spans = {}, aligns = {};
+                bancoMerges.forEach(function(m) {
+                    var k = m.row + '_' + m.col;
+                    spans[k] = m.span;
+                    aligns[k] = { h: m.hAlign || 'center', v: m.vAlign || 'middle' };
+                    for (var r = m.row + 1; r < m.row + m.span; r++) hidden[r + '_' + m.col] = true;
+                });
+                var html = '', cats = new Set(), lastCat = '';
+                var colFields = ['categoria','ensaio','metodo','nivel_especial','nqa','exemplo'];
+                bancoRows.forEach(function(r, idx) {
+                    cats.add(r.categoria);
+                    var inativo = r.ativo == 0;
+                    html += '<tr data-ridx="' + idx + '"' + (inativo ? ' style="opacity:0.5;"' : '') + '>';
+                    colFields.forEach(function(f, ci) {
+                        var k = idx + '_' + ci;
+                        if (hidden[k]) return;
+                        var rs = spans[k] ? ' rowspan="' + spans[k] + '"' : '';
+                        var isMaster = !!spans[k];
+                        var ms = aligns[k] ? 'vertical-align:' + aligns[k].v + ';text-align:' + aligns[k].h + ';' : '';
+                        var cls = isMaster ? ' class="bm-master"' : '';
+                        var val;
+                        if (f === 'categoria') {
+                            val = r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>';
+                            lastCat = r.categoria;
+                        } else {
+                            val = '<span class="muted" style="font-size:12px;">' + escE(r[f] || '') + '</span>';
+                        }
+                        var tools = '';
+                        if (isMaster) {
+                            tools = '<div class="bm-tools">' +
+                                '<button onclick="toggleBancoAlign(' + idx + ',' + ci + ',\'h\')" title="Alinhar H">&#9776;</button>' +
+                                '<button onclick="toggleBancoAlign(' + idx + ',' + ci + ',\'v\')" title="Alinhar V">&#8597;</button>' +
+                                '<button class="bm-unmerge" onclick="desfazerBancoMerge(' + idx + ',' + ci + ')" title="Separar">&#10005;</button>' +
+                            '</div>';
+                        }
+                        html += '<td data-col="' + ci + '"' + rs + cls + ' style="' + ms + '">' + val + tools + '</td>';
+                    });
+                    html += '<td>' + (inativo ? '<span class="pill pill-error">Inativo</span>' : '<span class="pill pill-success">Ativo</span>') + '</td>';
+                    html += '<td><button class="btn btn-ghost btn-sm" onclick=\'editEnsaio(' + JSON.stringify(r).replace(/'/g,"&#39;") + ')\'>Editar</button> ';
+                    html += '<button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarEnsaio(' + r.id + ',' + idx + ')">Eliminar</button></td></tr>';
+                });
+                tbody.innerHTML = html;
+                var dl = document.getElementById('ensCatList'); dl.innerHTML = '';
+                cats.forEach(function(c) { var o = document.createElement('option'); o.value = c; dl.appendChild(o); });
+                // Aplicar larguras e inicializar resize
+                var tbl = document.getElementById('bancoEnsaiosTable');
+                var ths = tbl.querySelectorAll('thead th');
+                var cw = bancoColWidths || defaultColWidths;
+                for (var i = 0; i < ths.length && i < cw.length; i++) ths[i].style.width = cw[i] + '%';
+                initBancoColResize(tbl);
+            }
+
+            // --- Column resize ---
+            var bcrState = null;
+            function initBancoColResize(table) {
+                var ths = table.querySelectorAll('thead th');
+                for (var i = 0; i < ths.length - 1; i++) {
+                    if (ths[i].querySelector('.bcr-handle')) continue;
+                    var h = document.createElement('div');
+                    h.className = 'bcr-handle';
+                    ths[i].appendChild(h);
+                    h.addEventListener('mousedown', bcrStart);
+                }
+            }
+            function bcrStart(e) {
+                e.preventDefault(); e.stopPropagation();
+                var th = e.target.parentElement;
+                var table = th.closest('table');
+                var ths = table.querySelectorAll('thead th');
+                var idx = Array.prototype.indexOf.call(ths, th);
+                var thNext = ths[idx + 1];
+                if (!thNext) return;
+                e.target.classList.add('active');
+                bcrState = { table: table, th: th, thNext: thNext, ths: ths, tableW: table.offsetWidth, startX: e.clientX, startW: th.offsetWidth, startNextW: thNext.offsetWidth, handle: e.target };
+                document.addEventListener('mousemove', bcrMove);
+                document.addEventListener('mouseup', bcrEnd);
+            }
+            function bcrMove(e) {
+                if (!bcrState) return;
+                var s = bcrState, diff = e.clientX - s.startX;
+                var newW = s.startW + diff, newNextW = s.startNextW - diff;
+                var minPx = s.tableW * 0.04;
+                if (newW < minPx || newNextW < minPx) return;
+                s.th.style.width = (newW / s.tableW * 100).toFixed(1) + '%';
+                s.thNext.style.width = (newNextW / s.tableW * 100).toFixed(1) + '%';
+            }
+            function bcrEnd() {
+                if (!bcrState) return;
+                bcrState.handle.classList.remove('active');
+                // Guardar larguras
+                var ths = bcrState.table.querySelectorAll('thead th');
+                var tw = bcrState.table.offsetWidth;
+                bancoColWidths = [];
+                for (var i = 0; i < ths.length; i++) bancoColWidths.push(parseFloat((ths[i].offsetWidth / tw * 100).toFixed(1)));
+                bcrState = null;
+                document.removeEventListener('mousemove', bcrMove);
+                document.removeEventListener('mouseup', bcrEnd);
+                salvarBancoMerges();
+            }
+
+            // --- Merge selection via Ctrl/Cmd+click ---
+            document.getElementById('bancoEnsaiosTable').addEventListener('mousedown', function(e) {
+                if (!e.ctrlKey && !e.metaKey) return;
+                var td = e.target.closest('td[data-col]');
+                if (!td) return;
+                var tr = td.closest('tr[data-ridx]');
+                if (!tr) return;
+                e.preventDefault();
+                var col = parseInt(td.getAttribute('data-col'));
+                var row = parseInt(tr.getAttribute('data-ridx'));
+                if (col > 5) return;
+                if (bmSel.col === null || bmSel.col !== col) {
+                    limparBancoSel();
+                    bmSel = { col: col, start: row, end: row };
+                } else {
+                    bmSel.start = Math.min(bmSel.start, row);
+                    bmSel.end = Math.max(bmSel.end, row);
+                }
+                highlightBancoSel();
+                updateBancoFloat();
+            });
+            document.addEventListener('mousedown', function(e) {
+                if (e.ctrlKey || e.metaKey) return;
+                if (!e.target.closest('#bancoEnsaiosTable') && !e.target.closest('#bancoMergeFloat')) limparBancoSel();
+            });
+
+            function highlightBancoSel() {
+                document.querySelectorAll('#bancoEnsaiosTable td.bm-selected').forEach(function(el) { el.classList.remove('bm-selected'); });
+                if (bmSel.col === null) return;
+                for (var r = bmSel.start; r <= bmSel.end; r++) {
+                    var td = document.querySelector('#bancoEnsaiosTable tr[data-ridx="' + r + '"] td[data-col="' + bmSel.col + '"]');
+                    if (td) td.classList.add('bm-selected');
+                }
+            }
+            function updateBancoFloat() {
+                var fl = document.getElementById('bancoMergeFloat');
+                if (bmSel.col === null || bmSel.start === bmSel.end) { fl.style.display = 'none'; return; }
+                var lastTd = document.querySelector('#bancoEnsaiosTable tr[data-ridx="' + bmSel.end + '"] td[data-col="' + bmSel.col + '"]');
+                if (!lastTd) lastTd = document.querySelector('#bancoEnsaiosTable tr[data-ridx="' + bmSel.start + '"] td[data-col="' + bmSel.col + '"]');
+                if (!lastTd) { fl.style.display = 'none'; return; }
+                var rect = lastTd.getBoundingClientRect();
+                fl.style.top = (rect.bottom + 4) + 'px';
+                fl.style.left = rect.left + 'px';
+                fl.style.display = 'block';
+            }
+            function limparBancoSel() {
+                bmSel = { col: null, start: null, end: null };
+                highlightBancoSel();
+                document.getElementById('bancoMergeFloat').style.display = 'none';
+            }
+
+            // --- Merge/Unmerge ---
+            function executarBancoMerge() {
+                if (bmSel.col === null || bmSel.start === bmSel.end) return;
+                var col = bmSel.col, s = bmSel.start, e = bmSel.end;
+                // Remove overlapping merges and expand range
+                var newMerges = [];
+                bancoMerges.forEach(function(m) {
+                    if (m.col === col) {
+                        var mEnd = m.row + m.span - 1;
+                        if (!(e < m.row || s > mEnd)) { s = Math.min(s, m.row); e = Math.max(e, mEnd); return; }
+                    }
+                    newMerges.push(m);
+                });
+                newMerges.push({ col: col, row: s, span: e - s + 1, hAlign: 'center', vAlign: 'middle' });
+                bancoMerges = newMerges;
+                limparBancoSel();
+                salvarBancoMerges();
+                renderBancoTable();
+            }
+            function desfazerBancoMerge(row, col) {
+                bancoMerges = bancoMerges.filter(function(m) { return !(m.col === col && m.row === row); });
+                salvarBancoMerges();
+                renderBancoTable();
+            }
+            function toggleBancoAlign(row, col, axis) {
+                var hCycle = ['left','center','right'], vCycle = ['top','middle','bottom'];
+                var cycle = axis === 'h' ? hCycle : vCycle;
+                var key = axis === 'h' ? 'hAlign' : 'vAlign';
+                bancoMerges.forEach(function(m) {
+                    if (m.col === col && m.row === row) {
+                        var cur = m[key] || (axis === 'h' ? 'center' : 'middle');
+                        m[key] = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
+                    }
+                });
+                salvarBancoMerges();
+                renderBancoTable();
+            }
+            function salvarBancoMerges() {
+                fetch('<?= BASE_PATH ?>/api.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'save_banco_merges', merges: { merges: bancoMerges, colWidths: bancoColWidths } })
+                });
+            }
+
+            // --- Ajustar merges ao eliminar linha ---
+            function ajustarMergesDelete(delIdx) {
+                var newMerges = [];
+                bancoMerges.forEach(function(m) {
+                    var mEnd = m.row + m.span - 1;
+                    if (delIdx < m.row) {
+                        newMerges.push({ col: m.col, row: m.row - 1, span: m.span, hAlign: m.hAlign, vAlign: m.vAlign });
+                    } else if (delIdx > mEnd) {
+                        newMerges.push(m);
+                    } else {
+                        // delIdx está dentro do merge
+                        var newSpan = m.span - 1;
+                        if (newSpan > 1) {
+                            var newRow = delIdx === m.row ? m.row : m.row;
+                            newMerges.push({ col: m.col, row: delIdx <= m.row ? m.row : m.row, span: newSpan, hAlign: m.hAlign, vAlign: m.vAlign });
+                        }
+                    }
+                });
+                bancoMerges = newMerges;
+                salvarBancoMerges();
+            }
+
+            // --- CRUD ---
             function resetEnsaioForm() {
                 document.getElementById('ensaioModalTitle').textContent = 'Novo Ensaio';
                 document.getElementById('ens_id').value = '0';
@@ -1562,20 +1797,23 @@ $activeNav = $tab;
                 fd.append('exemplo', document.getElementById('ens_exemplo').value);
                 fd.append('ativo', document.getElementById('ens_ativo').checked ? '1' : '0');
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
-                .then(r => r.json())
-                .then(data => {
+                .then(function(r){return r.json();})
+                .then(function(data) {
                     if (data.success) { document.getElementById('ensaioModal').style.display = 'none'; carregarEnsaios(); }
                     else alert(data.error || 'Erro ao guardar.');
                 });
             }
-            function eliminarEnsaio(id) {
+            function eliminarEnsaio(id, rowIdx) {
                 if (!confirm('Eliminar este ensaio?')) return;
                 var fd = new FormData();
                 fd.append('action', 'delete_ensaio_banco');
                 fd.append('id', id);
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
-                .then(r => r.json())
-                .then(data => { if (data.success) carregarEnsaios(); else alert(data.error || 'Erro.'); });
+                .then(function(r){return r.json();})
+                .then(function(data) {
+                    if (data.success) { ajustarMergesDelete(rowIdx); carregarEnsaios(); }
+                    else alert(data.error || 'Erro.');
+                });
             }
             carregarEnsaios();
             </script>
@@ -1584,31 +1822,59 @@ $activeNav = $tab;
         <?php elseif ($tab === 'ensaios' && !$isSuperAdminUser): ?>
             <div class="flex-between mb-md"><h2>Banco de Ensaios</h2></div>
             <div class="card">
-                <table>
+                <style>#bancoEnsaiosRO { table-layout:fixed; width:100%; } #bancoEnsaiosRO td { overflow:hidden; text-overflow:ellipsis; }</style>
+                <table id="bancoEnsaiosRO">
                     <thead><tr><th>Categoria</th><th>Ensaio</th><th>Método/Norma</th><th title="Nível Especial de Inspeção">NEI</th><th title="Nível de Qualidade Aceitável">NQA</th><th>Valor Referência</th></tr></thead>
                     <tbody id="ensaioRowsRO"><tr><td colspan="6" class="muted" style="text-align:center; padding:20px;">A carregar...</td></tr></tbody>
                 </table>
             </div>
             <script>
             function escE(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-            fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_banco')
-            .then(r => r.json())
-            .then(data => {
-                if (!data.success) return;
-                var rows = data.data.ensaios || [];
+            var defaultCwRO = [14, 18, 16, 8, 12, 16];
+            Promise.all([
+                fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_banco').then(function(r){return r.json();}),
+                fetch('<?= BASE_PATH ?>/api.php?action=get_banco_merges').then(function(r){return r.json();})
+            ]).then(function(res) {
+                var rows = (res[0].data && res[0].data.ensaios) || [];
+                var mData = (res[1].data && res[1].data.merges) || [];
+                var merges, colWidths;
+                if (Array.isArray(mData)) { merges = mData; colWidths = null; }
+                else { merges = mData.merges || []; colWidths = mData.colWidths || null; }
                 var tbody = document.getElementById('ensaioRowsRO');
                 if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
+                var hidden = {}, spans = {}, aligns = {};
+                merges.forEach(function(m) {
+                    var k = m.row + '_' + m.col;
+                    spans[k] = m.span;
+                    aligns[k] = { h: m.hAlign || 'center', v: m.vAlign || 'middle' };
+                    for (var r = m.row + 1; r < m.row + m.span; r++) hidden[r + '_' + m.col] = true;
+                });
                 var html = '', lastCat = '';
-                rows.forEach(function(r) {
-                    var catLabel = r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>';
-                    lastCat = r.categoria;
-                    html += '<tr><td>' + catLabel + '</td><td>' + escE(r.ensaio) + '</td>';
-                    html += '<td class="muted" style="font-size:12px;">' + escE(r.metodo || '') + '</td>';
-                    html += '<td class="muted" style="font-size:12px;">' + escE(r.nivel_especial || '') + '</td>';
-                    html += '<td class="muted" style="font-size:12px;">' + escE(r.nqa || '') + '</td>';
-                    html += '<td class="muted" style="font-size:12px;">' + escE(r.exemplo || '') + '</td></tr>';
+                var colFields = ['categoria','ensaio','metodo','nivel_especial','nqa','exemplo'];
+                rows.forEach(function(r, idx) {
+                    html += '<tr>';
+                    colFields.forEach(function(f, ci) {
+                        var k = idx + '_' + ci;
+                        if (hidden[k]) return;
+                        var rs = spans[k] ? ' rowspan="' + spans[k] + '"' : '';
+                        var ms = aligns[k] ? ' style="vertical-align:' + aligns[k].v + ';text-align:' + aligns[k].h + ';"' : '';
+                        var val;
+                        if (f === 'categoria') {
+                            val = r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>';
+                            lastCat = r.categoria;
+                        } else {
+                            val = '<span class="muted" style="font-size:12px;">' + escE(r[f] || '') + '</span>';
+                        }
+                        html += '<td' + rs + ms + '>' + val + '</td>';
+                    });
+                    html += '</tr>';
                 });
                 tbody.innerHTML = html;
+                // Aplicar larguras (sem Estado/Ações — RO tem 6 colunas)
+                var tbl = document.getElementById('bancoEnsaiosRO');
+                var ths = tbl.querySelectorAll('thead th');
+                var cw = colWidths ? colWidths.slice(0, 6) : defaultCwRO;
+                for (var i = 0; i < ths.length && i < cw.length; i++) ths[i].style.width = cw[i] + '%';
             });
             </script>
 

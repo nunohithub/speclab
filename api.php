@@ -1785,6 +1785,27 @@ try {
             jsonSuccess('Ensaio eliminado.');
             break;
 
+        case 'get_banco_merges':
+            $stmt = $db->prepare("SELECT valor FROM configuracoes WHERE chave = 'banco_ensaios_merges'");
+            $stmt->execute();
+            $val = json_decode($stmt->fetchColumn() ?: '[]', true);
+            // Compat: pode ser array legado (só merges) ou objeto {merges, colWidths}
+            if (isset($val['merges'])) {
+                jsonSuccess('OK', ['merges' => $val]);
+            } else {
+                jsonSuccess('OK', ['merges' => is_array($val) ? $val : []]);
+            }
+            break;
+
+        case 'save_banco_merges':
+            if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+            $input = json_decode(file_get_contents('php://input'), true);
+            $merges = json_encode($input['merges'] ?? []);
+            $stmt = $db->prepare("UPDATE configuracoes SET valor = ? WHERE chave = 'banco_ensaios_merges'");
+            $stmt->execute([$merges]);
+            jsonSuccess('Merges guardados.');
+            break;
+
         // AÇÃO DESCONHECIDA
         // ===================================================================
         default:
