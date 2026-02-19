@@ -16,6 +16,7 @@ if (in_array($tab, ['legislacao', 'ensaios'])) {
 $user = getCurrentUser();
 $db = getDB();
 $msg = $_GET['msg'] ?? '';
+$msgType = $_GET['msg_type'] ?? 'success';
 
 $isSuperAdminUser = isSuperAdmin();
 $orgId = $user['org_id'] ?? null;
@@ -34,7 +35,7 @@ if ($isSuperAdminUser) {
 // Processar formulários
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validateCsrf()) {
-        header('Location: ' . BASE_PATH . '/admin.php?msg=' . urlencode('Erro de segurança. Recarregue a página.'));
+        header('Location: ' . BASE_PATH . '/admin.php?msg=' . urlencode('Erro de segurança. Recarregue a página.') . '&msg_type=error');
         exit;
     }
     $action = $_POST['action'] ?? '';
@@ -77,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $checkStmt->execute([$uid]);
                 $checkOrg = $checkStmt->fetchColumn();
                 if ($checkOrg != $orgId) {
-                    header('Location: ' . BASE_PATH . '/admin.php?tab=utilizadores&msg=Acesso+negado');
+                    header('Location: ' . BASE_PATH . '/admin.php?tab=utilizadores&msg=Acesso+negado&msg_type=error');
                     exit;
                 }
             }
@@ -157,7 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $checkStmt = $db->prepare('SELECT organizacao_id FROM clientes WHERE id = ?');
                 $checkStmt->execute([$cid]);
                 if ($checkStmt->fetchColumn() != $orgId) {
-                    header('Location: ' . BASE_PATH . '/admin.php?tab=clientes&msg=Acesso+negado');
+                    header('Location: ' . BASE_PATH . '/admin.php?tab=clientes&msg=Acesso+negado&msg_type=error');
                     exit;
                 }
             }
@@ -190,7 +191,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $checkStmt = $db->prepare('SELECT organizacao_id FROM produtos WHERE id = ?');
                 $checkStmt->execute([$pid]);
                 if ($checkStmt->fetchColumn() != $orgId) {
-                    header('Location: ' . BASE_PATH . '/admin.php?tab=produtos&msg=Acesso+negado');
+                    header('Location: ' . BASE_PATH . '/admin.php?tab=produtos&msg=Acesso+negado&msg_type=error');
                     exit;
                 }
             }
@@ -213,9 +214,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $telefone = trim($_POST['telefone'] ?? '');
         $email = trim($_POST['email'] ?? '');
         $website = trim($_POST['website'] ?? '');
-        $cor_primaria = trim($_POST['cor_primaria'] ?? '#2596be');
-        $cor_primaria_dark = trim($_POST['cor_primaria_dark'] ?? '#1a7a9e');
-        $cor_primaria_light = trim($_POST['cor_primaria_light'] ?? '#e6f4f9');
+        $cor_primaria = sanitizeColor(trim($_POST['cor_primaria'] ?? '#2596be'));
+        $cor_primaria_dark = sanitizeColor(trim($_POST['cor_primaria_dark'] ?? '#1a7a9e'), '#1a7a9e');
+        $cor_primaria_light = sanitizeColor(trim($_POST['cor_primaria_light'] ?? '#e6f4f9'), '#e6f4f9');
         $numeracao_prefixo = trim($_POST['numeracao_prefixo'] ?? 'CE');
         $tem_clientes = isset($_POST['tem_clientes']) ? 1 : 0;
         $tem_fornecedores = isset($_POST['tem_fornecedores']) ? 1 : 0;
@@ -297,7 +298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $checkStmt = $db->prepare('SELECT organizacao_id FROM fornecedores WHERE id = ?');
                 $checkStmt->execute([$fid]);
                 if ($checkStmt->fetchColumn() != $orgId) {
-                    header('Location: ' . BASE_PATH . '/admin.php?tab=fornecedores&msg=Acesso+negado');
+                    header('Location: ' . BASE_PATH . '/admin.php?tab=fornecedores&msg=Acesso+negado&msg_type=error');
                     exit;
                 }
             }
@@ -348,9 +349,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Org admin: guardar email speclab da organização
 if ($action === 'save_org_branding' && $user['role'] === 'org_admin' && $orgId) {
-    $cor_primaria = trim($_POST['cor_primaria'] ?? '#2596be');
-    $cor_primaria_dark = trim($_POST['cor_primaria_dark'] ?? '#1a7a9e');
-    $cor_primaria_light = trim($_POST['cor_primaria_light'] ?? '#e6f4f9');
+    $cor_primaria = sanitizeColor(trim($_POST['cor_primaria'] ?? '#2596be'));
+    $cor_primaria_dark = sanitizeColor(trim($_POST['cor_primaria_dark'] ?? '#1a7a9e'), '#1a7a9e');
+    $cor_primaria_light = sanitizeColor(trim($_POST['cor_primaria_light'] ?? '#e6f4f9'), '#e6f4f9');
     $nif = trim($_POST['nif'] ?? '');
     $morada = trim($_POST['morada'] ?? '');
     $telefone = trim($_POST['telefone'] ?? '');
@@ -472,7 +473,7 @@ $activeNav = $tab;
 
     <div class="container">
         <?php if ($msg): ?>
-            <div class="alert alert-success"><?= sanitize($msg) ?></div>
+            <div class="alert <?= $msgType === 'error' ? 'alert-error' : 'alert-success' ?>"><?= sanitize($msg) ?></div>
         <?php endif; ?>
         <?php if (!empty($_SESSION['temp_new_password'])): ?>
             <div class="alert alert-success" style="background:#fef3c7; border-color:#f59e0b; color:#92400e;">

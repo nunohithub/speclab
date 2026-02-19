@@ -55,9 +55,9 @@ if ($espec) {
     $stmtOrg->execute([$espec['id']]);
     $org = $stmtOrg->fetch();
 }
-$corPrimaria = $org ? $org['cor_primaria'] : '#2596be';
-$corPrimariaDark = $org ? $org['cor_primaria_dark'] : '#1a7a9e';
-$corPrimariaLight = $org ? $org['cor_primaria_light'] : '#e6f4f9';
+$corPrimaria = sanitizeColor($org ? $org['cor_primaria'] : '#2596be');
+$corPrimariaDark = sanitizeColor($org ? $org['cor_primaria_dark'] : '#1a7a9e', '#1a7a9e');
+$corPrimariaLight = sanitizeColor($org ? $org['cor_primaria_light'] : '#e6f4f9', '#e6f4f9');
 $orgNome = $org ? $org['nome'] : 'SpecLab';
 $orgLogo = ($org && $org['logo']) ? (BASE_PATH . '/uploads/logos/' . $org['logo']) : (BASE_PATH . '/assets/img/exi_logo.png');
 $temClientes = $org && !empty($org['tem_clientes']);

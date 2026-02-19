@@ -38,9 +38,9 @@ $activeNav = $activeNav ?? '';
 <!-- CSS Override: cores da organização -->
 <style>
     :root {
-        --color-primary: <?= sanitize($orgCor) ?>;
-        --color-primary-dark: <?= sanitize($orgCorDark) ?>;
-        --color-primary-lighter: <?= sanitize($orgCorLight) ?>;
+        --color-primary: <?= sanitizeColor($orgCor) ?>;
+        --color-primary-dark: <?= sanitizeColor($orgCorDark, '#1a7a9e') ?>;
+        --color-primary-lighter: <?= sanitizeColor($orgCorLight, '#e6f4f9') ?>;
     }
 </style>
 

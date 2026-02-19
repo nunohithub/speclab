@@ -204,6 +204,14 @@ function sanitizeRichText(string $html): string {
 }
 
 // =============================================
+// VALIDAÇÃO DE CORES HEX (previne CSS injection)
+// =============================================
+
+function sanitizeColor(string $color, string $default = '#2596be'): string {
+    return preg_match('/^#[0-9a-fA-F]{3,8}$/', $color) ? $color : $default;
+}
+
+// =============================================
 // SANITIZAÇÃO DE SVG
 // =============================================
 

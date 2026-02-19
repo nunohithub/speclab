@@ -102,9 +102,13 @@ function enviarEmail(PDO $db, int $especificacaoId, string $destinatario, string
         $mail->SMTPSecure = $smtpPort == 465 ? PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS : PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port = $smtpPort;
         $mail->CharSet = 'UTF-8';
-        $mail->SMTPOptions = [
-            'ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]
-        ];
+        // SSL: verificar certificados em produção, desativar em localhost
+        $isLocalhost = in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1']);
+        if ($isLocalhost) {
+            $mail->SMTPOptions = [
+                'ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]
+            ];
+        }
 
         $mail->setFrom($smtpFrom ?: $smtpUser, $smtpFromName);
         $mail->addAddress($destinatario);
