@@ -53,6 +53,7 @@ if ($org && $org['logo']) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= san($data['titulo']) ?> - SpecLab</title>
+    <link rel="icon" type="image/svg+xml" href="<?= asset('assets/img/favicon.svg') ?>">
     <link rel="stylesheet" href="<?= asset('assets/css/style.css') ?>">
     <style>
         .doc-container { max-width: 900px; margin: 0 auto; padding: 24px; }
@@ -428,5 +429,6 @@ if ($org && $org['logo']) {
     }
     </script>
     <?php include __DIR__ . '/includes/modals.php'; ?>
+    <?php include __DIR__ . '/includes/footer.php'; ?>
 </body>
 </html>

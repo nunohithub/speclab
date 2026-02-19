@@ -306,7 +306,7 @@ function gerarCorpoEmailAceitacao(array $espec, string $link, string $nomeDestin
 
     $html .= '<p style="font-size: 12px; color: #667085;">Se o botão não funcionar, copie este link: <a href="' . htmlspecialchars($link) . '">' . htmlspecialchars($link) . '</a></p>';
 
-    $html .= '<div style="margin-top: 30px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #999;">Este email foi enviado automaticamente pela plataforma SpecLab. Este link é pessoal e intransmissível.</div>';
+    $html .= '<div style="margin-top: 30px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #999;">Este email foi enviado automaticamente pela plataforma SpecLab. Este link é pessoal e intransmissível.<br>Powered by <strong>SpecLab</strong> &copy;' . date('Y') . '</div>';
 
     $html .= '</body></html>';
     return $html;

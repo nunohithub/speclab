@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100%" height="100%" fill="white"/>
+  <path d="M450 220 C350 180, 300 260, 400 300 C500 340, 450 420, 330 390" fill="none" stroke="#1f2a44" stroke-width="12" stroke-linecap="round"/>
+  <polygon points="520,170 550,185 550,215 520,230 490,215 490,185" fill="none" stroke="#1f2a44" stroke-width="8"/>
+  <text x="400" y="500" font-family="Arial, Helvetica, sans-serif" font-size="72" fill="#1f2a44" text-anchor="middle">SpecLab</text>
+</svg>

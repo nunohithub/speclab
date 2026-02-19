@@ -177,7 +177,7 @@ if ($useMpdf) {
             <tr>
                 <td width="33%">' . san($orgNome) . '</td>
                 <td width="33%" style="text-align: center;">Página {PAGENO} de {nbpg}</td>
-                <td width="33%" style="text-align: right;">' . san($data['numero']) . '</td>
+                <td width="33%" style="text-align: right;">Powered by SpecLab &copy;' . date('Y') . '</td>
             </tr>
         </table>';
     $mpdf->SetHTMLHeader($headerHtml);
@@ -976,7 +976,7 @@ $tamNome    = (int)$cv['tamanho_nome'];
     </div>
 
     <div class="footer">
-        <span>&copy; <?= san($orgNome) ?> <?= date('Y') ?></span>
+        <span>&copy; <?= san($orgNome) ?> <?= date('Y') ?> | Powered by SpecLab</span>
         <span><?= san($data['numero']) ?> | Versão <?= san($data['versao']) ?> | <?= date('d/m/Y') ?></span>
     </div>
 </body>

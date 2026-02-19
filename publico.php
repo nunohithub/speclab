@@ -129,6 +129,7 @@ if ($authenticated) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= san($espec['titulo']) ?> - <?= san($orgNome) ?></title>
+    <link rel="icon" type="image/svg+xml" href="<?= asset('assets/img/favicon.svg') ?>">
     <link rel="stylesheet" href="<?= asset('assets/css/style.css') ?>">
     <style>
         .public-container { max-width: 900px; margin: 0 auto; padding: 24px; }
@@ -581,5 +582,6 @@ if ($authenticated) {
 
 <?php endif; ?>
 
+<?php include __DIR__ . '/includes/footer.php'; ?>
 </body>
 </html>

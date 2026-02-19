@@ -198,6 +198,7 @@ $pageSubtitle = 'Editor de Especificação';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $pageTitle ?> - Cadernos de Encargos</title>
     <link rel="stylesheet" href="<?= asset('assets/css/style.css') ?>">
+    <link rel="icon" type="image/svg+xml" href="<?= BASE_PATH ?>/assets/img/favicon.svg">
     <style>
         .save-indicator {
             display: inline-flex;
@@ -4575,5 +4576,6 @@ $pageSubtitle = 'Editor de Especificação';
     }
     </script>
     <?php include __DIR__ . '/includes/modals.php'; ?>
+    <?php include __DIR__ . '/includes/footer.php'; ?>
 </body>
 </html>

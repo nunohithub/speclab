@@ -80,10 +80,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SpecLab - Cadernos de Encargos</title>
     <link rel="stylesheet" href="<?= asset('assets/css/style.css') ?>">
+    <link rel="icon" type="image/svg+xml" href="<?= BASE_PATH ?>/assets/img/favicon.svg">
 </head>
 <body class="login-page">
     <div class="login-box">
-        <img src="<?= BASE_PATH ?>/assets/img/exi_logo.png" alt="SpecLab" onerror="this.style.display='none'">
+        <img src="<?= BASE_PATH ?>/assets/img/speclab_logo.svg" alt="SpecLab" style="max-width: 180px; margin-bottom: 8px;" onerror="this.style.display='none'">
         <h1>Cadernos de Encargos</h1>
         <p>Sistema de Especificações Técnicas</p>
 
