@@ -107,6 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $filename = 'assinatura_' . $uid . '_' . time() . '.' . $ext;
                 $filepath = $uploadDir . $filename;
                 if (move_uploaded_file($_FILES['assinatura']['tmp_name'], $filepath)) {
+                    if ($ext === 'svg') sanitizeSvg($filepath);
                     // Remover assinatura anterior
                     $old = $db->prepare('SELECT assinatura FROM utilizadores WHERE id = ?');
                     $old->execute([$uid]);
@@ -132,7 +133,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $msgUser = 'Utilizador guardado';
         if ($isNewUser && !empty($password)) {
-            $msgUser .= '. Palavra-passe inicial: ' . $password;
+            // Guardar password na sessão (nunca na URL)
+            $_SESSION['temp_new_password'] = $password;
         }
         header('Location: ' . BASE_PATH . '/admin.php?tab=utilizadores&msg=' . urlencode($msgUser));
         exit;
@@ -262,6 +264,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'svg'])) {
                 $filename = 'org_' . $oid . '_' . time() . '.' . $ext;
                 if (move_uploaded_file($_FILES['logo_file']['tmp_name'], $uploadDir . $filename)) {
+                    if ($ext === 'svg') sanitizeSvg($uploadDir . $filename);
                     // Remover logo anterior
                     $old = $db->prepare('SELECT logo FROM organizacoes WHERE id = ?');
                     $old->execute([$oid]);
@@ -329,9 +332,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'save_config' && $isSuperAdminUser) {
+        // Campos sensíveis: não gravar se vazio (manter valor atual)
+        $sensitiveKeys = ['smtp_pass', 'openai_api_key'];
         foreach ($_POST as $key => $value) {
             if (strpos($key, 'cfg_') === 0) {
                 $chave = substr($key, 4);
+                if (in_array($chave, $sensitiveKeys) && trim($value) === '') continue;
                 setConfiguracao($chave, trim($value));
             }
         }
@@ -362,6 +368,7 @@ if ($action === 'save_org_branding' && $user['role'] === 'org_admin' && $orgId) 
         if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'svg'])) {
             $filename = 'org_' . $orgId . '_' . time() . '.' . $ext;
             if (move_uploaded_file($_FILES['logo_file']['tmp_name'], $uploadDir . $filename)) {
+                if ($ext === 'svg') sanitizeSvg($uploadDir . $filename);
                 $old = $db->prepare('SELECT logo FROM organizacoes WHERE id = ?');
                 $old->execute([$orgId]);
                 $oldLogo = $old->fetchColumn();
@@ -466,6 +473,13 @@ $activeNav = $tab;
     <div class="container">
         <?php if ($msg): ?>
             <div class="alert alert-success"><?= sanitize($msg) ?></div>
+        <?php endif; ?>
+        <?php if (!empty($_SESSION['temp_new_password'])): ?>
+            <div class="alert alert-success" style="background:#fef3c7; border-color:#f59e0b; color:#92400e;">
+                <strong>Palavra-passe inicial:</strong> <code><?= sanitize($_SESSION['temp_new_password']) ?></code>
+                <br><small>Copie agora. Esta informação não será mostrada novamente.</small>
+            </div>
+            <?php unset($_SESSION['temp_new_password']); ?>
         <?php endif; ?>
 
         <!-- ORGANIZAÇÕES (super_admin only) -->
@@ -2437,7 +2451,7 @@ $activeNav = $tab;
                     </div>
                     <div class="form-row">
                         <div class="form-group"><label>Utilizador SMTP</label><input type="text" name="cfg_smtp_user" value="<?= sanitize(getConfiguracao('smtp_user')) ?>" placeholder="user@gmail.com"></div>
-                        <div class="form-group"><label>Password SMTP</label><input type="password" name="cfg_smtp_pass" value="<?= sanitize(getConfiguracao('smtp_pass')) ?>" placeholder="app password"></div>
+                        <div class="form-group"><label>Password SMTP</label><input type="password" name="cfg_smtp_pass" value="" placeholder="<?= getConfiguracao('smtp_pass') ? '••••••• (definida)' : 'app password' ?>"><small class="muted">Deixe em branco para manter a atual</small></div>
                     </div>
                     <div class="form-row">
                         <div class="form-group"><label>Email Remetente</label><input type="text" name="cfg_smtp_from" value="<?= sanitize(getConfiguracao('smtp_from')) ?>" placeholder="noreply@empresa.pt"></div>
@@ -2449,7 +2463,7 @@ $activeNav = $tab;
                     <h3 style="color: #2596be; font-size: 15px; margin-bottom: 12px;">Inteligência Artificial (OpenAI)</h3>
                     <div class="form-group">
                         <label>Chave API OpenAI</label>
-                        <input type="password" name="cfg_openai_api_key" value="<?= sanitize(getConfiguracao('openai_api_key')) ?>" placeholder="sk-...">
+                        <input type="password" name="cfg_openai_api_key" value="" placeholder="<?= getConfiguracao('openai_api_key') ? '••••••• (definida)' : 'sk-...' ?>"><small class="muted">Deixe em branco para manter a atual</small>
                         <small class="muted">Usada para assistente IA, verificação de legislação e chat. Obter em platform.openai.com</small>
                     </div>
 

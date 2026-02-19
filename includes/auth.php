@@ -204,6 +204,26 @@ function sanitizeRichText(string $html): string {
 }
 
 // =============================================
+// SANITIZAÇÃO DE SVG
+// =============================================
+
+/**
+ * Remove elementos e atributos perigosos de ficheiros SVG
+ */
+function sanitizeSvg(string $filepath): bool {
+    $content = file_get_contents($filepath);
+    if ($content === false) return false;
+    // Remover scripts, event handlers e elementos perigosos
+    $content = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $content);
+    $content = preg_replace('/<foreignObject\b[^>]*>.*?<\/foreignObject>/is', '', $content);
+    $content = preg_replace('/\s+on\w+\s*=\s*["\'][^"\']*["\']/i', '', $content);
+    $content = preg_replace('/\s+on\w+\s*=\s*\S+/i', '', $content);
+    $content = preg_replace('/javascript\s*:/i', '', $content);
+    $content = preg_replace('/data\s*:\s*text\/html/i', '', $content);
+    return file_put_contents($filepath, $content) !== false;
+}
+
+// =============================================
 // NUMERAÇÃO DE ESPECIFICAÇÕES (scoped por org)
 // =============================================
 
