@@ -3,13 +3,6 @@
  * SpecLab - Cadernos de Encargos
  * Visualização Pública com Password
  */
-ini_set('session.gc_maxlifetime', 86400);
-ini_set('session.cookie_lifetime', 86400);
-ini_set('session.cookie_httponly', 1);
-ini_set('session.cookie_samesite', 'Lax');
-ini_set('session.use_strict_mode', 1);
-session_start();
-
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/auth.php';
@@ -207,7 +200,7 @@ if ($authenticated) {
             <p style="font-size:12px; color:#667085; margin-bottom:20px;">Este documento requer autenticação para visualização.</p>
 
             <?php if (isset($error)): ?>
-                <div class="alert alert-error"><?= $error ?></div>
+                <div class="alert alert-error"><?= sanitize($error) ?></div>
             <?php endif; ?>
 
             <form method="POST">

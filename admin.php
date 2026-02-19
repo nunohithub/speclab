@@ -761,6 +761,9 @@ $activeNav = $tab;
                             </td>
                         </tr>
                     <?php endforeach; ?>
+                    <?php if (empty($utilizadores)): ?>
+                        <tr><td colspan="6" class="muted" style="text-align:center; padding:20px;">Nenhum utilizador encontrado.</td></tr>
+                    <?php endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -886,6 +889,9 @@ $activeNav = $tab;
                             </td>
                         </tr>
                     <?php endforeach; ?>
+                    <?php if (empty($clientes)): ?>
+                        <tr><td colspan="5" class="muted" style="text-align:center; padding:20px;">Nenhum cliente encontrado.</td></tr>
+                    <?php endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -1081,6 +1087,9 @@ $activeNav = $tab;
                             </td>
                         </tr>
                     <?php endforeach; ?>
+                    <?php if (empty($produtos)): ?>
+                        <tr><td colspan="5" class="muted" style="text-align:center; padding:20px;">Nenhum produto encontrado.</td></tr>
+                    <?php endif; ?>
                     </tbody>
                 </table>
             </div>

@@ -3,13 +3,7 @@
  * SpecLab - Download de Ficheiros
  */
 require_once __DIR__ . '/config/database.php';
-
-ini_set('session.gc_maxlifetime', 28800);
-ini_set('session.cookie_lifetime', 28800);
-ini_set('session.cookie_httponly', 1);
-ini_set('session.cookie_samesite', 'Lax');
-ini_set('session.use_strict_mode', 1);
-session_start();
+require_once __DIR__ . '/includes/auth.php';
 
 $db = getDB();
 $id = (int)($_GET['id'] ?? 0);

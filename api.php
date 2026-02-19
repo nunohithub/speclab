@@ -967,6 +967,7 @@ try {
         // 10. SAVE CLIENTE
         // ===================================================================
         case 'save_cliente':
+            requireAdminApi($user);
             $id       = (int)($_POST['id'] ?? 0);
             $nome     = sanitize($_POST['nome'] ?? '');
             $sigla    = sanitize($_POST['sigla'] ?? '');
@@ -1010,6 +1011,7 @@ try {
         // 11. SAVE PRODUTO
         // ===================================================================
         case 'save_produto':
+            requireAdminApi($user);
             $id        = (int)($_POST['id'] ?? 0);
             $nome      = sanitize($_POST['nome'] ?? '');
             $tipo      = sanitize($_POST['tipo'] ?? '');
@@ -2049,7 +2051,7 @@ try {
 
         case 'gerar_token':
             $especId = (int)($jsonBody['especificacao_id'] ?? $_POST['especificacao_id'] ?? 0);
-            if ($especId > 0) checkSaOrgAccess($db, $user, $especId);
+            if ($especId > 0) verifySpecAccess($db, $especId, $user);
             $nome = sanitize($jsonBody['nome'] ?? $_POST['nome'] ?? '');
             $email = sanitize($jsonBody['email'] ?? $_POST['email'] ?? '');
             $tipo = sanitize($jsonBody['tipo'] ?? $_POST['tipo'] ?? 'outro');
