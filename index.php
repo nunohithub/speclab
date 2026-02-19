@@ -102,12 +102,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="form-group">
                 <label for="username">Utilizador</label>
                 <input type="text" id="username" name="username" required autofocus
+                       autocomplete="username"
                        value="<?= htmlspecialchars($username ?? '') ?>"
                        placeholder="O seu utilizador">
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required
+                       autocomplete="current-password"
                        placeholder="A sua password">
             </div>
             <button type="submit" class="btn btn-primary btn-lg">Entrar</button>

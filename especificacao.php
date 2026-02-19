@@ -3792,7 +3792,6 @@ $pageSubtitle = 'Editor de Especificação';
         var assunto = document.getElementById('email_assunto').value.trim();
         var mensagem = document.getElementById('email_mensagem').value.trim();
         var incluirLink = document.getElementById('email_incluir_link').checked;
-        var anexarPdf = document.getElementById('email_anexar_pdf').checked;
 
         if (!destinatario) {
             showToast('Introduza o email do destinatário.', 'warning');
@@ -3817,8 +3816,7 @@ $pageSubtitle = 'Editor de Especificação';
                 destinatario: destinatario,
                 assunto: assunto,
                 mensagem: mensagem,
-                incluir_link: incluirLink ? 1 : 0,
-                anexar_pdf: anexarPdf ? 1 : 0
+                incluir_link: incluirLink ? 1 : 0
             })
         .then(function(r) { return r.json(); })
         .then(function(result) {

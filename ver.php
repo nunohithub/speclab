@@ -46,9 +46,6 @@ if ($org && $org['logo']) {
     $orgLogo = BASE_PATH . '/assets/img/exi_logo.png';
 }
 
-function san(string $s): string {
-    return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-}
 ?>
 <!DOCTYPE html>
 <html lang="pt-PT">
@@ -299,7 +296,7 @@ function san(string $s): string {
                                 if (strip_tags($secContent) === $secContent) {
                                     echo nl2br(san($secContent));
                                 } else {
-                                    echo $secContent;
+                                    echo sanitizeRichText($secContent);
                                 }
                             ?></div>
                         <?php endif; ?>

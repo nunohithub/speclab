@@ -185,6 +185,10 @@ function sanitize(string $input): string {
     return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
 }
 
+function san(string $s): string {
+    return sanitize($s);
+}
+
 function sanitizeRichText(string $html): string {
     $html = preg_replace('/<\/div>\s*<div[^>]*>/i', '<br>', $html);
     $html = preg_replace('/<div[^>]*>/i', '<br>', $html);

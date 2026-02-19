@@ -1828,8 +1828,7 @@ try {
 
         case 'save_banco_merges':
             if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
-            $input = json_decode(file_get_contents('php://input'), true);
-            $merges = json_encode($input['merges'] ?? []);
+            $merges = json_encode($jsonBody['merges'] ?? []);
             $stmt = $db->prepare("UPDATE configuracoes SET valor = ? WHERE chave = 'banco_ensaios_merges'");
             $stmt->execute([$merges]);
             jsonSuccess('Merges guardados.');

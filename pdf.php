@@ -83,9 +83,6 @@ if (strpos($fornecedorDisplay, ',') !== false || empty($fornecedorDisplay)) {
 $stmt = $db->prepare('INSERT INTO acessos_log (especificacao_id, ip, user_agent, tipo) VALUES (?, ?, ?, ?)');
 $stmt->execute([$id, $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '', 'pdf']);
 
-function san(string $s): string {
-    return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-}
 
 // Tentar mPDF
 $useMpdf = file_exists(__DIR__ . '/vendor/autoload.php');
@@ -408,6 +405,8 @@ if ($useMpdf) {
                 $secContent = $sec['conteudo'] ?? '';
                 if (strip_tags($secContent) === $secContent) {
                     $secContent = nl2br(san($secContent));
+                } else {
+                    $secContent = sanitizeRichText($secContent);
                 }
                 $html .= '<div class="content">' . $secContent . '</div>';
             }
@@ -741,7 +740,7 @@ $tamNome    = (int)$cv['tamanho_nome'];
                         if (strip_tags($secContent) === $secContent) {
                             echo nl2br(san($secContent));
                         } else {
-                            echo $secContent;
+                            echo sanitizeRichText($secContent);
                         }
                     ?></div>
                 <?php endif; ?>

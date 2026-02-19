@@ -2522,10 +2522,17 @@ $activeNav = $tab;
     }
 
     // ===================================
-    // GLOBAL: Close modal on overlay click
+    // GLOBAL: Close modal on overlay click or Escape key
     // ===================================
     document.querySelectorAll('.modal-overlay').forEach(function(m) {
         m.addEventListener('click', function(e) { if (e.target === m) m.style.display = 'none'; });
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay').forEach(function(m) {
+                if (m.style.display !== 'none') m.style.display = 'none';
+            });
+        }
     });
     </script>
 </body>

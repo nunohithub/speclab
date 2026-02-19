@@ -39,6 +39,8 @@ $corPrimariaDark = $org ? $org['cor_primaria_dark'] : '#1a7a9e';
 $corPrimariaLight = $org ? $org['cor_primaria_light'] : '#e6f4f9';
 $orgNome = $org ? $org['nome'] : 'SpecLab';
 $orgLogo = ($org && $org['logo']) ? (BASE_PATH . '/uploads/logos/' . $org['logo']) : (BASE_PATH . '/assets/img/exi_logo.png');
+$temClientes = $org && !empty($org['tem_clientes']);
+$temFornecedores = $org && !empty($org['tem_fornecedores']);
 
 if (!$espec) {
     http_response_code(404);
@@ -76,9 +78,7 @@ if ($authenticated) {
     $stmt->execute([$espec['id'], $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '', 'view']);
 }
 
-function san(string $s): string {
-    return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-}
+
 
 // Se autenticado, carregar dados completos
 $data = null;
@@ -157,7 +157,7 @@ if ($authenticated) {
     <!-- PASSWORD FORM -->
     <div class="login-page" style="min-height:100vh;">
         <div class="login-box">
-            <img src="<?= BASE_PATH ?>/assets/img/exi_logo.png" alt="SpecLab" onerror="this.style.display='none'">
+            <img src="<?= $orgLogo ?>" alt="<?= sanitize($orgNome) ?>" onerror="this.style.display='none'">
             <h1 style="font-size:16px; color:<?= $corPrimaria ?>; margin-bottom:4px;">Caderno de Encargos</h1>
             <p style="font-size:13px; color:#111827; margin-bottom:4px;"><strong><?= san($espec['titulo']) ?></strong></p>
             <p style="font-size:12px; color:#667085; margin-bottom:20px;">Este documento requer autenticação para visualização.</p>
@@ -184,7 +184,7 @@ if ($authenticated) {
 
             <!-- Header -->
             <div class="doc-header">
-                <img src="<?= BASE_PATH ?>/assets/img/exi_logo.png" alt="SpecLab" onerror="this.style.display='none'">
+                <img src="<?= $orgLogo ?>" alt="<?= sanitize($orgNome) ?>" onerror="this.style.display='none'">
                 <div class="doc-title">
                     <h1><?= san($data['titulo']) ?></h1>
                     <p><?= san($data['numero']) ?> | Versão <?= san($data['versao']) ?></p>
@@ -194,8 +194,12 @@ if ($authenticated) {
             <!-- Meta -->
             <div class="doc-meta">
                 <div><span>Produto:</span> <strong><?= san($data['produto_nome'] ?? '-') ?></strong></div>
+                <?php if ($temClientes): ?>
                 <div><span>Cliente:</span> <strong><?= san($data['cliente_nome'] ?? 'Geral') ?></strong></div>
+                <?php endif; ?>
+                <?php if ($temFornecedores): ?>
                 <div><span>Fornecedor:</span> <strong><?= san($data['fornecedor_nome'] ?? 'Todos') ?></strong></div>
+                <?php endif; ?>
                 <div><span>Emissão:</span> <strong><?= formatDate($data['data_emissao']) ?></strong></div>
                 <div><span>Revisão:</span> <strong><?= $data['data_revisao'] ? formatDate($data['data_revisao']) : '-' ?></strong></div>
                 <div><span>Estado:</span> <strong><?= ucfirst($data['estado']) ?></strong></div>
@@ -214,27 +218,27 @@ if ($authenticated) {
                             $ensaiosRaw = json_decode($sec['conteudo'] ?? '[]', true);
                             if (isset($ensaiosRaw['rows'])) {
                                 $ensaiosData = $ensaiosRaw['rows'];
-                                $colWidths = $ensaiosRaw['colWidths'] ?? [20, 25, 20, 18, 12];
+                                $colWidths = $ensaiosRaw['colWidths'] ?? [20, 22, 18, 13, 13, 10];
                                 $merges = $ensaiosRaw['merges'] ?? [];
                             } else {
                                 $ensaiosData = is_array($ensaiosRaw) ? $ensaiosRaw : [];
-                                $colWidths = [20, 25, 20, 18, 12];
+                                $colWidths = [20, 22, 18, 13, 13, 10];
                                 $merges = [];
                             }
-                            if (count($colWidths) >= 5) {
-                                $outCw = array_slice($colWidths, 1, 4);
+                            if (count($colWidths) >= 6) {
+                                $outCw = array_slice($colWidths, 1, 5);
                                 $colShift = 1;
                             } else {
-                                $outCw = array_slice($colWidths, 0, 4);
+                                $outCw = array_slice($colWidths, 0, 5);
                                 $colShift = 0;
                             }
-                            if (count($outCw) < 4) $outCw = [30, 25, 22, 15];
+                            if (count($outCw) < 5) $outCw = [26, 22, 18, 15, 14];
                             $cwSum = array_sum($outCw) ?: 1;
                             $cwPct = array_map(function($v) use ($cwSum) { return round($v / $cwSum * 100, 1); }, $outCw);
                             $hiddenCells = []; $spanCells = []; $alignCells = []; $rowInMerge = [];
                             foreach ($merges as $m) {
                                 $nc = $m['col'] - $colShift;
-                                if ($nc < 0 || $nc > 3) continue;
+                                if ($nc < 0 || $nc > 4) continue;
                                 $k = $m['row'] . '_' . $nc;
                                 $spanCells[$k] = $m['span'];
                                 $alignCells[$k] = ['h' => $m['hAlign'] ?? 'center', 'v' => $m['vAlign'] ?? 'middle'];
@@ -259,16 +263,17 @@ if ($authenticated) {
                                         <th style="width:<?= $cwPct[0] ?>%">Ensaio / Controlo</th>
                                         <th style="width:<?= $cwPct[1] ?>%">Especificação</th>
                                         <th style="width:<?= $cwPct[2] ?>%">Norma</th>
-                                        <th style="width:<?= $cwPct[3] ?>%">NQA</th>
+                                        <th style="width:<?= $cwPct[3] ?>%" title="Nível Especial de Inspeção">NEI</th>
+                                        <th style="width:<?= $cwPct[4] ?>%" title="Nível de Qualidade Aceitável">NQA</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php
-                                    $fields = ['ensaio','especificacao','norma','nqa'];
+                                    $fields = ['ensaio','especificacao','norma','nivel_especial','nqa'];
                                     foreach ($ensaiosData as $rIdx => $ens):
                                         if (isset($catHeaders[$rIdx])):
                                     ?>
-                                    <tr class="cat-header"><td colspan="4"><?= san($catHeaders[$rIdx]) ?></td></tr>
+                                    <tr class="cat-header"><td colspan="5"><?= san($catHeaders[$rIdx]) ?></td></tr>
                                     <?php endif; ?>
                                     <tr>
                                         <?php foreach ($fields as $cIdx => $field):
@@ -286,6 +291,7 @@ if ($authenticated) {
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
+                            <p style="font-size:11px; color:#888; margin:3px 0 0 0;">NEI — Nível Especial de Inspeção &nbsp;|&nbsp; NQA — Nível de Qualidade Aceitável &nbsp;(NP 2922)</p>
                             <?php endif; ?>
                         <?php else: ?>
                             <div class="content"><?php
@@ -293,7 +299,7 @@ if ($authenticated) {
                                 if (strip_tags($secContent) === $secContent) {
                                     echo nl2br(san($secContent));
                                 } else {
-                                    echo $secContent;
+                                    echo sanitizeRichText($secContent);
                                 }
                             ?></div>
                         <?php endif; ?>
