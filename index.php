@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     // Registar tentativa falhada
                     $db->prepare('INSERT INTO login_attempts (ip, username) VALUES (?, ?)')->execute([$ip, $username]);
-                    $error = 'Utilizador ou password incorretos.';
+                    $error = 'Utilizador ou palavra-passe incorretos.';
                 }
             }
         } catch (PDOException $e) {
@@ -107,10 +107,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        placeholder="O seu utilizador">
             </div>
             <div class="form-group">
-                <label for="password">Password</label>
+                <label for="password">Palavra-passe</label>
                 <input type="password" id="password" name="password" required
                        autocomplete="current-password"
-                       placeholder="A sua password">
+                       placeholder="A sua palavra-passe">
             </div>
             <button type="submit" class="btn btn-primary btn-lg">Entrar</button>
         </form>

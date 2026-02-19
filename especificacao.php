@@ -872,14 +872,7 @@ $pageSubtitle = 'Editor de Especificação';
                                 <label for="versao">Versão</label>
                                 <input type="text" id="versao" name="versao" value="<?= sanitize($espec['versao']) ?>" placeholder="1.0">
                             </div>
-                            <div class="form-group">
-                                <label for="estado">Estado</label>
-                                <select id="estado" name="estado">
-                                    <option value="rascunho" <?= $espec['estado'] === 'rascunho' ? 'selected' : '' ?>>Rascunho</option>
-                                    <option value="ativo" <?= $espec['estado'] === 'ativo' ? 'selected' : '' ?>>Ativo</option>
-                                    <option value="obsoleto" <?= $espec['estado'] === 'obsoleto' ? 'selected' : '' ?>>Obsoleto</option>
-                                </select>
-                            </div>
+                            <input type="hidden" id="estado" name="estado" value="<?= sanitize($espec['estado']) ?>">
                         </div>
                         <div class="form-group">
                             <label for="titulo">Título da Especificação</label>

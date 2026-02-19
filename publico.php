@@ -65,7 +65,7 @@ if ($needsPassword) {
             $_SESSION[$sessionKey] = true;
             $authenticated = true;
         } else {
-            $error = 'Password incorreta.';
+            $error = 'Palavra-passe incorreta.';
         }
     }
 } else {
@@ -169,8 +169,8 @@ if ($authenticated) {
             <form method="POST">
                 <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
                 <div class="form-group">
-                    <label for="password">Password de Acesso</label>
-                    <input type="password" id="password" name="password" required autofocus placeholder="Introduza a password">
+                    <label for="password">Palavra-passe de Acesso</label>
+                    <input type="password" id="password" name="password" required autofocus placeholder="Introduza a palavra-passe">
                 </div>
                 <button type="submit" class="btn btn-primary btn-lg">Aceder ao Documento</button>
             </form>

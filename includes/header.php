@@ -54,7 +54,11 @@ $activeNav = $activeNav ?? '';
         </div>
     </div>
     <div class="header-actions">
-        <span class="user-info"><?= sanitize($user['nome']) ?> (<?= $user['role'] ?>)</span>
+        <?php
+        $roleLabels = ['super_admin' => 'Super Admin', 'org_admin' => 'Administrador', 'user' => 'Utilizador'];
+        $roleLabel = $roleLabels[$user['role']] ?? $user['role'];
+        ?>
+        <span class="user-info"><?= sanitize($user['nome']) ?> (<?= $roleLabel ?>)</span>
         <a href="<?= BASE_PATH ?>/logout.php" class="btn btn-ghost btn-sm">Sair</a>
     </div>
 </div>

@@ -38,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'save_user') {
         $uid = (int)($_POST['user_id'] ?? 0);
+        $isNewUser = ($uid === 0);
         $nome = trim($_POST['nome'] ?? '');
         $username = trim($_POST['username'] ?? '');
         $role = $_POST['role'] ?? 'user';
@@ -126,7 +127,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        header('Location: ' . BASE_PATH . '/admin.php?tab=utilizadores&msg=Utilizador+guardado');
+        $msgUser = 'Utilizador guardado';
+        if ($isNewUser && !empty($password)) {
+            $msgUser .= '. Palavra-passe inicial: ' . $password;
+        }
+        header('Location: ' . BASE_PATH . '/admin.php?tab=utilizadores&msg=' . urlencode($msgUser));
         exit;
     }
 
@@ -636,7 +641,8 @@ $activeNav = $tab;
                                 if ($u['role'] === 'super_admin') $rolePillClass = 'pill-error';
                                 elseif ($u['role'] === 'org_admin') $rolePillClass = 'pill-primary';
                                 ?>
-                                <span class="pill <?= $rolePillClass ?>"><?= sanitize($u['role']) ?></span>
+                                <?php $roleLabels = ['super_admin' => 'Super Admin', 'org_admin' => 'Administrador', 'user' => 'Utilizador']; ?>
+                                <span class="pill <?= $rolePillClass ?>"><?= $roleLabels[$u['role']] ?? sanitize($u['role']) ?></span>
                             </td>
                             <?php if ($isSuperAdminUser): ?>
                                 <td><?= sanitize($u['org_nome'] ?? 'Sem org.') ?></td>
@@ -671,7 +677,7 @@ $activeNav = $tab;
                             <input type="text" name="username" id="user_username" required>
                         </div>
                         <div class="form-group">
-                            <label>Password <span class="muted">(deixe vazio para manter)</span></label>
+                            <label id="user_password_label">Palavra-passe <span class="muted">(deixe vazio para gerar automaticamente)</span></label>
                             <input type="password" name="password" id="user_password">
                         </div>
                         <div class="form-row">
@@ -2244,6 +2250,7 @@ $activeNav = $tab;
         document.getElementById('user_nome').value = '';
         document.getElementById('user_username').value = '';
         document.getElementById('user_password').value = '';
+        document.getElementById('user_password_label').innerHTML = 'Palavra-passe <span class="muted">(deixe vazio para gerar automaticamente)</span>';
         document.getElementById('user_role').value = 'user';
         document.getElementById('user_ativo').checked = true;
         document.getElementById('user_assinatura').value = '';
@@ -2268,6 +2275,7 @@ $activeNav = $tab;
         document.getElementById('user_nome').value = u.nome;
         document.getElementById('user_username').value = u.username;
         document.getElementById('user_password').value = '';
+        document.getElementById('user_password_label').innerHTML = 'Palavra-passe <span class="muted">(deixe vazio para manter)</span>';
         document.getElementById('user_role').value = u.role;
         document.getElementById('user_ativo').checked = u.ativo == 1;
         document.getElementById('remover_assinatura').value = '0';
