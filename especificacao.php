@@ -5,6 +5,7 @@
  */
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/includes/versioning.php';
 requireLogin();
 
 $user = getCurrentUser();
@@ -119,6 +120,19 @@ if ($isNew) {
 } else {
     header('Location: ' . BASE_PATH . '/dashboard.php');
     exit;
+}
+
+// Versionamento
+$versaoBloqueada = (bool)($espec['versao_bloqueada'] ?? 0);
+$grupoVersao = $espec['grupo_versao'] ?? '';
+$versaoNumero = (int)($espec['versao_numero'] ?? 1);
+$versoesGrupo = [];
+$resumoAceitacao = ['total_tokens' => 0, 'aceites' => 0, 'rejeicoes' => 0, 'pendentes' => 0];
+$tokensEspec = [];
+if (!$isNew && $grupoVersao) {
+    $versoesGrupo = getVersoesGrupo($db, $grupoVersao);
+    $resumoAceitacao = getResumoAceitacao($db, $espec['id']);
+    $tokensEspec = getTokensEspecificacao($db, $espec['id']);
 }
 
 // Templates de parâmetros
@@ -815,11 +829,18 @@ $pageSubtitle = 'Editor de Especificação';
                     <?= ucfirst($espec['estado']) ?>
                 </span>
                 <span class="muted" id="specNumero"><?= sanitize($espec['numero']) ?></span>
+                <?php if (!$isNew): ?>
+                <span class="pill pill-info" style="font-size:11px;">v<?= sanitize($espec['versao']) ?></span>
+                <?php if ($versaoBloqueada): ?>
+                <span class="pill pill-muted" style="font-size:11px;" title="Versão bloqueada">Bloqueada</span>
+                <?php endif; ?>
+                <?php endif; ?>
             </div>
             <div class="right">
-                <button class="btn btn-secondary btn-sm" onclick="window.print()" title="Imprimir">Imprimir</button>
-                <a href="<?= BASE_PATH ?>/pdf.php?id=<?= $espec['id'] ?>" class="btn btn-secondary btn-sm" target="_blank" title="Exportar PDF" id="btnPdf"<?= $isNew ? ' style="display:none"' : '' ?>>PDF</a>
-                <a href="<?= BASE_PATH ?>/ver.php?id=<?= $espec['id'] ?>" class="btn btn-secondary btn-sm" target="_blank" title="Pré-visualizar" id="btnVer"<?= $isNew ? ' style="display:none"' : '' ?>>Ver</a>
+                <button class="btn btn-outline-primary btn-sm" onclick="window.print()" title="Imprimir">Imprimir</button>
+                <a href="<?= BASE_PATH ?>/pdf.php?id=<?= $espec['id'] ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Exportar PDF" id="btnPdf"<?= $isNew ? ' style="display:none"' : '' ?>>PDF</a>
+                <a href="<?= BASE_PATH ?>/ver.php?id=<?= $espec['id'] ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Ver documento completo" id="btnVer"<?= $isNew ? ' style="display:none"' : '' ?>>Ver</a>
+                <?php if (!$versaoBloqueada): ?>
                 <div class="dropdown">
                     <button class="btn btn-secondary btn-sm" onclick="toggleDropdown('estadoMenu')">Estado</button>
                     <div class="dropdown-menu" id="estadoMenu">
@@ -830,8 +851,20 @@ $pageSubtitle = 'Editor de Especificação';
                     </div>
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="guardarTudo()">Guardar</button>
+                <?php if (!$isNew): ?>
+                <button class="btn btn-primary btn-sm" onclick="publicarVersaoUI()" title="Bloquear esta versão e enviar ao cliente">Publicar</button>
+                <?php endif; ?>
+                <?php else: ?>
+                <button class="btn btn-primary btn-sm" onclick="criarNovaVersaoUI()" title="Criar nova versão editável a partir desta">Nova Versão</button>
+                <?php endif; ?>
             </div>
         </div>
+
+        <?php if ($versaoBloqueada): ?>
+        <div class="alert alert-warning" style="margin: var(--spacing-sm) 0; display:flex; align-items:center; gap:var(--spacing-sm);">
+            <strong>Versão bloqueada (v<?= sanitize($espec['versao']) ?>)</strong> &mdash; Esta versão foi publicada e não pode ser editada. Use "Nova Versão" para criar uma cópia editável.
+        </div>
+        <?php endif; ?>
 
         <!-- TABS NAVIGATION -->
         <div class="tabs" id="mainTabs">
@@ -1017,7 +1050,7 @@ $pageSubtitle = 'Editor de Especificação';
                                     </div>
                                     <div style="padding: var(--spacing-md);">
                                         <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">
-                                            <label style="font-size:12px; font-weight:600; color:#374151;">No PDF:</label>
+                                            <label style="font-size:12px; font-weight:600; color:var(--color-text);">No PDF:</label>
                                             <select id="ficheiros_posicao" style="font-size:12px; padding:4px 8px; border:1px solid var(--color-border); border-radius:4px;">
                                                 <option value="local" <?= $ficPosicao === 'local' ? 'selected' : '' ?>>Mostrar neste local</option>
                                                 <option value="final" <?= $ficPosicao === 'final' ? 'selected' : '' ?>>Mostrar no final do documento</option>
@@ -1262,45 +1295,254 @@ $pageSubtitle = 'Editor de Especificação';
 
                 <!-- TAB: PARTILHA -->
                 <div class="tab-panel" id="panel-partilha">
+
+                    <?php if (!$isNew && count($versoesGrupo) > 1): ?>
+                    <!-- HISTÓRICO DE VERSÕES -->
                     <div class="card">
                         <div class="card-header">
-                            <span class="card-title">Acesso Público</span>
-                            <span class="muted">Gerar link para partilha externa</span>
+                            <span class="card-title">Histórico de Versões</span>
+                            <span class="muted"><?= count($versoesGrupo) ?> versões</span>
                         </div>
+                        <table class="table" style="font-size:13px;">
+                            <thead>
+                                <tr><th>Versão</th><th>Estado</th><th>Publicado por</th><th>Data</th><th>Aceitação</th><th></th></tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($versoesGrupo as $v): ?>
+                                <tr<?= $v['id'] == $espec['id'] ? ' style="background:var(--color-bg-alt);font-weight:600;"' : '' ?>>
+                                    <td>v<?= sanitize($v['versao']) ?></td>
+                                    <td>
+                                        <?php if ($v['versao_bloqueada']): ?>
+                                            <span class="pill pill-success" style="font-size:11px;">Publicada</span>
+                                        <?php else: ?>
+                                            <span class="pill pill-warning" style="font-size:11px;"><?= ucfirst(sanitize($v['estado'])) ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= sanitize($v['publicado_por_nome'] ?? '-') ?></td>
+                                    <td><?= $v['publicado_em'] ? date('d/m/Y H:i', strtotime($v['publicado_em'])) : '-' ?></td>
+                                    <td>
+                                        <?php if ($v['total_aceites'] || $v['total_rejeicoes']): ?>
+                                            <span style="color:var(--color-success);"><?= (int)$v['total_aceites'] ?> aceites</span>
+                                            <?php if ($v['total_rejeicoes']): ?><span style="color:var(--color-danger);"> / <?= (int)$v['total_rejeicoes'] ?> rej.</span><?php endif; ?>
+                                        <?php elseif ($v['total_tokens']): ?>
+                                            <span class="muted"><?= (int)$v['total_tokens'] ?> pendentes</span>
+                                        <?php else: ?>
+                                            <span class="muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php if ($v['id'] != $espec['id']): ?>
+                                        <a href="<?= BASE_PATH ?>/especificacao.php?id=<?= $v['id'] ?>" class="btn btn-ghost btn-sm">Abrir</a>
+                                        <?php else: ?>
+                                        <span class="muted">Atual</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php endif; ?>
 
-                        <div class="form-group">
-                            <label for="senha_publica">Palavra-passe para acesso público</label>
-                            <input type="text" id="senha_publica" name="senha_publica" value="<?= sanitize($espec['senha_publica'] ?? '') ?>" placeholder="Definir palavra-passe (opcional)">
-                            <span class="muted" style="display:block; margin-top: var(--spacing-xs);">Se definida, será necessária para aceder ao link público.</span>
+                    <?php if (!$isNew && $versaoBloqueada): ?>
+                    <!-- ACEITAÇÃO FORMAL -->
+                    <div class="card" style="border-left:3px solid var(--color-primary);">
+                        <div class="card-header">
+                            <span class="card-title">Aceitação Formal</span>
+                            <span class="muted">Cada destinatário recebe um link pessoal para aceitar ou rejeitar</span>
                         </div>
-
-                        <div class="form-group">
-                            <label>Código de Acesso</label>
-                            <div class="flex gap-sm" style="align-items: center;">
-                                <input type="text" id="codigo_acesso" name="codigo_acesso" value="<?= sanitize($espec['codigo_acesso'] ?? '') ?>" readonly style="background: var(--color-bg); font-family: monospace; flex:1;">
-                                <button class="btn btn-secondary btn-sm" onclick="gerarCodigoAcesso()">Gerar Código</button>
+                        <div style="display:flex; gap:var(--spacing-sm); align-items:end; flex-wrap:wrap; margin-bottom:var(--spacing-md);">
+                            <div class="form-group" style="flex:1; min-width:150px; margin:0;">
+                                <label for="dest_nome">Nome</label>
+                                <input type="text" id="dest_nome" placeholder="Nome do destinatário">
                             </div>
+                            <div class="form-group" style="flex:1; min-width:200px; margin:0;">
+                                <label for="dest_email">Email</label>
+                                <input type="email" id="dest_email" placeholder="email@exemplo.com">
+                            </div>
+                            <div class="form-group" style="width:140px; margin:0;">
+                                <label for="dest_tipo">Tipo</label>
+                                <select id="dest_tipo">
+                                    <option value="cliente">Cliente</option>
+                                    <option value="fornecedor">Fornecedor</option>
+                                    <option value="outro">Outro</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary btn-sm" onclick="adicionarDestinatario()">Adicionar</button>
                         </div>
 
-                        <?php if (!empty($espec['codigo_acesso'])): ?>
+                        <div id="listaDestinatarios">
+                        <?php if (empty($tokensEspec)): ?>
+                            <p class="muted">Nenhum destinatário adicionado.</p>
+                        <?php else: ?>
+                            <table class="table" style="font-size:13px;">
+                                <thead>
+                                    <tr><th>Nome</th><th>Email</th><th>Tipo</th><th>Estado</th><th>Acessos</th><th></th></tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($tokensEspec as $tk): ?>
+                                    <tr>
+                                        <td><?= sanitize($tk['destinatario_nome'] ?? '-') ?></td>
+                                        <td><?= sanitize($tk['destinatario_email'] ?? '-') ?></td>
+                                        <td><?= ucfirst(sanitize($tk['tipo_destinatario'])) ?></td>
+                                        <td>
+                                            <?php if ($tk['tipo_decisao'] === 'aceite'): ?>
+                                                <span class="pill pill-success" style="font-size:11px;">Aceite</span>
+                                            <?php elseif ($tk['tipo_decisao'] === 'rejeitado'): ?>
+                                                <span class="pill pill-danger" style="font-size:11px;">Rejeitado</span>
+                                            <?php else: ?>
+                                                <span class="pill pill-warning" style="font-size:11px;">Pendente</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><?= (int)$tk['total_acessos'] ?></td>
+                                        <td style="display:flex; gap:4px;">
+                                            <?php if (empty($tk['enviado_em'])): ?>
+                                            <button class="btn btn-primary btn-sm" onclick="enviarLinkToken(<?= $tk['id'] ?>)" title="Enviar email">Enviar</button>
+                                            <?php else: ?>
+                                            <span class="muted" style="font-size:11px;" title="Enviado em <?= date('d/m/Y H:i', strtotime($tk['enviado_em'])) ?>">Enviado</span>
+                                            <?php endif; ?>
+                                            <button class="btn btn-ghost btn-sm" onclick="copiarLinkToken('<?= sanitize($tk['token']) ?>')" title="Copiar link">Copiar</button>
+                                            <button class="btn btn-danger btn-sm" onclick="revogarToken(<?= $tk['id'] ?>)" title="Revogar acesso">&times;</button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        <?php endif; ?>
+                        </div>
+
+                        <?php if ($resumoAceitacao['total_tokens'] > 0): ?>
+                        <div style="margin-top:var(--spacing-md); padding:var(--spacing-sm); background:var(--color-bg-alt); border-radius:var(--radius); font-size:13px;">
+                            <strong>Resumo:</strong>
+                            <?= (int)$resumoAceitacao['aceites'] ?> aceites,
+                            <?= (int)$resumoAceitacao['rejeicoes'] ?> rejeições,
+                            <?= (int)$resumoAceitacao['pendentes'] ?> pendentes
+                            de <?= (int)$resumoAceitacao['total_tokens'] ?> destinatários
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- PARTILHA RÁPIDA -->
+                    <?php if (!$isNew): ?>
+                    <?php
+                        $smtpConfigurado = !empty(getConfiguracao('smtp_host')) && !empty(getConfiguracao('smtp_user'));
+                        $emailsForn = [];
+                        foreach (($espec['fornecedores_lista'] ?? []) as $f) {
+                            if (!empty($f['email'])) {
+                                foreach (array_map('trim', explode(',', $f['email'])) as $em) {
+                                    if ($em) $emailsForn[] = $em;
+                                }
+                            }
+                        }
+                        $emailsCli = [];
+                        if (!empty($espec['cliente_email'])) {
+                            foreach (array_map('trim', explode(',', $espec['cliente_email'])) as $em) {
+                                if ($em) $emailsCli[] = $em;
+                            }
+                        }
+                        $nForn = count($espec['fornecedores_lista'] ?? []);
+                        $nCli = !empty($espec['cliente_id']) ? 1 : 0;
+                    ?>
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">Partilha Rápida</span>
+                            <span class="muted">Enviar documento por email ou gerar link público</span>
+                        </div>
+
+                        <!-- Enviar por Email -->
+                        <div style="margin-bottom:var(--spacing-lg);">
+                            <div class="section-label" style="margin-bottom:var(--spacing-sm);">Enviar por Email</div>
                             <div class="form-group">
-                                <label>Link de Partilha</label>
-                                <div class="share-link">
-                                    <input type="text" id="shareLink" value="" readonly>
-                                    <button class="btn btn-primary btn-sm" onclick="copiarLink()">Copiar</button>
+                                <label for="email_destinatario">Destinatário</label>
+                                <div style="display:flex; gap:6px; align-items:center;">
+                                    <input type="text" id="email_destinatario" placeholder="email@exemplo.com" style="flex:1;">
+                                    <button type="button" id="btnLimparDest" class="btn btn-sm btn-ghost" onclick="limparDestinatarios()" style="display:none;" title="Limpar">&times;</button>
+                                </div>
+                                <?php if ($emailsForn || $emailsCli): ?>
+                                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+                                    <?php if ($emailsForn): ?>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="preencherDestinatarios('fornecedores')">
+                                        <?= $nForn === 1 ? sanitize($espec['fornecedores_lista'][0]['nome']) : 'Fornecedores ('.$nForn.')' ?>
+                                    </button>
+                                    <?php endif; ?>
+                                    <?php if ($emailsCli): ?>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="preencherDestinatarios('cliente')">
+                                        <?= sanitize($espec['cliente_nome']) ?>
+                                    </button>
+                                    <?php endif; ?>
+                                    <?php if ($emailsForn && $emailsCli): ?>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="preencherDestinatarios('todos')">Todos</button>
+                                    <?php endif; ?>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                            <div class="form-group">
+                                <label for="email_assunto">Assunto</label>
+                                <input type="text" id="email_assunto" value="Caderno de Encargos: <?= sanitize($espec['numero']) ?> - <?= sanitize($espec['titulo']) ?>">
+                            </div>
+                            <div class="form-group">
+                                <label for="email_mensagem">Mensagem personalizada (opcional)</label>
+                                <textarea id="email_mensagem" rows="3" placeholder="Adicionar mensagem ao email..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                    <input type="checkbox" id="email_incluir_link" checked> Incluir link de visualização online
+                                </label>
+                            </div>
+                            <div style="display:flex; align-items:center; gap: var(--spacing-sm); flex-wrap:wrap;">
+                                <button class="btn btn-primary" onclick="abrirEmailCliente()" id="btnAbrirEmail">Abrir no Email</button>
+                                <?php if ($smtpConfigurado): ?>
+                                <button class="btn btn-secondary" onclick="enviarEmailEspec()" id="btnEnviarEmail">Enviar via Servidor</button>
+                                <?php endif; ?>
+                                <span class="muted" id="emailStatus"></span>
+                            </div>
+                            <?php if (!$smtpConfigurado): ?>
+                            <div class="alert alert-info" style="margin-top: var(--spacing-sm);">
+                                O email será aberto no seu programa de email (Outlook, Gmail, etc.). Para enviar diretamente pelo servidor, configure o SMTP nas definições.
+                            </div>
+                            <?php endif; ?>
+                        </div>
+
+                        <!-- Link de Consulta -->
+                        <div style="border-top:1px solid var(--color-border); padding-top:var(--spacing-md);">
+                            <div class="section-label" style="margin-bottom:var(--spacing-xs);">Link de Consulta</div>
+                            <p class="muted" style="font-size:12px; margin:0 0 var(--spacing-sm);">Link para consulta rápida do documento. Não requer aceitação — ideal para partilha interna ou consultas informais.</p>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Código de Acesso</label>
+                                    <div class="flex gap-sm" style="align-items: center;">
+                                        <input type="text" id="codigo_acesso" name="codigo_acesso" value="<?= sanitize($espec['codigo_acesso'] ?? '') ?>" readonly style="background: var(--color-bg); font-family: monospace; flex:1;">
+                                        <?php if (!$versaoBloqueada): ?>
+                                        <button class="btn btn-secondary btn-sm" onclick="gerarCodigoAcesso()">Gerar Código</button>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="senha_publica">Palavra-passe (opcional)</label>
+                                    <input type="text" id="senha_publica" name="senha_publica" value="<?= sanitize($espec['senha_publica'] ?? '') ?>" placeholder="Sem palavra-passe"<?= $versaoBloqueada ? ' readonly style="background:var(--color-bg);"' : '' ?>>
                                 </div>
                             </div>
-                        <?php else: ?>
-                            <div class="alert alert-info">
-                                Gere um código de acesso para criar um link de partilha pública.
-                            </div>
-                        <?php endif; ?>
-
-                        <div class="alert alert-warning mt-lg">
-                            <strong>Nota:</strong> O link público permite que qualquer pessoa com o código (e palavra-passe, se definida) visualize esta especificação. Não permite edição.
+                            <?php if (!empty($espec['codigo_acesso'])): ?>
+                                <div class="form-group">
+                                    <label>Link de Partilha</label>
+                                    <div class="share-link">
+                                        <input type="text" id="shareLink" value="" readonly>
+                                        <button class="btn btn-primary btn-sm" onclick="copiarLink()">Copiar</button>
+                                    </div>
+                                </div>
+                            <?php else: ?>
+                                <div class="alert alert-info">
+                                    Gere um código de acesso para criar um link de partilha pública.
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
+                    <?php endif; ?>
+                </div>
 
+                <!-- TAB 7: CONFIGURAÇÕES VISUAIS -->
+                <div class="tab-panel" id="panel-configuracoes">
                     <?php if (!$isNew): ?>
                     <div class="card">
                         <div class="card-header">
@@ -1322,88 +1564,6 @@ $pageSubtitle = 'Editor de Especificação';
                         </div>
                     </div>
                     <?php endif; ?>
-
-                    <?php if (!$isNew): ?>
-                    <?php
-                        $smtpConfigurado = !empty(getConfiguracao('smtp_host')) && !empty(getConfiguracao('smtp_user'));
-                        // Recolher emails de fornecedores e cliente
-                        $emailsForn = [];
-                        foreach (($espec['fornecedores_lista'] ?? []) as $f) {
-                            if (!empty($f['email'])) {
-                                foreach (array_map('trim', explode(',', $f['email'])) as $em) {
-                                    if ($em) $emailsForn[] = $em;
-                                }
-                            }
-                        }
-                        $emailsCli = [];
-                        if (!empty($espec['cliente_email'])) {
-                            foreach (array_map('trim', explode(',', $espec['cliente_email'])) as $em) {
-                                if ($em) $emailsCli[] = $em;
-                            }
-                        }
-                        $nForn = count($espec['fornecedores_lista'] ?? []);
-                        $nCli = !empty($espec['cliente_id']) ? 1 : 0;
-                    ?>
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">Enviar por Email</span>
-                            <span class="muted">Enviar especificação por email</span>
-                        </div>
-                        <div class="form-group">
-                            <label for="email_destinatario">Destinatário</label>
-                            <div style="display:flex; gap:6px; align-items:center;">
-                                <input type="text" id="email_destinatario" placeholder="email@exemplo.com" style="flex:1;">
-                                <button type="button" id="btnLimparDest" class="btn btn-sm btn-ghost" onclick="limparDestinatarios()" style="display:none;" title="Limpar">&times;</button>
-                            </div>
-                            <?php if ($emailsForn || $emailsCli): ?>
-                            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
-                                <?php if ($emailsForn): ?>
-                                <button type="button" class="btn btn-sm btn-secondary" onclick="preencherDestinatarios('fornecedores')">
-                                    <?= $nForn === 1 ? sanitize($espec['fornecedores_lista'][0]['nome']) : 'Fornecedores ('.$nForn.')' ?>
-                                </button>
-                                <?php endif; ?>
-                                <?php if ($emailsCli): ?>
-                                <button type="button" class="btn btn-sm btn-secondary" onclick="preencherDestinatarios('cliente')">
-                                    <?= sanitize($espec['cliente_nome']) ?>
-                                </button>
-                                <?php endif; ?>
-                                <?php if ($emailsForn && $emailsCli): ?>
-                                <button type="button" class="btn btn-sm btn-secondary" onclick="preencherDestinatarios('todos')">Todos</button>
-                                <?php endif; ?>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                        <div class="form-group">
-                            <label for="email_assunto">Assunto</label>
-                            <input type="text" id="email_assunto" value="Caderno de Encargos: <?= sanitize($espec['numero']) ?> - <?= sanitize($espec['titulo']) ?>">
-                        </div>
-                        <div class="form-group">
-                            <label for="email_mensagem">Mensagem personalizada (opcional)</label>
-                            <textarea id="email_mensagem" rows="3" placeholder="Adicionar mensagem ao email..."></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-                                <input type="checkbox" id="email_incluir_link" checked> Incluir link de visualização online
-                            </label>
-                        </div>
-                        <div style="display:flex; align-items:center; gap: var(--spacing-sm); flex-wrap:wrap; margin-top: var(--spacing-md);">
-                            <button class="btn btn-primary" onclick="abrirEmailCliente()" id="btnAbrirEmail">Abrir no Email</button>
-                            <?php if ($smtpConfigurado): ?>
-                            <button class="btn btn-secondary" onclick="enviarEmailEspec()" id="btnEnviarEmail">Enviar via Servidor</button>
-                            <?php endif; ?>
-                            <span class="muted" id="emailStatus"></span>
-                        </div>
-                        <?php if (!$smtpConfigurado): ?>
-                        <div class="alert alert-info" style="margin-top: var(--spacing-sm);">
-                            O email será aberto no seu programa de email (Outlook, Gmail, etc.). Para enviar diretamente pelo servidor, configure o SMTP nas definições.
-                        </div>
-                        <?php endif; ?>
-                    </div>
-                    <?php endif; ?>
-                </div>
-
-                <!-- TAB 7: CONFIGURAÇÕES VISUAIS -->
-                <div class="tab-panel" id="panel-configuracoes">
                     <div class="card">
                         <div class="card-header">
                             <span class="card-title">Configurações Visuais do Documento</span>
@@ -1508,13 +1668,8 @@ $pageSubtitle = 'Editor de Especificação';
             <div class="sidebar no-print">
                 <div class="preview-container">
                     <div class="preview-header">
-                        <h3>Pré-visualização</h3>
-                        <div style="display:flex; gap:4px;">
-                            <button class="btn btn-sm" style="background:rgba(255,255,255,0.2); color:white; border:none;" onclick="atualizarPreview()" title="Atualizar">&#8635;</button>
-                            <?php if (!$isNew): ?>
-                            <button class="btn btn-sm" style="background:rgba(255,255,255,0.2); color:white; border:none;" onclick="abrirPreviewReal()" title="Preview real (nova aba)">&#128065; Preview Real</button>
-                            <?php endif; ?>
-                        </div>
+                        <h3>Pré-visualização do Documento</h3>
+                        <button class="btn btn-sm" style="background:rgba(255,255,255,0.2); color:white; border:none;" onclick="atualizarPreview()" title="Atualizar pré-visualização">&#8635;</button>
                     </div>
                     <div class="preview-body" id="previewBody">
                         <div class="preview-logo">
@@ -1682,7 +1837,7 @@ $pageSubtitle = 'Editor de Especificação';
     }
     function apiPostForm(formData) {
         formData.append('csrf_token', CSRF_TOKEN);
-        return fetch(BASE_PATH + '/api.php', { method: 'POST', body: formData });
+        return fetch(BASE_PATH + '/api.php', { method: 'POST', headers: { 'X-CSRF-Token': CSRF_TOKEN }, body: formData });
     }
 
     // Emails de fornecedores/cliente para pré-preenchimento
@@ -3524,7 +3679,7 @@ $pageSubtitle = 'Editor de Especificação';
             '</div>' +
             '<div style="padding: var(--spacing-md);">' +
                 '<div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">' +
-                    '<label style="font-size:12px; font-weight:600; color:#374151;">No PDF:</label>' +
+                    '<label style="font-size:12px; font-weight:600; color:var(--color-text);">No PDF:</label>' +
                     '<select id="ficheiros_posicao" style="font-size:12px; padding:4px 8px; border:1px solid var(--color-border); border-radius:4px;">' +
                         '<option value="local">Mostrar neste local</option>' +
                         '<option value="final">Mostrar no final do documento</option>' +
@@ -3594,6 +3749,7 @@ $pageSubtitle = 'Editor de Especificação';
 
         var xhr = new XMLHttpRequest();
         xhr.open('POST', BASE_PATH + '/api.php', true);
+        xhr.setRequestHeader('X-CSRF-Token', CSRF_TOKEN);
 
         xhr.upload.addEventListener('progress', function(e) {
             if (e.lengthComputable) {
@@ -3687,23 +3843,39 @@ $pageSubtitle = 'Editor de Especificação';
         atualizarShareLink(code);
     }
 
+    function getBaseUrl() {
+        var origin = window.location.origin;
+        if (origin.indexOf('localhost') === -1) {
+            origin = origin.replace('http://', 'https://').replace('www.', '');
+        }
+        return origin + BASE_PATH;
+    }
+
     function atualizarShareLink(code) {
         var linkInput = document.getElementById('shareLink');
         if (linkInput) {
-            linkInput.value = window.location.origin + BASE_PATH + '/publico.php?code=' + code;
+            linkInput.value = getBaseUrl() + '/publico.php?code=' + code;
         }
     }
 
     function copiarLink() {
         var linkInput = document.getElementById('shareLink');
-        if (linkInput && linkInput.value) {
-            navigator.clipboard.writeText(linkInput.value).then(function() {
-                showToast('Link copiado para a área de transferência!', 'success');
-            }).catch(function() {
-                linkInput.select();
-                document.execCommand('copy');
+        if (!linkInput || !linkInput.value) return;
+        var text = linkInput.value;
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(function() {
                 showToast('Link copiado!', 'success');
             });
+        } else {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast('Link copiado!', 'success');
         }
     }
 
@@ -4129,6 +4301,144 @@ $pageSubtitle = 'Editor de Especificação';
             guardarTudo();
         }
     });
+
+    // ============================================================
+    // VERSIONAMENTO
+    // ============================================================
+    var versaoBloqueada = <?= $versaoBloqueada ? 'true' : 'false' ?>;
+
+    function publicarVersaoUI() {
+        if (!especId) { showToast('Guarde a especificação primeiro.', 'warning'); return; }
+        if (isDirty) { showToast('Guarde as alterações antes de publicar.', 'warning'); return; }
+        var notas = prompt('Notas desta versão (opcional):');
+        if (notas === null) return; // cancelou
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'publicar_versao', id: especId, notas: notas })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showToast('Versão publicada com sucesso!', 'success');
+                setTimeout(function() { location.reload(); }, 800);
+            } else {
+                showToast(data.error || 'Erro ao publicar.', 'danger');
+            }
+        });
+    }
+
+    function criarNovaVersaoUI() {
+        if (!especId) return;
+        if (!confirm('Criar uma nova versão editável a partir desta?\nA versão atual mantém-se bloqueada.')) return;
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'nova_versao', id: especId })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success && data.novo_id) {
+                showToast('Nova versão criada!', 'success');
+                setTimeout(function() {
+                    window.location.href = BASE_PATH + '/especificacao.php?id=' + data.novo_id;
+                }, 600);
+            } else {
+                showToast(data.error || 'Erro ao criar nova versão.', 'danger');
+            }
+        })
+        .catch(function(err) { showToast('Erro de rede: ' + err.message, 'danger'); });
+    }
+
+    function adicionarDestinatario() {
+        var nome = document.getElementById('dest_nome').value.trim();
+        var email = document.getElementById('dest_email').value.trim();
+        var tipo = document.getElementById('dest_tipo').value;
+        if (!nome || !email) { showToast('Preencha nome e email.', 'warning'); return; }
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'gerar_token', especificacao_id: especId, nome: nome, email: email, tipo: tipo })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showToast('Destinatário adicionado!', 'success');
+                location.reload();
+            } else {
+                showToast(data.error || 'Erro.', 'danger');
+            }
+        });
+    }
+
+    function enviarLinkToken(tokenId) {
+        if (!confirm('Enviar email com link de aceitação a este destinatário?')) return;
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'enviar_link_aceitacao', token_id: tokenId, especificacao_id: especId, base_url: window.location.origin + BASE_PATH })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showToast('Email enviado com sucesso!', 'success');
+                setTimeout(function() { location.reload(); }, 800);
+            } else {
+                showToast(data.error || 'Erro ao enviar email.', 'danger');
+            }
+        })
+        .catch(function(err) { showToast('Erro: ' + err.message, 'danger'); });
+    }
+
+    function copiarLinkToken(token) {
+        var url = getBaseUrl() + '/publico.php?token=' + token;
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(url).then(function() {
+                showToast('Link copiado!', 'success');
+            });
+        } else {
+            var ta = document.createElement('textarea');
+            ta.value = url;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast('Link copiado!', 'success');
+        }
+    }
+
+    function revogarToken(tokenId) {
+        if (!confirm('Revogar acesso deste destinatário?')) return;
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'revogar_token', token_id: tokenId })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showToast('Acesso revogado.', 'success');
+                location.reload();
+            } else {
+                showToast(data.error || 'Erro.', 'danger');
+            }
+        });
+    }
+
+    // Desabilitar edição se versão bloqueada
+    if (versaoBloqueada) {
+        document.querySelectorAll('input:not([readonly]):not([type="hidden"]), textarea:not([readonly]), select:not([disabled])').forEach(function(el) {
+            if (el.closest('#panel-partilha')) return; // permitir interagir com destinatários
+            el.setAttribute('readonly', true);
+            if (el.tagName === 'SELECT') { el.setAttribute('disabled', true); el.removeAttribute('readonly'); }
+        });
+        document.querySelectorAll('.remove-btn, .add-btn, [onclick*="adicionar"], [onclick*="remover"]').forEach(function(btn) {
+            if (btn.closest('#panel-partilha')) return;
+            btn.style.display = 'none';
+        });
+    }
     </script>
 </body>
 </html>

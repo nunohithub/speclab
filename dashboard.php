@@ -271,7 +271,12 @@ $activeNav = 'especificacoes';
                                     <?php if ($isSA): ?>
                                         <td><span class="pill pill-muted"><?= sanitize($e['org_nome'] ?? '-') ?></span></td>
                                     <?php endif; ?>
-                                    <td><?= sanitize($e['versao']) ?></td>
+                                    <td>
+                                        v<?= sanitize($e['versao']) ?>
+                                        <?php if (!empty($e['versao_bloqueada'])): ?>
+                                            <span class="pill pill-info" style="font-size:10px;">Publicada</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?= formatDate($e['data_emissao']) ?></td>
                                     <td>
                                         <?php

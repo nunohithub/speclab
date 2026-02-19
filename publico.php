@@ -13,19 +13,40 @@ session_start();
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/versioning.php';
 
-// Obter código de acesso
+// Suporta acesso por código (?code=XXX) ou token individual (?token=XXX)
 $code = $_GET['code'] ?? '';
-if (!$code) {
+$tokenStr = $_GET['token'] ?? '';
+$tokenData = null;
+
+if (!$code && !$tokenStr) {
     http_response_code(404);
     echo '<!DOCTYPE html><html><head><title>Não encontrado</title></head><body><h1>Especificação não encontrada</h1></body></html>';
     exit;
 }
 
 $db = getDB();
-$stmt = $db->prepare('SELECT id, titulo, password_acesso, estado FROM especificacoes WHERE codigo_acesso = ?');
-$stmt->execute([$code]);
-$espec = $stmt->fetch();
+$espec = null;
+
+if ($tokenStr) {
+    // Acesso via token individual — sem password necessária
+    $stmtTk = $db->prepare('SELECT t.*, e.id as espec_id, e.titulo, e.password_acesso, e.estado, e.codigo_acesso
+        FROM especificacao_tokens t
+        INNER JOIN especificacoes e ON e.id = t.especificacao_id
+        WHERE t.token = ? AND t.ativo = 1');
+    $stmtTk->execute([$tokenStr]);
+    $tokenData = $stmtTk->fetch();
+    if ($tokenData) {
+        $espec = ['id' => $tokenData['espec_id'], 'titulo' => $tokenData['titulo'], 'password_acesso' => '', 'estado' => $tokenData['estado']];
+        $code = $tokenData['codigo_acesso'] ?: 'token';
+        registarAcessoToken($db, $tokenData['id'], $tokenData['espec_id']);
+    }
+} else {
+    $stmt = $db->prepare('SELECT id, titulo, password_acesso, estado FROM especificacoes WHERE codigo_acesso = ?');
+    $stmt->execute([$code]);
+    $espec = $stmt->fetch();
+}
 
 // Carregar organização da especificação
 $org = null;
@@ -48,9 +69,9 @@ if (!$espec) {
     exit;
 }
 
-// Verificar se precisa de password
-$needsPassword = !empty($espec['password_acesso']);
-$authenticated = false;
+// Token dá acesso direto sem password
+$needsPassword = !$tokenData && !empty($espec['password_acesso']);
+$authenticated = $tokenData ? true : false;
 
 if ($needsPassword) {
     // Verificar se já autenticou na sessão
@@ -79,6 +100,18 @@ if ($authenticated) {
 }
 
 
+
+// Processar aceitação/rejeição via formulário
+$aceitacaoMsg = null;
+if ($authenticated && $tokenData && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao_aceitacao']) && validateCsrf()) {
+    $decisao = ($_POST['decisao'] ?? '') === 'aceite' ? 'aceite' : 'rejeitado';
+    $nome = sanitize($_POST['aceitar_nome'] ?? '');
+    $cargo = sanitize($_POST['aceitar_cargo'] ?? '');
+    $comentario = sanitize($_POST['aceitar_comentario'] ?? '');
+    if ($nome && registarDecisao($db, $espec['id'], $tokenData['id'], $decisao, $nome, $cargo ?: null, $comentario ?: null)) {
+        $aceitacaoMsg = $decisao === 'aceite' ? 'Documento aceite com sucesso!' : 'Documento rejeitado.';
+    }
+}
 
 // Se autenticado, carregar dados completos
 $data = null;
@@ -452,6 +485,69 @@ if ($authenticated) {
                 <span>&copy; <?= getConfiguracao('empresa_nome', 'SpecLab') ?> <?= date('Y') ?></span>
                 <span>Documento: <?= san($data['numero']) ?> | Versão <?= san($data['versao']) ?></span>
             </div>
+
+            <?php
+            // Formulário de aceitação (só para tokens com permissão ver_aceitar)
+            $mostrarAceitacao = false;
+            $jaDecidiu = false;
+            $decisaoExistente = null;
+            if ($tokenData && $tokenData['permissao'] === 'ver_aceitar') {
+                $mostrarAceitacao = true;
+                $stmtDec = $db->prepare('SELECT * FROM especificacao_aceitacoes WHERE token_id = ?');
+                $stmtDec->execute([$tokenData['id']]);
+                $decisaoExistente = $stmtDec->fetch();
+                if ($decisaoExistente) $jaDecidiu = true;
+            }
+            ?>
+
+            <?php if ($mostrarAceitacao): ?>
+            <div class="doc-section" id="secAceitacao" style="margin-top:var(--spacing-xl); border-top:2px solid <?= $corPrimaria ?>; padding-top:var(--spacing-lg);">
+                <h2 style="color:<?= $corPrimaria ?>;">Aceitação do Documento</h2>
+
+                <?php if ($jaDecidiu): ?>
+                    <div style="padding:var(--spacing-md); border-radius:8px; background:<?= $decisaoExistente['tipo_decisao'] === 'aceite' ? '#dcfce7' : '#fee2e2' ?>; text-align:center;">
+                        <strong style="font-size:16px;">
+                            <?= $decisaoExistente['tipo_decisao'] === 'aceite' ? 'Documento Aceite' : 'Documento Rejeitado' ?>
+                        </strong>
+                        <p style="margin:8px 0 0; color:#666;">
+                            por <?= san($decisaoExistente['nome_signatario']) ?>
+                            <?= $decisaoExistente['cargo_signatario'] ? ' (' . san($decisaoExistente['cargo_signatario']) . ')' : '' ?>
+                            em <?= date('d/m/Y H:i', strtotime($decisaoExistente['created_at'])) ?>
+                        </p>
+                        <?php if ($decisaoExistente['comentario']): ?>
+                        <p style="margin-top:8px; font-style:italic;">"<?= san($decisaoExistente['comentario']) ?>"</p>
+                        <?php endif; ?>
+                    </div>
+                <?php else: ?>
+                    <?php if (isset($aceitacaoMsg)): ?>
+                        <div style="padding:var(--spacing-sm); border-radius:6px; background:#dcfce7; margin-bottom:var(--spacing-md); text-align:center;">
+                            <?= $aceitacaoMsg ?>
+                        </div>
+                    <?php endif; ?>
+                    <form method="POST" style="max-width:500px;">
+                        <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
+                        <input type="hidden" name="acao_aceitacao" value="1">
+                        <div style="margin-bottom:12px;">
+                            <label style="display:block; font-weight:600; margin-bottom:4px;">Nome completo *</label>
+                            <input type="text" name="aceitar_nome" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;" placeholder="O seu nome">
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="display:block; font-weight:600; margin-bottom:4px;">Cargo (opcional)</label>
+                            <input type="text" name="aceitar_cargo" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;" placeholder="Ex: Diretor de Qualidade">
+                        </div>
+                        <div style="margin-bottom:16px;">
+                            <label style="display:block; font-weight:600; margin-bottom:4px;">Comentário (opcional)</label>
+                            <textarea name="aceitar_comentario" rows="2" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;" placeholder="Observações..."></textarea>
+                        </div>
+                        <div style="display:flex; gap:12px;">
+                            <button type="submit" name="decisao" value="aceite" style="flex:1; padding:12px; background:#16a34a; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Aceitar Documento</button>
+                            <button type="submit" name="decisao" value="rejeitado" style="flex:1; padding:12px; background:#dc2626; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Rejeitar</button>
+                        </div>
+                    </form>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
         </div>
     </div>
 

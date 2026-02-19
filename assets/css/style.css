@@ -68,7 +68,7 @@ a:hover { color: var(--color-primary-dark); }
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    background: linear-gradient(135deg, #f0f8fb 0%, #e6f4f9 50%, #d1edf7 100%);
+    background: linear-gradient(135deg, var(--color-primary-lighter) 0%, var(--color-primary-light) 50%, color-mix(in srgb, var(--color-primary) 15%, white) 100%);
 }
 
 .login-box {
@@ -78,7 +78,7 @@ a:hover { color: var(--color-primary-dark); }
     width: 100%;
     max-width: 420px;
     text-align: center;
-    box-shadow: 0 20px 60px rgba(37, 150, 190, 0.12), 0 1px 3px rgba(0,0,0,0.08);
+    box-shadow: 0 20px 60px color-mix(in srgb, var(--color-primary) 12%, transparent), 0 1px 3px rgba(0,0,0,0.08);
 }
 
 .login-box img {
@@ -239,7 +239,18 @@ a:hover { color: var(--color-primary-dark); }
 
 .btn-primary:hover {
     background: var(--color-primary-dark);
-    box-shadow: 0 4px 12px rgba(37, 150, 190, 0.3);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 30%, transparent);
+    color: white;
+}
+
+.btn-outline-primary {
+    background: var(--color-surface);
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+}
+
+.btn-outline-primary:hover {
+    background: var(--color-primary);
     color: white;
 }
 
@@ -324,7 +335,7 @@ textarea { resize: vertical; min-height: 80px; }
 input:focus, select:focus, textarea:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(37, 150, 190, 0.15);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
 }
 
 input::placeholder, textarea::placeholder {
@@ -411,7 +422,7 @@ tr:hover { background: var(--color-primary-lighter); }
 .alert-success { background: rgba(26, 127, 55, 0.1); color: var(--color-success); border-color: rgba(26, 127, 55, 0.35); }
 .alert-warning { background: rgba(179, 92, 0, 0.1); color: var(--color-warning); border-color: rgba(179, 92, 0, 0.35); }
 .alert-error { background: rgba(180, 35, 24, 0.1); color: var(--color-error); border-color: rgba(180, 35, 24, 0.35); }
-.alert-info { background: var(--color-primary-light); color: var(--color-primary-dark); border-color: rgba(37, 150, 190, 0.35); }
+.alert-info { background: var(--color-primary-light); color: var(--color-primary-dark); border-color: color-mix(in srgb, var(--color-primary) 35%, transparent); }
 
 /* ---- PILLS / BADGES ---- */
 .pill {
@@ -428,6 +439,7 @@ tr:hover { background: var(--color-primary-lighter); }
 .pill-error { background: rgba(180, 35, 24, 0.1); color: var(--color-error); }
 .pill-muted { background: var(--color-bg); color: var(--color-muted); }
 .pill-info { background: #e0f2fe; color: #0369a1; }
+.pill-danger { background: #fee2e2; color: #b91c1c; }
 
 /* ---- MODAL ---- */
 .modal-overlay {
@@ -800,7 +812,7 @@ tr:hover { background: var(--color-primary-lighter); }
     background: var(--color-surface);
     border: 1px solid var(--color-primary);
     border-radius: var(--border-radius-lg);
-    box-shadow: 0 4px 20px rgba(37, 150, 190, 0.1), 0 1px 3px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 20px color-mix(in srgb, var(--color-primary) 10%, transparent), 0 1px 3px rgba(0,0,0,0.08);
     overflow: hidden;
 }
 
@@ -1069,11 +1081,11 @@ tr:hover { background: var(--color-primary-lighter); }
         justify-content: space-between;
         align-items: center;
         padding-bottom: 8pt;
-        border-bottom: 2pt solid #2596be;
+        border-bottom: 2pt solid var(--color-primary);
         margin-bottom: 12pt;
     }
 
-    .print-header .title { font-size: 14pt; font-weight: bold; color: #2596be; }
+    .print-header .title { font-size: 14pt; font-weight: bold; color: var(--color-primary); }
     .print-header .subtitle { font-size: 9pt; color: #666; }
     .print-header img { height: 40pt; }
 
@@ -1083,7 +1095,7 @@ tr:hover { background: var(--color-primary-lighter); }
     }
 
     table th {
-        background: #2596be !important;
+        background: var(--color-primary) !important;
         color: white !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;

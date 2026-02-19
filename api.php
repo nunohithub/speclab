@@ -6,6 +6,7 @@
 
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/includes/versioning.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -1832,6 +1833,59 @@ try {
             $stmt = $db->prepare("UPDATE configuracoes SET valor = ? WHERE chave = 'banco_ensaios_merges'");
             $stmt->execute([$merges]);
             jsonSuccess('Merges guardados.');
+            break;
+
+        // ===================================================================
+        // VERSIONAMENTO
+        // ===================================================================
+        case 'publicar_versao':
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) jsonError('ID inválido.');
+            $notas = sanitize($_POST['notas'] ?? '');
+            if (!publicarVersao($db, $id, $user['id'], $notas ?: null)) {
+                jsonError('Não foi possível publicar. Versão já bloqueada ou não encontrada.');
+            }
+            jsonSuccess('Versão publicada.');
+            break;
+
+        case 'nova_versao':
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) jsonError('ID inválido.');
+            $novoId = criarNovaVersao($db, $id, $user['id']);
+            if (!$novoId) jsonError('Erro ao criar nova versão.');
+            echo json_encode(['success' => true, 'novo_id' => $novoId]);
+            exit;
+
+        case 'gerar_token':
+            $especId = (int)($_POST['especificacao_id'] ?? 0);
+            $nome = sanitize($_POST['nome'] ?? '');
+            $email = sanitize($_POST['email'] ?? '');
+            $tipo = sanitize($_POST['tipo'] ?? 'outro');
+            if (!$especId || !$nome || !$email) jsonError('Dados incompletos.');
+            $token = gerarTokenDestinatario($db, $especId, $user['id'], $nome, $email, $tipo);
+            echo json_encode(['success' => true, 'token' => $token]);
+            exit;
+
+        case 'revogar_token':
+            $tokenId = (int)($_POST['token_id'] ?? 0);
+            if (!$tokenId) jsonError('Token inválido.');
+            $db->prepare('UPDATE especificacao_tokens SET ativo = 0 WHERE id = ?')->execute([$tokenId]);
+            jsonSuccess('Token revogado.');
+            break;
+
+        case 'enviar_link_aceitacao':
+            require_once __DIR__ . '/includes/email.php';
+            $tokenId = (int)($_POST['token_id'] ?? 0);
+            $especId = (int)($_POST['especificacao_id'] ?? 0);
+            if (!$tokenId || !$especId) jsonError('Dados incompletos.');
+            $baseUrl = rtrim(($_POST['base_url'] ?? ''), '/');
+            if (!$baseUrl) $baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_PATH;
+            $result = enviarLinkAceitacao($db, $especId, $tokenId, $baseUrl, $user['id']);
+            if ($result['success']) {
+                jsonSuccess('Email enviado.');
+            } else {
+                jsonError($result['error'] ?? 'Erro ao enviar.');
+            }
             break;
 
         // AÇÃO DESCONHECIDA
