@@ -288,7 +288,19 @@ if ($org && $org['logo']) {
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
-                            <p style="font-size:11px; color:#888; margin:3px 0 0 0;">NEI — Nível Especial de Inspeção &nbsp;|&nbsp; NQA — Nível de Qualidade Aceitável &nbsp;(NP 2922)</p>
+                            <?php
+                            $verLegenda = $org['ensaios_legenda'] ?? '';
+                            $verLegTam = (int)($org['ensaios_legenda_tamanho'] ?? 9);
+                            if (empty($verLegenda)) {
+                                $stmtGlob = $db->prepare("SELECT valor FROM configuracoes WHERE chave = 'ensaios_legenda_global'");
+                                $stmtGlob->execute();
+                                $globRow = $stmtGlob->fetch(PDO::FETCH_ASSOC);
+                                if ($globRow) { $gData = json_decode($globRow['valor'], true); $verLegenda = $gData['legenda'] ?? ''; $verLegTam = (int)($gData['tamanho'] ?? 9); }
+                            }
+                            if (!empty($verLegenda)):
+                            ?>
+                            <p style="font-size:<?= $verLegTam ?>px; color:#888; font-style:italic; margin:3px 0 0 0;"><?= san($verLegenda) ?></p>
+                            <?php endif; ?>
                             <?php endif; ?>
                         <?php else: ?>
                             <div class="content"><?php
@@ -411,9 +423,10 @@ if ($org && $org['logo']) {
     function copyLink() {
         const url = window.location.origin + '<?= BASE_PATH ?>/publico.php?code=<?= $data['codigo_acesso'] ?? '' ?>';
         navigator.clipboard.writeText(url).then(() => {
-            alert('Link público copiado para a área de transferência!');
+            appAlert('Link público copiado para a área de transferência!');
         });
     }
     </script>
+    <?php include __DIR__ . '/includes/modals.php'; ?>
 </body>
 </html>

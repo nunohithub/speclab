@@ -44,20 +44,22 @@ function getSmtpConfig(PDO $db, int $especificacaoId): array {
         ];
     }
 
-    // 3) Fallback: SMTP global — só para super admin (sem organização)
-    if (!$org) {
+    // 3) Fallback: SMTP global (super admin)
+    $globalHost = getConfiguracao('smtp_host');
+    $globalUser = getConfiguracao('smtp_user');
+    if (!empty($globalHost) && !empty($globalUser)) {
         return [
-            'host' => getConfiguracao('smtp_host'),
+            'host' => $globalHost,
             'port' => getConfiguracao('smtp_port', '465'),
-            'user' => getConfiguracao('smtp_user'),
+            'user' => $globalUser,
             'pass' => getConfiguracao('smtp_pass'),
-            'from' => getConfiguracao('smtp_from'),
+            'from' => getConfiguracao('smtp_from') ?: $globalUser,
             'from_name' => getConfiguracao('smtp_from_name', 'SpecLab'),
         ];
     }
 
-    // Org sem email configurado → não pode enviar
-    return ['error' => 'A sua organização não tem email configurado. Peça ao administrador para configurar o email nas Configurações.'];
+    // Sem nenhum email configurado
+    return ['error' => 'Nenhum email configurado. Configure o SMTP da organização ou o SMTP global nas Configurações.'];
 }
 
 /**

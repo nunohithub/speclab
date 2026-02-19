@@ -31,6 +31,29 @@ if (isSuperAdmin()) {
     $fornecedores = $stmt->fetchAll();
 }
 
+// Carregar legenda de ensaios da org (com fallback para global)
+$ensaiosLegenda = '';
+$ensaiosLegendaTamanho = 9;
+if ($orgId) {
+    $stmtLeg = $db->prepare('SELECT ensaios_legenda, ensaios_legenda_tamanho FROM organizacoes WHERE id = ?');
+    $stmtLeg->execute([$orgId]);
+    $legRow = $stmtLeg->fetch(PDO::FETCH_ASSOC);
+    if ($legRow) {
+        $ensaiosLegenda = $legRow['ensaios_legenda'] ?? '';
+        $ensaiosLegendaTamanho = (int)($legRow['ensaios_legenda_tamanho'] ?? 9);
+    }
+}
+if (empty($ensaiosLegenda)) {
+    $stmtGlob = $db->prepare("SELECT valor FROM configuracoes WHERE chave = 'ensaios_legenda_global'");
+    $stmtGlob->execute();
+    $globRow = $stmtGlob->fetch(PDO::FETCH_ASSOC);
+    if ($globRow) {
+        $gData = json_decode($globRow['valor'], true);
+        $ensaiosLegenda = $gData['legenda'] ?? '';
+        $ensaiosLegendaTamanho = (int)($gData['tamanho'] ?? 9);
+    }
+}
+
 // Determinar se é nova especificação ou edição
 $isNew = isset($_GET['novo']) && $_GET['novo'] == '1';
 $especId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -86,6 +109,11 @@ if ($isNew) {
         header('Location: ' . BASE_PATH . '/dashboard.php');
         exit;
     }
+    // Verificar acesso multi-tenant (não-super_admin só acede à sua org)
+    if (!isSuperAdmin() && (int)($espec['organizacao_id'] ?? 0) !== (int)$orgId) {
+        header('Location: ' . BASE_PATH . '/dashboard.php');
+        exit;
+    }
 
     // Backward compat: se não há secções dinâmicas mas há campos fixos, converter
     if (empty($espec['seccoes'])) {
@@ -121,6 +149,9 @@ if ($isNew) {
     header('Location: ' . BASE_PATH . '/dashboard.php');
     exit;
 }
+
+// Super admin a ver spec de outra org → só leitura
+$saOutraOrg = (isSuperAdmin() && !$isNew && ($espec['organizacao_id'] ?? null) != $orgId && $orgId !== null);
 
 // Versionamento
 $versaoBloqueada = (bool)($espec['versao_bloqueada'] ?? 0);
@@ -806,10 +837,12 @@ $pageSubtitle = 'Editor de Especificação';
             </div>
         </div>
         <div class="header-actions">
+            <?php if (!$saOutraOrg): ?>
             <div class="save-indicator" id="saveIndicator">
                 <span class="save-dot"></span>
                 <span class="save-text">Pronto</span>
             </div>
+            <?php endif; ?>
             <span class="user-info"><?= sanitize($user['nome']) ?> (<?= $user['role'] ?>)</span>
             <?php if (in_array($user['role'], ['super_admin', 'org_admin'])): ?>
                 <a href="<?= BASE_PATH ?>/admin.php" class="btn btn-secondary btn-sm">Admin</a>
@@ -824,7 +857,7 @@ $pageSubtitle = 'Editor de Especificação';
         <div class="editor-toolbar">
             <div class="left">
                 <a href="<?= BASE_PATH ?>/dashboard.php" class="btn btn-ghost btn-sm" title="Voltar ao Dashboard">&larr; Voltar</a>
-                <h2><?= $isNew ? 'Nova Especificação' : 'Editar Especificação' ?></h2>
+                <h2><?= $saOutraOrg ? 'Ver Especificação' : ($isNew ? 'Nova Especificação' : 'Editar Especificação') ?></h2>
                 <span class="pill <?= $espec['estado'] === 'ativo' ? 'pill-success' : ($espec['estado'] === 'rascunho' ? 'pill-warning' : 'pill-muted') ?>" id="estadoPill">
                     <?= ucfirst($espec['estado']) ?>
                 </span>
@@ -840,6 +873,7 @@ $pageSubtitle = 'Editor de Especificação';
                 <button class="btn btn-outline-primary btn-sm" onclick="window.print()" title="Imprimir">Imprimir</button>
                 <a href="<?= BASE_PATH ?>/pdf.php?id=<?= $espec['id'] ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Exportar PDF" id="btnPdf"<?= $isNew ? ' style="display:none"' : '' ?>>PDF</a>
                 <a href="<?= BASE_PATH ?>/ver.php?id=<?= $espec['id'] ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Ver documento completo" id="btnVer"<?= $isNew ? ' style="display:none"' : '' ?>>Ver</a>
+                <?php if (!$saOutraOrg): ?>
                 <?php if (!$versaoBloqueada): ?>
                 <div class="dropdown">
                     <button class="btn btn-secondary btn-sm" onclick="toggleDropdown('estadoMenu')">Estado</button>
@@ -857,10 +891,15 @@ $pageSubtitle = 'Editor de Especificação';
                 <?php else: ?>
                 <button class="btn btn-primary btn-sm" onclick="criarNovaVersaoUI()" title="Criar nova versão editável a partir desta">Nova Versão</button>
                 <?php endif; ?>
+                <?php endif; ?>
             </div>
         </div>
 
-        <?php if ($versaoBloqueada): ?>
+        <?php if ($saOutraOrg): ?>
+        <div class="alert alert-info" style="margin: var(--spacing-sm) 0; display:flex; align-items:center; gap:var(--spacing-sm);">
+            <strong>Modo consulta</strong> &mdash; Esta especificação pertence a outra organização. Só pode visualizar.
+        </div>
+        <?php elseif ($versaoBloqueada): ?>
         <div class="alert alert-warning" style="margin: var(--spacing-sm) 0; display:flex; align-items:center; gap:var(--spacing-sm);">
             <strong>Versão bloqueada (v<?= sanitize($espec['versao']) ?>)</strong> &mdash; Esta versão foi publicada e não pode ser editada. Use "Nova Versão" para criar uma cópia editável.
         </div>
@@ -871,8 +910,10 @@ $pageSubtitle = 'Editor de Especificação';
             <button class="tab active" data-tab="dados-gerais">Dados Gerais</button>
             <button class="tab" data-tab="conteudo">Conteúdo</button>
             <button class="tab" data-tab="classes-defeitos">Classes e Defeitos</button>
+            <?php if (!$saOutraOrg): ?>
             <button class="tab" data-tab="partilha">Partilha</button>
             <button class="tab" data-tab="configuracoes">Configurações</button>
+            <?php endif; ?>
         </div>
         </div><!-- /.sticky-header -->
 
@@ -1138,6 +1179,9 @@ $pageSubtitle = 'Editor de Especificação';
                                                 <?php endforeach; ?>
                                             </tbody>
                                         </table>
+                                        <?php if (!empty($ensaiosLegenda)): ?>
+                                        <div class="ensaios-legenda" style="font-size:<?= $ensaiosLegendaTamanho ?>px; color:#666; font-style:italic; margin-top:4px; padding:2px 4px;"><?= htmlspecialchars($ensaiosLegenda) ?></div>
+                                        <?php endif; ?>
                                         <div class="seccao-ensaios-actions">
                                             <button class="btn btn-secondary btn-sm" onclick="adicionarEnsaioLinhaManual(this)">+ Linha</button>
                                             <button class="btn btn-secondary btn-sm" onclick="abrirSelectorEnsaiosParaSeccao(this)">+ Do Banco de Ensaios</button>
@@ -1363,8 +1407,8 @@ $pageSubtitle = 'Editor de Especificação';
                             <div class="form-group" style="width:140px; margin:0;">
                                 <label for="dest_tipo">Tipo</label>
                                 <select id="dest_tipo">
-                                    <option value="cliente">Cliente</option>
-                                    <option value="fornecedor">Fornecedor</option>
+                                    <?php if ($temClientes): ?><option value="cliente">Cliente</option><?php endif; ?>
+                                    <?php if ($temFornecedores): ?><option value="fornecedor">Fornecedor</option><?php endif; ?>
                                     <option value="outro">Outro</option>
                                 </select>
                             </div>
@@ -1388,8 +1432,18 @@ $pageSubtitle = 'Editor de Especificação';
                                         <td>
                                             <?php if ($tk['tipo_decisao'] === 'aceite'): ?>
                                                 <span class="pill pill-success" style="font-size:11px;">Aceite</span>
+                                                <div style="font-size:11px; color:#666; margin-top:2px;">
+                                                    por <?= sanitize($tk['nome_signatario']) ?><?= $tk['cargo_signatario'] ? ' (' . sanitize($tk['cargo_signatario']) . ')' : '' ?><br>
+                                                    <?= date('d/m/Y H:i', strtotime($tk['decisao_em'])) ?>
+                                                    <?php if (!empty($tk['decisao_comentario'])): ?><br><em>"<?= sanitize($tk['decisao_comentario']) ?>"</em><?php endif; ?>
+                                                </div>
                                             <?php elseif ($tk['tipo_decisao'] === 'rejeitado'): ?>
                                                 <span class="pill pill-danger" style="font-size:11px;">Rejeitado</span>
+                                                <div style="font-size:11px; color:#666; margin-top:2px;">
+                                                    por <?= sanitize($tk['nome_signatario']) ?><?= $tk['cargo_signatario'] ? ' (' . sanitize($tk['cargo_signatario']) . ')' : '' ?><br>
+                                                    <?= date('d/m/Y H:i', strtotime($tk['decisao_em'])) ?>
+                                                    <?php if (!empty($tk['decisao_comentario'])): ?><br><em>"<?= sanitize($tk['decisao_comentario']) ?>"</em><?php endif; ?>
+                                                </div>
                                             <?php else: ?>
                                                 <span class="pill pill-warning" style="font-size:11px;">Pendente</span>
                                             <?php endif; ?>
@@ -1740,7 +1794,7 @@ $pageSubtitle = 'Editor de Especificação';
         <div class="modal-box" style="max-width:460px;">
             <div class="modal-header">
                 <h3>Publicar Versão</h3>
-                <button class="modal-close" onclick="document.getElementById('publicarModal').style.display='none'">&times;</button>
+                <button class="modal-close" onclick="var m=document.getElementById('publicarModal');m.style.display='none';m.classList.add('hidden')">&times;</button>
             </div>
             <div style="padding:var(--spacing-lg);">
                 <div class="alert alert-warning" style="margin-bottom:var(--spacing-md);">
@@ -1752,7 +1806,7 @@ $pageSubtitle = 'Editor de Especificação';
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="document.getElementById('publicarModal').style.display='none'">Cancelar</button>
+                <button class="btn btn-secondary" onclick="var m=document.getElementById('publicarModal');m.style.display='none';m.classList.add('hidden')">Cancelar</button>
                 <button class="btn btn-primary" onclick="confirmarPublicar()">Confirmar Publicação</button>
             </div>
         </div>
@@ -2039,9 +2093,15 @@ $pageSubtitle = 'Editor de Especificação';
             });
         }
 
+        var legendaHtml = '';
+        <?php if (!empty($ensaiosLegenda)): ?>
+        legendaHtml = '<div class="ensaios-legenda" style="font-size:<?= $ensaiosLegendaTamanho ?>px; color:#666; font-style:italic; margin-top:4px; padding:2px 4px;"><?= addslashes(htmlspecialchars($ensaiosLegenda)) ?></div>';
+        <?php endif; ?>
+
         tableHtml +=
                     '</tbody>' +
                 '</table>' +
+                legendaHtml +
                 '<div class="seccao-ensaios-actions">' +
                     '<button class="btn btn-secondary btn-sm" onclick="adicionarEnsaioLinhaManual(this)">+ Linha</button>' +
                     '<button class="btn btn-secondary btn-sm" onclick="abrirSelectorEnsaiosParaSeccao(this)">+ Do Banco de Ensaios</button>' +
@@ -2770,7 +2830,7 @@ $pageSubtitle = 'Editor de Especificação';
         });
 
         if (ensaios.length === 0) {
-            alert('Selecione pelo menos um ensaio.');
+            appAlert('Selecione pelo menos um ensaio.');
             return;
         }
 
@@ -3099,21 +3159,27 @@ $pageSubtitle = 'Editor de Especificação';
     // ============================================================
     // TABS
     // ============================================================
+    function activateTab(targetId) {
+        document.querySelectorAll('#mainTabs .tab').forEach(function(t) {
+            t.classList.remove('active');
+        });
+        var tabBtn = document.querySelector('#mainTabs .tab[data-tab="' + targetId + '"]');
+        if (tabBtn) tabBtn.classList.add('active');
+        document.querySelectorAll('.tab-panel').forEach(function(panel) {
+            panel.classList.remove('active');
+        });
+        var panel = document.getElementById('panel-' + targetId);
+        if (panel) panel.classList.add('active');
+    }
     document.querySelectorAll('#mainTabs .tab').forEach(function(tab) {
         tab.addEventListener('click', function() {
-            var targetId = this.getAttribute('data-tab');
-
-            document.querySelectorAll('#mainTabs .tab').forEach(function(t) {
-                t.classList.remove('active');
-            });
-            this.classList.add('active');
-
-            document.querySelectorAll('.tab-panel').forEach(function(panel) {
-                panel.classList.remove('active');
-            });
-            document.getElementById('panel-' + targetId).classList.add('active');
+            activateTab(this.getAttribute('data-tab'));
         });
     });
+    // Restaurar tab via hash (ex: #tab-partilha)
+    if (window.location.hash && window.location.hash.startsWith('#tab-')) {
+        activateTab(window.location.hash.replace('#tab-', ''));
+    }
 
     // ============================================================
     // TOAST NOTIFICATIONS
@@ -3265,7 +3331,7 @@ $pageSubtitle = 'Editor de Especificação';
 
     function confirmarSelectorLeg() {
         var checks = document.querySelectorAll('#legSelectorGrid input[name="sel_leg"]:checked');
-        if (checks.length === 0) { alert('Selecione pelo menos uma legislação.'); return; }
+        if (checks.length === 0) { appAlert('Selecione pelo menos uma legislação.'); return; }
 
         var ul = '<ul>';
         checks.forEach(function(cb) {
@@ -3849,21 +3915,21 @@ $pageSubtitle = 'Editor de Especificação';
     }
 
     function removerFicheiro(id) {
-        if (!confirm('Tem a certeza que deseja remover este ficheiro?')) return;
-
-        apiPost({ action: 'remover_ficheiro', id: id })
-        .then(function(r) { return checkSession(r); })
-        .then(function(result) {
-            if (result.success) {
-                var el = document.querySelector('[data-file-id="' + id + '"]');
-                if (el) el.remove();
-                showToast('Ficheiro removido.', 'success');
-            } else {
-                showToast(result.message || 'Erro ao remover ficheiro.', 'error');
-            }
-        })
-        .catch(function() {
-            showToast('Erro de ligação.', 'error');
+        appConfirmDanger('Tem a certeza que deseja remover este ficheiro?', function() {
+            apiPost({ action: 'remover_ficheiro', id: id })
+            .then(function(r) { return checkSession(r); })
+            .then(function(result) {
+                if (result.success) {
+                    var el = document.querySelector('[data-file-id="' + id + '"]');
+                    if (el) el.remove();
+                    showToast('Ficheiro removido.', 'success');
+                } else {
+                    showToast(result.message || 'Erro ao remover ficheiro.', 'error');
+                }
+            })
+            .catch(function() {
+                showToast('Erro de ligação.', 'error');
+            });
         });
     }
 
@@ -4334,7 +4400,7 @@ $pageSubtitle = 'Editor de Especificação';
 
     // Avisar antes de sair se houver alterações pendentes
     window.addEventListener('beforeunload', function(e) {
-        if (isDirty) {
+        if (isDirty && !versaoBloqueada) {
             e.preventDefault();
             e.returnValue = 'Tem alterações por guardar. Deseja sair?';
             return e.returnValue;
@@ -4353,17 +4419,22 @@ $pageSubtitle = 'Editor de Especificação';
     // VERSIONAMENTO
     // ============================================================
     var versaoBloqueada = <?= $versaoBloqueada ? 'true' : 'false' ?>;
+    var saOutraOrg = <?= $saOutraOrg ? 'true' : 'false' ?>;
 
     function publicarVersaoUI() {
         if (!especId) { showToast('Guarde a especificação primeiro.', 'warning'); return; }
         if (isDirty) { showToast('Guarde as alterações antes de publicar.', 'warning'); return; }
-        document.getElementById('publicarModal').style.display = 'flex';
+        var m = document.getElementById('publicarModal');
+        m.classList.remove('hidden');
+        m.style.display = 'flex';
         document.getElementById('publicarNotas').value = '';
         document.getElementById('publicarNotas').focus();
     }
     function confirmarPublicar() {
         var notas = document.getElementById('publicarNotas').value;
-        document.getElementById('publicarModal').style.display = 'none';
+        var m = document.getElementById('publicarModal');
+        m.style.display = 'none';
+        m.classList.add('hidden');
         fetch(BASE_PATH + '/api.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
@@ -4372,6 +4443,7 @@ $pageSubtitle = 'Editor de Especificação';
         .then(function(r) { return checkSession(r); })
         .then(function(data) {
             if (data.success) {
+                isDirty = false;
                 showToast('Versão publicada com sucesso!', 'success');
                 setTimeout(function() { location.reload(); }, 800);
             } else {
@@ -4383,26 +4455,33 @@ $pageSubtitle = 'Editor de Especificação';
 
     function criarNovaVersaoUI() {
         if (!especId) return;
-        if (!confirm('Criar uma nova versão editável a partir desta?\nA versão atual mantém-se bloqueada.')) return;
-        fetch(BASE_PATH + '/api.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
-            body: JSON.stringify({ action: 'nova_versao', id: especId })
-        })
-        .then(function(r) { return checkSession(r); })
-        .then(function(data) {
-            if (data.success && data.novo_id) {
-                showToast('Nova versão criada!', 'success');
-                setTimeout(function() {
-                    window.location.href = BASE_PATH + '/especificacao.php?id=' + data.novo_id;
-                }, 600);
-            } else {
-                showToast(data.error || 'Erro ao criar nova versão.', 'danger');
-            }
-        })
-        .catch(function(err) { showToast('Erro de rede: ' + err.message, 'danger'); });
+        appConfirm('Criar uma nova versão editável a partir desta?<br>A versão atual mantém-se bloqueada.', function() {
+            fetch(BASE_PATH + '/api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                body: JSON.stringify({ action: 'nova_versao', id: especId })
+            })
+            .then(function(r) { return checkSession(r); })
+            .then(function(data) {
+                if (data.success && data.novo_id) {
+                    showToast('Nova versão criada!', 'success');
+                    setTimeout(function() {
+                        window.location.href = BASE_PATH + '/especificacao.php?id=' + data.novo_id;
+                    }, 600);
+                } else {
+                    showToast(data.error || 'Erro ao criar nova versão.', 'danger');
+                }
+            })
+            .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de rede.', 'danger'); });
+        }, 'Nova Versão');
     }
 
+    function reloadToTab(tab) {
+        var url = window.location.pathname + window.location.search;
+        url += (url.indexOf('#') > -1 ? '' : '#tab-') + tab;
+        window.location.href = url.replace(/#.*/, '#tab-' + tab);
+        window.location.reload();
+    }
     function adicionarDestinatario() {
         var nome = document.getElementById('dest_nome').value.trim();
         var email = document.getElementById('dest_email').value.trim();
@@ -4417,7 +4496,7 @@ $pageSubtitle = 'Editor de Especificação';
         .then(function(data) {
             if (data.success) {
                 showToast('Destinatário adicionado!', 'success');
-                location.reload();
+                reloadToTab('partilha');
             } else {
                 showToast(data.error || 'Erro.', 'danger');
             }
@@ -4425,22 +4504,23 @@ $pageSubtitle = 'Editor de Especificação';
     }
 
     function enviarLinkToken(tokenId) {
-        if (!confirm('Enviar email com link de aceitação a este destinatário?')) return;
-        fetch(BASE_PATH + '/api.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
-            body: JSON.stringify({ action: 'enviar_link_aceitacao', token_id: tokenId, especificacao_id: especId, base_url: window.location.origin + BASE_PATH })
-        })
-        .then(function(r) { return checkSession(r); })
-        .then(function(data) {
-            if (data.success) {
-                showToast('Email enviado com sucesso!', 'success');
-                setTimeout(function() { location.reload(); }, 800);
-            } else {
-                showToast(data.error || 'Erro ao enviar email.', 'danger');
-            }
-        })
-        .catch(function(err) { showToast('Erro: ' + err.message, 'danger'); });
+        appConfirm('Enviar email com link de aceitação a este destinatário?', function() {
+            fetch(BASE_PATH + '/api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                body: JSON.stringify({ action: 'enviar_link_aceitacao', token_id: tokenId, especificacao_id: especId, base_url: window.location.origin + BASE_PATH })
+            })
+            .then(function(r) { return checkSession(r); })
+            .then(function(data) {
+                if (data.success) {
+                    showToast('Email enviado com sucesso!', 'success');
+                    setTimeout(function() { reloadToTab('partilha'); }, 800);
+                } else {
+                    showToast(data.error || 'Erro ao enviar email.', 'danger');
+                }
+            })
+            .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro ao enviar.', 'danger'); });
+        }, 'Enviar Email');
     }
 
     function copiarLinkToken(token) {
@@ -4463,8 +4543,8 @@ $pageSubtitle = 'Editor de Especificação';
     }
 
     function revogarToken(tokenId) {
-        if (!confirm('Revogar acesso deste destinatário?')) return;
-        fetch(BASE_PATH + '/api.php', {
+        appConfirmDanger('Revogar acesso deste destinatário?', function() {
+            fetch(BASE_PATH + '/api.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
             body: JSON.stringify({ action: 'revogar_token', token_id: tokenId })
@@ -4473,25 +4553,27 @@ $pageSubtitle = 'Editor de Especificação';
         .then(function(data) {
             if (data.success) {
                 showToast('Acesso revogado.', 'success');
-                location.reload();
+                reloadToTab('partilha');
             } else {
                 showToast(data.error || 'Erro.', 'danger');
             }
         });
+        }, 'Revogar Acesso');
     }
 
-    // Desabilitar edição se versão bloqueada
-    if (versaoBloqueada) {
+    // Desabilitar edição se versão bloqueada ou super admin a ver outra org
+    if (versaoBloqueada || saOutraOrg) {
         document.querySelectorAll('input:not([readonly]):not([type="hidden"]), textarea:not([readonly]), select:not([disabled])').forEach(function(el) {
-            if (el.closest('#panel-partilha')) return; // permitir interagir com destinatários
+            if (!saOutraOrg && el.closest('#panel-partilha')) return; // permitir interagir com destinatários (só na própria org)
             el.setAttribute('readonly', true);
             if (el.tagName === 'SELECT') { el.setAttribute('disabled', true); el.removeAttribute('readonly'); }
         });
         document.querySelectorAll('.remove-btn, .add-btn, [onclick*="adicionar"], [onclick*="remover"]').forEach(function(btn) {
-            if (btn.closest('#panel-partilha')) return;
+            if (!saOutraOrg && btn.closest('#panel-partilha')) return;
             btn.style.display = 'none';
         });
     }
     </script>
+    <?php include __DIR__ . '/includes/modals.php'; ?>
 </body>
 </html>

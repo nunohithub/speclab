@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mkdir($uploadDir, 0755, true);
             }
             $ext = strtolower(pathinfo($_FILES['assinatura']['name'], PATHINFO_EXTENSION));
-            if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif'])) {
+            if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'svg'])) {
                 $filename = 'assinatura_' . $uid . '_' . time() . '.' . $ext;
                 $filepath = $uploadDir . $filename;
                 if (move_uploaded_file($_FILES['assinatura']['tmp_name'], $filepath)) {
@@ -259,7 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mkdir($uploadDir, 0755, true);
             }
             $ext = strtolower(pathinfo($_FILES['logo_file']['name'], PATHINFO_EXTENSION));
-            if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif'])) {
+            if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'svg'])) {
                 $filename = 'org_' . $oid . '_' . time() . '.' . $ext;
                 if (move_uploaded_file($_FILES['logo_file']['tmp_name'], $uploadDir . $filename)) {
                     // Remover logo anterior
@@ -328,7 +328,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    if ($action === 'save_config') {
+    if ($action === 'save_config' && $isSuperAdminUser) {
         foreach ($_POST as $key => $value) {
             if (strpos($key, 'cfg_') === 0) {
                 $chave = substr($key, 4);
@@ -341,7 +341,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Org admin: guardar email speclab da organização
-if ($action === 'save_org_email' && $userRole === 'org_admin' && $orgId) {
+if ($action === 'save_org_branding' && $user['role'] === 'org_admin' && $orgId) {
+    $cor_primaria = trim($_POST['cor_primaria'] ?? '#2596be');
+    $cor_primaria_dark = trim($_POST['cor_primaria_dark'] ?? '#1a7a9e');
+    $cor_primaria_light = trim($_POST['cor_primaria_light'] ?? '#e6f4f9');
+    $nif = trim($_POST['nif'] ?? '');
+    $morada = trim($_POST['morada'] ?? '');
+    $telefone = trim($_POST['telefone'] ?? '');
+    $emailOrg = trim($_POST['email'] ?? '');
+    $website = trim($_POST['website'] ?? '');
+
+    $db->prepare('UPDATE organizacoes SET cor_primaria=?, cor_primaria_dark=?, cor_primaria_light=?, nif=?, morada=?, telefone=?, email=?, website=?, updated_at=NOW() WHERE id=?')
+        ->execute([$cor_primaria, $cor_primaria_dark, $cor_primaria_light, $nif, $morada, $telefone, $emailOrg, $website, $orgId]);
+
+    // Upload de logo
+    if (!empty($_FILES['logo_file']['name']) && $_FILES['logo_file']['error'] === UPLOAD_ERR_OK) {
+        $uploadDir = __DIR__ . '/uploads/logos/';
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+        $ext = strtolower(pathinfo($_FILES['logo_file']['name'], PATHINFO_EXTENSION));
+        if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'svg'])) {
+            $filename = 'org_' . $orgId . '_' . time() . '.' . $ext;
+            if (move_uploaded_file($_FILES['logo_file']['tmp_name'], $uploadDir . $filename)) {
+                $old = $db->prepare('SELECT logo FROM organizacoes WHERE id = ?');
+                $old->execute([$orgId]);
+                $oldLogo = $old->fetchColumn();
+                if ($oldLogo && file_exists($uploadDir . $oldLogo)) unlink($uploadDir . $oldLogo);
+                $db->prepare('UPDATE organizacoes SET logo = ? WHERE id = ?')->execute([$filename, $orgId]);
+            }
+        }
+    }
+
+    // Atualizar sessão com novas cores/logo
+    $orgRefresh = $db->prepare('SELECT * FROM organizacoes WHERE id = ?');
+    $orgRefresh->execute([$orgId]);
+    $orgNew = $orgRefresh->fetch();
+    if ($orgNew) setUserSession(getCurrentUser(), $orgNew);
+
+    header('Location: ' . BASE_PATH . '/admin.php?tab=configuracoes&msg=Branding+atualizado');
+    exit;
+}
+
+if ($action === 'save_org_email' && $user['role'] === 'org_admin' && $orgId) {
     $orgEmailSpeclab = trim($_POST['email_speclab'] ?? '');
     $orgEmailPass = trim($_POST['email_speclab_pass'] ?? '');
     if ($orgEmailSpeclab) {
@@ -565,7 +605,7 @@ $activeNav = $tab;
                             <div id="org_logo_preview" style="margin-bottom: 8px; display: none;">
                                 <img id="org_logo_img" src="" alt="Logo" style="max-height: 60px; border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px; background: white;">
                             </div>
-                            <input type="file" name="logo_file" id="org_logo_file" accept="image/png,image/jpeg,image/gif" style="font-size: 13px;">
+                            <input type="file" name="logo_file" id="org_logo_file" accept="image/png,image/jpeg,image/gif,image/svg+xml" style="font-size: 13px;">
                             <small class="muted">Formatos: PNG, JPG, GIF, SVG</small>
                         </div>
 
@@ -768,7 +808,7 @@ $activeNav = $tab;
 
                         <div class="form-group">
                             <label>Assinatura Digital <span class="muted">(imagem PNG/JPG, fundo transparente recomendado)</span></label>
-                            <input type="file" name="assinatura" id="user_assinatura" accept="image/png,image/jpeg,image/gif" style="font-size: 13px;">
+                            <input type="file" name="assinatura" id="user_assinatura" accept="image/png,image/jpeg,image/gif,image/svg+xml" style="font-size: 13px;">
                             <div id="user_assinatura_preview" style="margin-top: 8px; display: none;">
                                 <img id="user_assinatura_img" src="" alt="Assinatura" style="max-height: 60px; border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px; background: white;">
                                 <button type="button" class="btn btn-danger btn-sm" onclick="removerAssinatura()" style="margin-left: 8px;">Remover</button>
@@ -1304,18 +1344,19 @@ $activeNav = $tab;
                 .then(r => r.json())
                 .then(data => {
                     if (data.success) { document.getElementById('legModal').style.display = 'none'; carregarLeg(); }
-                    else alert(data.error || 'Erro ao guardar.');
+                    else appAlert(data.error || 'Erro ao guardar.');
                 });
             }
             function eliminarLeg(id) {
-                if (!confirm('Eliminar esta legislação?')) return;
-                var fd = new FormData();
-                fd.append('action', 'delete_legislacao_banco');
-                fd.append('id', id);
-                fd.append('csrf_token', CSRF_TOKEN);
-                fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
-                .then(r => r.json())
-                .then(data => { if (data.success) carregarLeg(); else alert(data.error || 'Erro.'); });
+                appConfirmDanger('Eliminar esta legislação?', function() {
+                    var fd = new FormData();
+                    fd.append('action', 'delete_legislacao_banco');
+                    fd.append('id', id);
+                    fd.append('csrf_token', CSRF_TOKEN);
+                    fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
+                    .then(r => r.json())
+                    .then(data => { if (data.success) carregarLeg(); else appAlert(data.error || 'Erro.'); });
+                });
             }
 
             // --- VERIFICAÇÃO IA ---
@@ -1375,27 +1416,28 @@ $activeNav = $tab;
                 });
             }
             function aplicarSugestao(s) {
-                if (!confirm('Aplicar sugestão da IA para: ' + s.legislacao_norma + '?\nAção: ' + s.status)) return;
-                var fd = new FormData();
-                fd.append('action', 'aplicar_sugestao_leg');
-                fd.append('id', s.id);
-                fd.append('status', s.status);
-                fd.append('legislacao_norma', s.legislacao_norma);
-                fd.append('rolhas_aplicaveis', s.rolhas_aplicaveis || '');
-                fd.append('resumo', s.resumo || '');
-                fd.append('notas', 'IA: ' + (s.notas || ''));
-                fd.append('csrf_token', CSRF_TOKEN);
-                fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
-                .then(r => r.json())
-                .then(function(data) {
-                    if (data.success) {
-                        var el = document.getElementById('sug_' + s.id);
-                        if (el) el.innerHTML = '<div style="color:#16a34a; padding:4px;">&#10003; Aplicada (' + esc(data.data.acao) + ')</div>';
-                        carregarLeg();
-                    } else {
-                        alert(data.error || 'Erro ao aplicar.');
-                    }
-                });
+                appConfirm('Aplicar sugestão da IA para: <strong>' + esc(s.legislacao_norma) + '</strong>?<br>Ação: ' + esc(s.status), function() {
+                    var fd = new FormData();
+                    fd.append('action', 'aplicar_sugestao_leg');
+                    fd.append('id', s.id);
+                    fd.append('status', s.status);
+                    fd.append('legislacao_norma', s.legislacao_norma);
+                    fd.append('rolhas_aplicaveis', s.rolhas_aplicaveis || '');
+                    fd.append('resumo', s.resumo || '');
+                    fd.append('notas', 'IA: ' + (s.notas || ''));
+                    fd.append('csrf_token', CSRF_TOKEN);
+                    fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
+                    .then(r => r.json())
+                    .then(function(data) {
+                        if (data.success) {
+                            var el = document.getElementById('sug_' + s.id);
+                            if (el) el.innerHTML = '<div style="color:#16a34a; padding:4px;">&#10003; Aplicada (' + esc(data.data.acao) + ')</div>';
+                            carregarLeg();
+                        } else {
+                            appAlert(data.error || 'Erro ao aplicar.');
+                        }
+                    });
+                }, 'Aplicar Sugestão IA');
             }
             function ignorarSugestao(id) {
                 var el = document.getElementById('sug_' + id);
@@ -1566,8 +1608,100 @@ $activeNav = $tab;
         <?php elseif ($tab === 'ensaios' && $isSuperAdminUser): ?>
             <div class="flex-between mb-md">
                 <h2>Banco de Ensaios</h2>
-                <button class="btn btn-primary" onclick="document.getElementById('ensaioModal').style.display='flex'; resetEnsaioForm();">+ Novo Ensaio</button>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-secondary" onclick="toggleColunasConfig()">⚙ Configurar Colunas</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('ensaioModal').style.display='flex'; resetEnsaioForm();">+ Novo Ensaio</button>
+                </div>
             </div>
+
+            <!-- Painel de configuração de colunas (inicialmente oculto) -->
+            <div id="colunasConfigPanel" style="display:none; margin-bottom:16px;">
+                <div class="card" style="padding:16px;">
+                    <div class="flex-between mb-sm">
+                        <h3 style="margin:0; font-size:15px;">Configurar Colunas</h3>
+                        <button class="btn btn-primary btn-sm" onclick="abrirColunaModal()">+ Nova Coluna</button>
+                    </div>
+                    <p class="muted" style="font-size:12px; margin-bottom:10px;">Ative/desative colunas e defina quais organizações as veem. Colunas fixas não podem ser eliminadas.</p>
+                    <table id="colunasConfigTable" style="width:100%; font-size:13px;">
+                        <thead><tr><th style="width:25%;">Nome</th><th style="width:10%;">Tipo</th><th style="width:10%;">Fixa</th><th style="width:25%;">Organizações</th><th style="width:10%;">Ativa</th><th style="width:20%;">Ações</th></tr></thead>
+                        <tbody id="colunasConfigRows"><tr><td colspan="6" class="muted" style="text-align:center; padding:12px;">A carregar...</td></tr></tbody>
+                    </table>
+                    <hr style="margin:16px 0;">
+                    <h3 style="margin:0 0 8px; font-size:15px;">Legenda da Tabela de Ensaios (por organização)</h3>
+                    <p class="muted" style="font-size:12px; margin-bottom:8px;">Texto livre que aparece por baixo da tabela de ensaios no editor, consulta e PDF.</p>
+                    <div class="form-group">
+                        <label>Organização</label>
+                        <select id="legendaOrgSelect" class="form-control" onchange="carregarLegendaOrg()">
+                            <option value="">-- Selecionar --</option>
+                            <option value="global">Todas (por defeito)</option>
+                            <?php foreach ($organizacoes as $org): ?>
+                            <option value="<?= $org['id'] ?>"><?= htmlspecialchars($org['nome']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div id="legendaOrgFields" style="display:none;">
+                        <div class="form-group">
+                            <textarea id="saLegendaText" class="form-control" rows="3" placeholder="Ex: NEI - Nível Especial de Inspeção conforme NP2922"></textarea>
+                        </div>
+                        <div class="form-group" style="display:flex; align-items:center; gap:12px;">
+                            <label style="margin:0; white-space:nowrap;">Tamanho (pt):</label>
+                            <input type="number" id="saLegendaTamanho" class="form-control" value="9" min="6" max="14" style="width:80px;">
+                            <button class="btn btn-primary btn-sm" onclick="guardarLegendaOrg()">Guardar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal nova/editar coluna -->
+            <div id="colunaModal" class="modal-overlay" style="display:none; background:rgba(0,0,0,0.6);">
+                <div class="modal-box" style="max-width:480px; background:#fff;">
+                    <div class="modal-header">
+                        <h3 id="colunaModalTitle">Nova Coluna</h3>
+                        <button class="modal-close" onclick="document.getElementById('colunaModal').style.display='none';">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="col_id" value="0">
+                        <input type="hidden" id="col_campo_fixo" value="">
+                        <div class="form-group">
+                            <label>Nome da coluna</label>
+                            <input type="text" id="col_nome" class="form-control" placeholder="Ex: Tolerância">
+                        </div>
+                        <div class="form-group" id="col_tipo_group">
+                            <label>Tipo</label>
+                            <select id="col_tipo" class="form-control">
+                                <option value="texto">Texto</option>
+                                <option value="numero">Número</option>
+                                <option value="sim_nao">Sim/Não</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Ordem</label>
+                            <input type="number" id="col_ordem" class="form-control" value="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label><input type="checkbox" id="col_todas_orgs" checked onchange="document.getElementById('col_orgs_select').style.display = this.checked ? 'none' : 'block';"> Visível para todas as organizações</label>
+                        </div>
+                        <div id="col_orgs_select" style="display:none;" class="form-group">
+                            <label>Organizações</label>
+                            <div style="max-height:150px; overflow-y:auto; border:1px solid #d1d5db; border-radius:6px; padding:8px;">
+                                <?php foreach ($organizacoes as $org): ?>
+                                <label style="display:block; margin-bottom:4px; font-size:13px;">
+                                    <input type="checkbox" class="col_org_chk" value="<?= $org['id'] ?>"> <?= htmlspecialchars($org['nome']) ?>
+                                </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label><input type="checkbox" id="col_ativo" checked> Ativa</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="document.getElementById('colunaModal').style.display='none';">Cancelar</button>
+                        <button class="btn btn-primary" onclick="guardarColuna()">Guardar</button>
+                    </div>
+                </div>
+            </div>
+
             <p class="muted" style="font-size:12px; margin-bottom:8px;">Dica: <strong>Cmd+click</strong> (Mac) ou <strong>Ctrl+click</strong> em 2 células da mesma coluna para fundir.</p>
             <div class="card" style="overflow:visible;">
                 <table id="bancoEnsaiosTable">
@@ -1614,6 +1748,7 @@ $activeNav = $tab;
                             <div class="form-group"><label>NQA <span style="font-weight:normal; color:#667; font-size:12px;">(Nível de Qualidade Aceitável)</span></label><input type="text" id="ens_nqa" placeholder="Ex: 2,5"></div>
                             <div class="form-group"><label>Valor de Referência</label><input type="text" id="ens_exemplo" placeholder="Ex: ±0.7 mm"></div>
                         </div>
+                        <div id="ens_custom_fields"></div>
                         <div class="form-group"><label><input type="checkbox" id="ens_ativo" checked> Ativo</label></div>
                     </div>
                     <div class="modal-footer">
@@ -1625,32 +1760,182 @@ $activeNav = $tab;
             <datalist id="ensCatList"></datalist>
 
             <script>
+            // === CONFIGURAÇÃO DE COLUNAS ===
+            var ensaioColunas = [];
+            function toggleColunasConfig() {
+                var p = document.getElementById('colunasConfigPanel');
+                p.style.display = p.style.display === 'none' ? 'block' : 'none';
+                if (p.style.display === 'block') carregarColunas();
+            }
+            function carregarColunas() {
+                fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_colunas').then(function(r){return r.json();}).then(function(data) {
+                    ensaioColunas = (data.data && data.data.colunas) || [];
+                    renderColunasConfig();
+                });
+            }
+            function renderColunasConfig() {
+                var tbody = document.getElementById('colunasConfigRows');
+                if (ensaioColunas.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center; padding:12px;">Nenhuma coluna.</td></tr>'; return; }
+                var tipos = { texto: 'Texto', numero: 'Número', sim_nao: 'Sim/Não' };
+                var html = '';
+                ensaioColunas.forEach(function(c) {
+                    var fixa = c.campo_fixo ? '<span class="pill pill-info" style="font-size:11px;">Fixa</span>' : '<span class="muted" style="font-size:11px;">Custom</span>';
+                    var orgs = c.todas_orgs == 1 ? '<span class="muted" style="font-size:12px;">Todas</span>' : (c.org_ids || '<span class="muted" style="font-size:12px;">Nenhuma</span>');
+                    var ativa = c.ativo == 1 ? '<span class="pill pill-success">Ativa</span>' : '<span class="pill pill-error">Inativa</span>';
+                    html += '<tr>';
+                    html += '<td><strong>' + escE(c.nome) + '</strong></td>';
+                    html += '<td>' + (tipos[c.tipo] || c.tipo) + '</td>';
+                    html += '<td>' + fixa + '</td>';
+                    html += '<td>' + orgs + '</td>';
+                    html += '<td>' + ativa + '</td>';
+                    html += '<td>';
+                    html += '<button class="btn btn-ghost btn-sm" onclick=\'editarColuna(' + JSON.stringify(c).replace(/\'/g,"&#39;") + ')\'>Editar</button>';
+                    if (!c.campo_fixo) html += ' <button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarColuna(' + c.id + ')">Eliminar</button>';
+                    html += '</td></tr>';
+                });
+                tbody.innerHTML = html;
+            }
+            function abrirColunaModal() {
+                document.getElementById('colunaModalTitle').textContent = 'Nova Coluna';
+                document.getElementById('col_id').value = '0';
+                document.getElementById('col_campo_fixo').value = '';
+                document.getElementById('col_nome').value = '';
+                document.getElementById('col_tipo').value = 'texto';
+                document.getElementById('col_tipo_group').style.display = 'block';
+                document.getElementById('col_ordem').value = ensaioColunas.length + 1;
+                document.getElementById('col_todas_orgs').checked = true;
+                document.getElementById('col_orgs_select').style.display = 'none';
+                document.getElementById('col_ativo').checked = true;
+                document.querySelectorAll('.col_org_chk').forEach(function(cb) { cb.checked = false; });
+                document.getElementById('colunaModal').style.display = 'flex';
+            }
+            function editarColuna(c) {
+                document.getElementById('colunaModalTitle').textContent = 'Editar Coluna';
+                document.getElementById('col_id').value = c.id;
+                document.getElementById('col_campo_fixo').value = c.campo_fixo || '';
+                document.getElementById('col_nome').value = c.nome;
+                document.getElementById('col_tipo').value = c.tipo;
+                document.getElementById('col_tipo_group').style.display = c.campo_fixo ? 'none' : 'block';
+                document.getElementById('col_ordem').value = c.ordem;
+                document.getElementById('col_todas_orgs').checked = c.todas_orgs == 1;
+                document.getElementById('col_orgs_select').style.display = c.todas_orgs == 1 ? 'none' : 'block';
+                document.getElementById('col_ativo').checked = c.ativo == 1;
+                var orgIds = c.org_ids ? c.org_ids.split(',') : [];
+                document.querySelectorAll('.col_org_chk').forEach(function(cb) {
+                    cb.checked = orgIds.indexOf(cb.value) !== -1;
+                });
+                document.getElementById('colunaModal').style.display = 'flex';
+            }
+            function guardarColuna() {
+                var orgIds = [];
+                if (!document.getElementById('col_todas_orgs').checked) {
+                    document.querySelectorAll('.col_org_chk:checked').forEach(function(cb) { orgIds.push(parseInt(cb.value)); });
+                }
+                fetch('<?= BASE_PATH ?>/api.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                    body: JSON.stringify({
+                        action: 'save_ensaio_coluna',
+                        id: parseInt(document.getElementById('col_id').value),
+                        nome: document.getElementById('col_nome').value,
+                        tipo: document.getElementById('col_tipo').value,
+                        ordem: parseInt(document.getElementById('col_ordem').value),
+                        todas_orgs: document.getElementById('col_todas_orgs').checked ? 1 : 0,
+                        ativo: document.getElementById('col_ativo').checked ? 1 : 0,
+                        org_ids: orgIds
+                    })
+                }).then(function(r){return r.json();}).then(function(data) {
+                    if (data.success) {
+                        document.getElementById('colunaModal').style.display = 'none';
+                        carregarColunas();
+                        carregarEnsaios(); // refresh table with new columns
+                    } else appAlert(data.error || 'Erro ao guardar coluna.');
+                });
+            }
+            function eliminarColuna(id) {
+                appConfirmDanger('Eliminar esta coluna personalizada? Os valores associados serão perdidos.', function() {
+                    fetch('<?= BASE_PATH ?>/api.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                        body: JSON.stringify({ action: 'delete_ensaio_coluna', id: id })
+                    }).then(function(r){return r.json();}).then(function(data) {
+                        if (data.success) { carregarColunas(); carregarEnsaios(); }
+                        else appAlert(data.error || 'Erro.');
+                    });
+                });
+            }
+            function carregarLegendaOrg() {
+                var orgId = document.getElementById('legendaOrgSelect').value;
+                if (!orgId) { document.getElementById('legendaOrgFields').style.display = 'none'; return; }
+                document.getElementById('legendaOrgFields').style.display = 'block';
+                var url = orgId === 'global'
+                    ? '<?= BASE_PATH ?>/api.php?action=get_ensaios_legenda&global=1'
+                    : '<?= BASE_PATH ?>/api.php?action=get_ensaios_legenda&org_id=' + orgId;
+                fetch(url).then(function(r){return r.json();}).then(function(data) {
+                    document.getElementById('saLegendaText').value = (data.data && data.data.legenda) || '';
+                    document.getElementById('saLegendaTamanho').value = (data.data && data.data.tamanho) || 9;
+                });
+            }
+            function guardarLegendaOrg() {
+                var orgId = document.getElementById('legendaOrgSelect').value;
+                if (!orgId) return;
+                var payload = {
+                    action: orgId === 'global' ? 'save_ensaios_legenda_global' : 'save_ensaios_legenda',
+                    legenda: document.getElementById('saLegendaText').value,
+                    tamanho: parseInt(document.getElementById('saLegendaTamanho').value) || 9
+                };
+                if (orgId !== 'global') payload.org_id = parseInt(orgId);
+                fetch('<?= BASE_PATH ?>/api.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                    body: JSON.stringify(payload)
+                }).then(function(r){return r.json();}).then(function(data) {
+                    if (data.success) appAlert('Legenda guardada.');
+                    else appAlert(data.error || 'Erro ao guardar.');
+                });
+            }
+
+            // === BANCO DE ENSAIOS ===
             function escE(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
             var bancoRows = [], bancoMerges = [], bancoColWidths = null;
+            var bancoColunas = [], bancoCustomValues = {};
             var bmSel = { col: null, start: null, end: null }; // merge selection
-            var defaultColWidths = [12, 16, 14, 6, 10, 14, 8, 12]; // 8 colunas (%)
+            var defaultColWidths = null; // calculado dinamicamente
 
             function carregarEnsaios() {
                 Promise.all([
                     fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_banco&all=1').then(function(r){return r.json();}),
-                    fetch('<?= BASE_PATH ?>/api.php?action=get_banco_merges').then(function(r){return r.json();})
+                    fetch('<?= BASE_PATH ?>/api.php?action=get_banco_merges').then(function(r){return r.json();}),
+                    fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_colunas').then(function(r){return r.json();}),
+                    fetch('<?= BASE_PATH ?>/api.php?action=get_ensaio_valores_custom').then(function(r){return r.json();})
                 ]).then(function(res) {
                     bancoRows = (res[0].data && res[0].data.ensaios) || [];
                     var mData = (res[1].data && res[1].data.merges) || [];
-                    // merges pode ser objeto {merges:[], colWidths:[]} ou array legado
                     if (Array.isArray(mData)) {
                         bancoMerges = mData;
                     } else {
                         bancoMerges = mData.merges || [];
                         bancoColWidths = mData.colWidths || null;
                     }
+                    bancoColunas = ((res[2].data && res[2].data.colunas) || []).filter(function(c) { return c.ativo == 1; });
+                    bancoCustomValues = (res[3].data && res[3].data.valores) || {};
                     renderBancoTable();
                 });
             }
 
             function renderBancoTable() {
                 var tbody = document.getElementById('ensaioRows');
-                if (bancoRows.length === 0) { tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
+                var totalCols = bancoColunas.length + 2; // +Estado +Ações
+                if (bancoRows.length === 0) { tbody.innerHTML = '<tr><td colspan="' + totalCols + '" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
+
+                // Atualizar thead dinamicamente
+                var theadHtml = '<tr>';
+                bancoColunas.forEach(function(c) {
+                    theadHtml += '<th title="' + escE(c.nome) + '">' + escE(c.nome) + '</th>';
+                });
+                theadHtml += '<th>Estado</th><th>Ações</th></tr>';
+                document.querySelector('#bancoEnsaiosTable thead').innerHTML = theadHtml;
+
                 // Build merge maps
                 var hidden = {}, spans = {}, aligns = {};
                 bancoMerges.forEach(function(m) {
@@ -1660,12 +1945,11 @@ $activeNav = $tab;
                     for (var r = m.row + 1; r < m.row + m.span; r++) hidden[r + '_' + m.col] = true;
                 });
                 var html = '', cats = new Set(), lastCat = '';
-                var colFields = ['categoria','ensaio','metodo','nivel_especial','nqa','exemplo'];
                 bancoRows.forEach(function(r, idx) {
                     cats.add(r.categoria);
                     var inativo = r.ativo == 0;
                     html += '<tr data-ridx="' + idx + '"' + (inativo ? ' style="opacity:0.5;"' : '') + '>';
-                    colFields.forEach(function(f, ci) {
+                    bancoColunas.forEach(function(col, ci) {
                         var k = idx + '_' + ci;
                         if (hidden[k]) return;
                         var rs = spans[k] ? ' rowspan="' + spans[k] + '"' : '';
@@ -1673,11 +1957,23 @@ $activeNav = $tab;
                         var ms = aligns[k] ? 'vertical-align:' + aligns[k].v + ';text-align:' + aligns[k].h + ';' : '';
                         var cls = isMaster ? ' class="bm-master"' : '';
                         var val;
-                        if (f === 'categoria') {
-                            val = r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>';
-                            lastCat = r.categoria;
+                        if (col.campo_fixo) {
+                            // Coluna fixa: ler do ensaio
+                            var fval = r[col.campo_fixo] || '';
+                            if (col.campo_fixo === 'categoria') {
+                                val = r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>';
+                                lastCat = r.categoria;
+                            } else {
+                                val = '<span class="muted" style="font-size:12px;">' + escE(fval) + '</span>';
+                            }
                         } else {
-                            val = '<span class="muted" style="font-size:12px;">' + escE(r[f] || '') + '</span>';
+                            // Coluna custom: ler do mapa de valores
+                            var cv = (bancoCustomValues[r.id] && bancoCustomValues[r.id][col.id]) || '';
+                            if (col.tipo === 'sim_nao') {
+                                val = cv == '1' ? '<span class="pill pill-success" style="font-size:11px;">Sim</span>' : '<span class="muted" style="font-size:12px;">Não</span>';
+                            } else {
+                                val = '<span class="muted" style="font-size:12px;">' + escE(cv) + '</span>';
+                            }
                         }
                         var tools = '';
                         if (isMaster) {
@@ -1699,7 +1995,16 @@ $activeNav = $tab;
                 // Aplicar larguras e inicializar resize
                 var tbl = document.getElementById('bancoEnsaiosTable');
                 var ths = tbl.querySelectorAll('thead th');
-                var cw = bancoColWidths || defaultColWidths;
+                if (!bancoColWidths) {
+                    // Larguras automáticas proporcionais
+                    var dataColCount = bancoColunas.length;
+                    var pct = Math.floor(80 / (dataColCount || 1));
+                    bancoColWidths = [];
+                    for (var i = 0; i < dataColCount; i++) bancoColWidths.push(pct);
+                    bancoColWidths.push(8); // Estado
+                    bancoColWidths.push(12); // Ações
+                }
+                var cw = bancoColWidths;
                 for (var i = 0; i < ths.length && i < cw.length; i++) ths[i].style.width = cw[i] + '%';
                 initBancoColResize(tbl);
             }
@@ -1762,7 +2067,7 @@ $activeNav = $tab;
                 e.preventDefault();
                 var col = parseInt(td.getAttribute('data-col'));
                 var row = parseInt(tr.getAttribute('data-ridx'));
-                if (col > 5) return;
+                if (col >= bancoColunas.length) return;
                 if (bmSel.col === null || bmSel.col !== col) {
                     limparBancoSel();
                     bmSel = { col: col, start: row, end: row };
@@ -1871,6 +2176,24 @@ $activeNav = $tab;
             }
 
             // --- CRUD ---
+            function renderCustomFields(ensaioId) {
+                var container = document.getElementById('ens_custom_fields');
+                var customCols = bancoColunas.filter(function(c) { return !c.campo_fixo; });
+                if (customCols.length === 0) { container.innerHTML = ''; return; }
+                var html = '<hr style="margin:12px 0;"><p class="muted" style="font-size:12px; margin-bottom:8px;">Campos personalizados:</p><div class="form-row">';
+                var vals = ensaioId && bancoCustomValues[ensaioId] ? bancoCustomValues[ensaioId] : {};
+                customCols.forEach(function(c) {
+                    var v = vals[c.id] || '';
+                    if (c.tipo === 'sim_nao') {
+                        html += '<div class="form-group"><label><input type="checkbox" class="ens_custom" data-colid="' + c.id + '"' + (v == '1' ? ' checked' : '') + '> ' + escE(c.nome) + '</label></div>';
+                    } else {
+                        var inputType = c.tipo === 'numero' ? 'number' : 'text';
+                        html += '<div class="form-group"><label>' + escE(c.nome) + '</label><input type="' + inputType + '" class="ens_custom" data-colid="' + c.id + '" value="' + escE(v) + '"></div>';
+                    }
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            }
             function resetEnsaioForm() {
                 document.getElementById('ensaioModalTitle').textContent = 'Novo Ensaio';
                 document.getElementById('ens_id').value = '0';
@@ -1881,6 +2204,7 @@ $activeNav = $tab;
                 document.getElementById('ens_nqa').value = '';
                 document.getElementById('ens_exemplo').value = '';
                 document.getElementById('ens_ativo').checked = true;
+                renderCustomFields(null);
             }
             function editEnsaio(r) {
                 document.getElementById('ensaioModalTitle').textContent = 'Editar Ensaio';
@@ -1892,6 +2216,7 @@ $activeNav = $tab;
                 document.getElementById('ens_nqa').value = r.nqa || '';
                 document.getElementById('ens_exemplo').value = r.exemplo || '';
                 document.getElementById('ens_ativo').checked = r.ativo != 0;
+                renderCustomFields(r.id);
                 document.getElementById('ensaioModal').style.display = 'flex';
             }
             function guardarEnsaio() {
@@ -1909,12 +2234,30 @@ $activeNav = $tab;
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
                 .then(function(r){return r.json();})
                 .then(function(data) {
-                    if (data.success) { document.getElementById('ensaioModal').style.display = 'none'; carregarEnsaios(); }
-                    else alert(data.error || 'Erro ao guardar.');
+                    if (data.success) {
+                        // Guardar valores custom
+                        var ensaioId = data.data && data.data.id ? data.data.id : document.getElementById('ens_id').value;
+                        var customEls = document.querySelectorAll('.ens_custom');
+                        var promises = [];
+                        customEls.forEach(function(el) {
+                            var colId = el.getAttribute('data-colid');
+                            var val = el.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value;
+                            promises.push(fetch('<?= BASE_PATH ?>/api.php', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                                body: JSON.stringify({ action: 'save_ensaio_valor_custom', ensaio_id: parseInt(ensaioId), coluna_id: parseInt(colId), valor: val })
+                            }));
+                        });
+                        Promise.all(promises).then(function() {
+                            document.getElementById('ensaioModal').style.display = 'none';
+                            carregarEnsaios();
+                        });
+                    }
+                    else appAlert(data.error || 'Erro ao guardar.');
                 });
             }
             function eliminarEnsaio(id, rowIdx) {
-                if (!confirm('Eliminar este ensaio?')) return;
+                appConfirmDanger('Eliminar este ensaio?', function() {
                 var fd = new FormData();
                 fd.append('action', 'delete_ensaio_banco');
                 fd.append('id', id);
@@ -1923,7 +2266,8 @@ $activeNav = $tab;
                 .then(function(r){return r.json();})
                 .then(function(data) {
                     if (data.success) { ajustarMergesDelete(rowIdx); carregarEnsaios(); }
-                    else alert(data.error || 'Erro.');
+                    else appAlert(data.error || 'Erro.');
+                });
                 });
             }
             carregarEnsaios();
@@ -1931,28 +2275,90 @@ $activeNav = $tab;
 
         <!-- ENSAIOS (org_admin / user - read-only) -->
         <?php elseif ($tab === 'ensaios' && !$isSuperAdminUser): ?>
-            <div class="flex-between mb-md"><h2>Banco de Ensaios</h2></div>
+            <div class="flex-between mb-md">
+                <h2>Banco de Ensaios</h2>
+                <?php if ($user['role'] === 'org_admin'): ?>
+                <button class="btn btn-secondary btn-sm" onclick="toggleLegendaPanel()">Legenda da Tabela</button>
+                <?php endif; ?>
+            </div>
+
+            <?php if ($user['role'] === 'org_admin'): ?>
+            <div id="legendaPanel" style="display:none; margin-bottom:16px;">
+                <div class="card" style="padding:16px;">
+                    <h3 style="margin:0 0 8px; font-size:15px;">Legenda da Tabela de Ensaios</h3>
+                    <p class="muted" style="font-size:12px; margin-bottom:8px;">Texto livre que aparece por baixo da tabela de ensaios (editor, consulta e PDF).</p>
+                    <div class="form-group">
+                        <textarea id="ensaiosLegendaText" class="form-control" rows="3" placeholder="Ex: NEI - Nível Especial de Inspeção conforme NP2922; NQA - Nível de Qualidade Aceitável conforme ISO 2859-1"></textarea>
+                    </div>
+                    <div class="form-group" style="display:flex; align-items:center; gap:12px;">
+                        <label style="margin:0; white-space:nowrap;">Tamanho (pt):</label>
+                        <input type="number" id="ensaiosLegendaTamanho" class="form-control" value="9" min="6" max="14" style="width:80px;">
+                        <button class="btn btn-primary btn-sm" onclick="guardarEnsaiosLegenda()">Guardar</button>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
             <div class="card">
                 <style>#bancoEnsaiosRO { table-layout:fixed; width:100%; } #bancoEnsaiosRO td { overflow:hidden; text-overflow:ellipsis; }</style>
                 <table id="bancoEnsaiosRO">
-                    <thead><tr><th>Categoria</th><th>Ensaio</th><th>Método/Norma</th><th title="Nível Especial de Inspeção">NEI</th><th title="Nível de Qualidade Aceitável">NQA</th><th>Valor Referência</th></tr></thead>
-                    <tbody id="ensaioRowsRO"><tr><td colspan="6" class="muted" style="text-align:center; padding:20px;">A carregar...</td></tr></tbody>
+                    <thead id="ensaioHeadRO"><tr><td class="muted" style="text-align:center; padding:12px;">A carregar...</td></tr></thead>
+                    <tbody id="ensaioRowsRO"></tbody>
                 </table>
             </div>
             <script>
             function escE(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-            var defaultCwRO = [14, 18, 16, 8, 12, 16];
+            var roColunasData = [];
+            <?php if ($user['role'] === 'org_admin'): ?>
+            function toggleLegendaPanel() {
+                var p = document.getElementById('legendaPanel');
+                p.style.display = p.style.display === 'none' ? 'block' : 'none';
+            }
+            function guardarEnsaiosLegenda() {
+                fetch('<?= BASE_PATH ?>/api.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '<?= getCsrfToken() ?>' },
+                    body: JSON.stringify({
+                        action: 'save_ensaios_legenda',
+                        legenda: document.getElementById('ensaiosLegendaText').value,
+                        tamanho: parseInt(document.getElementById('ensaiosLegendaTamanho').value) || 9
+                    })
+                }).then(function(r){return r.json();}).then(function(data) {
+                    if (data.success) appAlert('Legenda guardada.');
+                    else appAlert(data.error || 'Erro ao guardar.');
+                });
+            }
+            // Carregar legenda existente
+            fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_legenda').then(function(r){return r.json();}).then(function(data) {
+                if (data.data) {
+                    document.getElementById('ensaiosLegendaText').value = data.data.legenda || '';
+                    document.getElementById('ensaiosLegendaTamanho').value = data.data.tamanho || 9;
+                }
+            });
+            <?php endif; ?>
             Promise.all([
                 fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_banco').then(function(r){return r.json();}),
-                fetch('<?= BASE_PATH ?>/api.php?action=get_banco_merges').then(function(r){return r.json();})
+                fetch('<?= BASE_PATH ?>/api.php?action=get_banco_merges').then(function(r){return r.json();}),
+                fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_colunas').then(function(r){return r.json();}),
+                fetch('<?= BASE_PATH ?>/api.php?action=get_ensaio_valores_custom').then(function(r){return r.json();})
             ]).then(function(res) {
                 var rows = (res[0].data && res[0].data.ensaios) || [];
                 var mData = (res[1].data && res[1].data.merges) || [];
                 var merges, colWidths;
                 if (Array.isArray(mData)) { merges = mData; colWidths = null; }
                 else { merges = mData.merges || []; colWidths = mData.colWidths || null; }
+                var colunas = ((res[2].data && res[2].data.colunas) || []).filter(function(c) { return c.ativo == 1; });
+                var customVals = (res[3].data && res[3].data.valores) || {};
+                roColunasData = colunas;
+
+                // Thead dinâmico (usa nome_display que inclui legendas custom)
+                var theadHtml = '<tr>';
+                colunas.forEach(function(c) { var dn = c.nome_display || c.nome; theadHtml += '<th title="' + escE(dn) + '">' + escE(dn) + '</th>'; });
+                theadHtml += '</tr>';
+                document.getElementById('ensaioHeadRO').innerHTML = theadHtml;
+
                 var tbody = document.getElementById('ensaioRowsRO');
-                if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
+                var totalCols = colunas.length;
+                if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="' + totalCols + '" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
                 var hidden = {}, spans = {}, aligns = {};
                 merges.forEach(function(m) {
                     var k = m.row + '_' + m.col;
@@ -1961,31 +2367,40 @@ $activeNav = $tab;
                     for (var r = m.row + 1; r < m.row + m.span; r++) hidden[r + '_' + m.col] = true;
                 });
                 var html = '', lastCat = '';
-                var colFields = ['categoria','ensaio','metodo','nivel_especial','nqa','exemplo'];
                 rows.forEach(function(r, idx) {
                     html += '<tr>';
-                    colFields.forEach(function(f, ci) {
+                    colunas.forEach(function(col, ci) {
                         var k = idx + '_' + ci;
                         if (hidden[k]) return;
                         var rs = spans[k] ? ' rowspan="' + spans[k] + '"' : '';
                         var ms = aligns[k] ? ' style="vertical-align:' + aligns[k].v + ';text-align:' + aligns[k].h + ';"' : '';
                         var val;
-                        if (f === 'categoria') {
-                            val = r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>';
-                            lastCat = r.categoria;
+                        if (col.campo_fixo) {
+                            if (col.campo_fixo === 'categoria') {
+                                val = r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>';
+                                lastCat = r.categoria;
+                            } else {
+                                val = '<span class="muted" style="font-size:12px;">' + escE(r[col.campo_fixo] || '') + '</span>';
+                            }
                         } else {
-                            val = '<span class="muted" style="font-size:12px;">' + escE(r[f] || '') + '</span>';
+                            var cv = (customVals[r.id] && customVals[r.id][col.id]) || '';
+                            if (col.tipo === 'sim_nao') {
+                                val = cv == '1' ? '<span class="pill pill-success" style="font-size:11px;">Sim</span>' : '<span class="muted" style="font-size:12px;">Não</span>';
+                            } else {
+                                val = '<span class="muted" style="font-size:12px;">' + escE(cv) + '</span>';
+                            }
                         }
                         html += '<td' + rs + ms + '>' + val + '</td>';
                     });
                     html += '</tr>';
                 });
                 tbody.innerHTML = html;
-                // Aplicar larguras (sem Estado/Ações — RO tem 6 colunas)
+                // Larguras automáticas
                 var tbl = document.getElementById('bancoEnsaiosRO');
                 var ths = tbl.querySelectorAll('thead th');
-                var cw = colWidths ? colWidths.slice(0, 6) : defaultCwRO;
-                for (var i = 0; i < ths.length && i < cw.length; i++) ths[i].style.width = cw[i] + '%';
+                var pct = Math.floor(100 / (colunas.length || 1));
+                var cw = colWidths ? colWidths.slice(0, colunas.length) : null;
+                for (var i = 0; i < ths.length; i++) ths[i].style.width = (cw && cw[i] ? cw[i] : pct) + '%';
             });
             </script>
 
@@ -2045,12 +2460,69 @@ $activeNav = $tab;
             </div>
 
             <?php else: ?>
-            <!-- Org Admin: configuração de email -->
+            <!-- Org Admin: branding + email -->
             <?php
-                $orgData = $db->prepare('SELECT email_speclab FROM organizacoes WHERE id = ?');
+                $orgData = $db->prepare('SELECT * FROM organizacoes WHERE id = ?');
                 $orgData->execute([$orgId]);
                 $orgInfo = $orgData->fetch();
             ?>
+            <div class="card" style="margin-bottom: 24px;">
+                <h3 style="color: var(--color-primary); font-size: 15px; margin-bottom: 12px;">A Minha Organização</h3>
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
+                    <input type="hidden" name="action" value="save_org_branding">
+
+                    <div class="form-group">
+                        <label>Logo da Organização</label>
+                        <?php if (!empty($orgInfo['logo'])): ?>
+                            <div style="margin-bottom: 8px;">
+                                <img src="<?= BASE_PATH ?>/uploads/logos/<?= sanitize($orgInfo['logo']) ?>" alt="Logo" style="max-height: 60px; border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px; background: white;">
+                            </div>
+                        <?php endif; ?>
+                        <input type="file" name="logo_file" accept="image/png,image/jpeg,image/gif,image/svg+xml" style="font-size: 13px;">
+                        <small class="muted">Formatos: PNG, JPG, GIF, SVG</small>
+                    </div>
+
+                    <h4 style="color: var(--color-primary); font-size: 14px; margin: 16px 0 12px;">Cores</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Cor Primária</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="color" name="cor_primaria" value="<?= sanitize($orgInfo['cor_primaria'] ?? '#2596be') ?>" style="width: 50px; height: 36px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer;">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Cor Primária Dark</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="color" name="cor_primaria_dark" value="<?= sanitize($orgInfo['cor_primaria_dark'] ?? '#1a7a9e') ?>" style="width: 50px; height: 36px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer;">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Cor Primária Light</label>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="color" name="cor_primaria_light" value="<?= sanitize($orgInfo['cor_primaria_light'] ?? '#e6f4f9') ?>" style="width: 50px; height: 36px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr style="margin: 18px 0; border: none; border-top: 1px solid #e5e7eb;">
+                    <h4 style="color: var(--color-primary); font-size: 14px; margin-bottom: 12px;">Dados da Organização</h4>
+                    <div class="form-row">
+                        <div class="form-group"><label>NIF</label><input type="text" name="nif" value="<?= sanitize($orgInfo['nif'] ?? '') ?>"></div>
+                        <div class="form-group"><label>Telefone</label><input type="text" name="telefone" value="<?= sanitize($orgInfo['telefone'] ?? '') ?>"></div>
+                    </div>
+                    <div class="form-group"><label>Morada</label><input type="text" name="morada" value="<?= sanitize($orgInfo['morada'] ?? '') ?>"></div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Email</label><input type="email" name="email" value="<?= sanitize($orgInfo['email'] ?? '') ?>"></div>
+                        <div class="form-group"><label>Website</label><input type="url" name="website" value="<?= sanitize($orgInfo['website'] ?? '') ?>" placeholder="https://"></div>
+                    </div>
+
+                    <div class="mt-lg">
+                        <button type="submit" class="btn btn-primary">Guardar Branding</button>
+                    </div>
+                </form>
+            </div>
+
             <div class="card">
                 <h3 style="color: var(--color-primary); font-size: 15px; margin-bottom: 12px;">Email SpecLab</h3>
                 <p style="font-size: 13px; color: #667085; margin-bottom: 16px;">Configure o email @speclab.pt da sua organização para envio de emails. Apenas precisa do email e password.</p>
@@ -2325,11 +2797,11 @@ $activeNav = $tab;
             if (result.success) {
                 location.reload();
             } else {
-                alert(result.error || 'Erro ao carregar logo.');
+                appAlert(result.error || 'Erro ao carregar logo.');
             }
         })
         .catch(function() {
-            alert('Erro ao carregar logo.');
+            appAlert('Erro ao carregar logo.');
         });
     }
 
@@ -2550,7 +3022,7 @@ $activeNav = $tab;
             amostra_nqa: document.getElementById('tmpl_nqa').value
         };
 
-        if (!data.ensaio) { alert('Introduza o nome do ensaio.'); return; }
+        if (!data.ensaio) { appAlert('Introduza o nome do ensaio.'); return; }
 
         fetch('<?= BASE_PATH ?>/api.php', {
             method: 'POST',
@@ -2566,24 +3038,25 @@ $activeNav = $tab;
                 document.getElementById('tmpl_nqa').value = '';
                 carregarTemplates(produtoId);
             } else {
-                alert(result.error || 'Erro ao guardar template.');
+                appAlert(result.error || 'Erro ao guardar template.');
             }
         });
     }
 
     function removerTemplate(id) {
-        if (!confirm('Remover este template?')) return;
-        var produtoId = document.getElementById('tmpl_produto_id').value;
-        fetch('<?= BASE_PATH ?>/api.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
-            body: JSON.stringify({ action: 'delete_template', id: id })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(result) {
-            if (result.success) {
-                carregarTemplates(produtoId);
-            }
+        appConfirmDanger('Remover este template?', function() {
+            var produtoId = document.getElementById('tmpl_produto_id').value;
+            fetch('<?= BASE_PATH ?>/api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                body: JSON.stringify({ action: 'delete_template', id: id })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.success) {
+                    carregarTemplates(produtoId);
+                }
+            });
         });
     }
 
@@ -2636,5 +3109,6 @@ $activeNav = $tab;
         }
     });
     </script>
+    <?php include __DIR__ . '/includes/modals.php'; ?>
 </body>
 </html>

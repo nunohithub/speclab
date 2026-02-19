@@ -108,7 +108,18 @@ if ($authenticated && $tokenData && $_SERVER['REQUEST_METHOD'] === 'POST' && iss
     $nome = sanitize($_POST['aceitar_nome'] ?? '');
     $cargo = sanitize($_POST['aceitar_cargo'] ?? '');
     $comentario = sanitize($_POST['aceitar_comentario'] ?? '');
-    if ($nome && registarDecisao($db, $espec['id'], $tokenData['id'], $decisao, $nome, $cargo ?: null, $comentario ?: null)) {
+    // Upload opcional de assinatura
+    $assinaturaFile = null;
+    if (!empty($_FILES['aceitar_assinatura']['name']) && $_FILES['aceitar_assinatura']['error'] === UPLOAD_ERR_OK) {
+        $upDir = __DIR__ . '/uploads/assinaturas/';
+        if (!is_dir($upDir)) mkdir($upDir, 0755, true);
+        $ext = strtolower(pathinfo($_FILES['aceitar_assinatura']['name'], PATHINFO_EXTENSION));
+        if (in_array($ext, ['png', 'jpg', 'jpeg'])) {
+            $assinaturaFile = 'aceite_' . $espec['id'] . '_' . $tokenData['id'] . '_' . time() . '.' . $ext;
+            move_uploaded_file($_FILES['aceitar_assinatura']['tmp_name'], $upDir . $assinaturaFile);
+        }
+    }
+    if ($nome && registarDecisao($db, $espec['id'], $tokenData['id'], $decisao, $nome, $cargo ?: null, $comentario ?: null, $assinaturaFile)) {
         $aceitacaoMsg = $decisao === 'aceite' ? 'Documento aceite com sucesso!' : 'Documento rejeitado.';
     }
 }
@@ -524,7 +535,7 @@ if ($authenticated) {
                             <?= $aceitacaoMsg ?>
                         </div>
                     <?php endif; ?>
-                    <form method="POST" style="max-width:500px;">
+                    <form method="POST" enctype="multipart/form-data" style="max-width:500px;">
                         <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
                         <input type="hidden" name="acao_aceitacao" value="1">
                         <div style="margin-bottom:12px;">
@@ -534,6 +545,10 @@ if ($authenticated) {
                         <div style="margin-bottom:12px;">
                             <label style="display:block; font-weight:600; margin-bottom:4px;">Cargo (opcional)</label>
                             <input type="text" name="aceitar_cargo" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;" placeholder="Ex: Diretor de Qualidade">
+                        </div>
+                        <div style="margin-bottom:12px;">
+                            <label style="display:block; font-weight:600; margin-bottom:4px;">Assinatura digital <span style="font-weight:400; color:#888;">(opcional, imagem PNG/JPG)</span></label>
+                            <input type="file" name="aceitar_assinatura" accept="image/png,image/jpeg" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                         </div>
                         <div style="margin-bottom:16px;">
                             <label style="display:block; font-weight:600; margin-bottom:4px;">Comentário (opcional)</label>

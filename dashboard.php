@@ -297,6 +297,12 @@ $activeNav = 'especificacoes';
                                                 <button class="btn btn-ghost btn-sm" title="Copiar link público"
                                                     onclick="copyShareLink('<?= $e['codigo_acesso'] ?>')">&#128279;</button>
                                             <?php endif; ?>
+                                            <?php
+                                            $podeEliminar = ((int)($e['criado_por'] ?? 0) === (int)$user['id'])
+                                                || (in_array($user['role'], ['org_admin', 'super_admin']) && ($e['organizacao_id'] ?? null) == $user['org_id']);
+                                            if ($podeEliminar): ?>
+                                                <button class="btn btn-ghost btn-sm" title="Eliminar" style="color:#dc2626;" onclick="eliminarEspec(<?= $e['id'] ?>, '<?= sanitize($e['numero']) ?>')">&#128465;</button>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>
@@ -328,7 +334,7 @@ $activeNav = 'especificacoes';
     }
 
     function duplicarEspec(id, numero) {
-        if (!confirm('Duplicar a especificação ' + numero + '?\nSerá criada uma cópia com novo número.')) return;
+        appConfirm('Duplicar a especificação ' + numero + '?<br>Será criada uma cópia com novo número.', function() {
 
         fetch('<?= BASE_PATH ?>/api.php', {
             method: 'POST',
@@ -354,7 +360,29 @@ $activeNav = 'especificacoes';
         .catch(function() {
             showToast('Erro de ligação ao servidor.', 'error');
         });
+        });
+    }
+
+    function eliminarEspec(id, numero) {
+        appConfirmDanger('Eliminar permanentemente a especificação <strong>' + numero + '</strong>?<br>Esta ação não pode ser revertida.', function() {
+            fetch('<?= BASE_PATH ?>/api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '<?= getCsrfToken() ?>' },
+                body: JSON.stringify({ action: 'delete_especificacao', id: id })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.success) {
+                    showToast('Especificação eliminada.', 'success');
+                    setTimeout(function() { window.location.reload(); }, 500);
+                } else {
+                    showToast(result.error || 'Erro ao eliminar.', 'error');
+                }
+            })
+            .catch(function() { showToast('Erro de ligação ao servidor.', 'error'); });
+        }, 'Eliminar Especificação');
     }
     </script>
+    <?php include __DIR__ . '/includes/modals.php'; ?>
 </body>
 </html>

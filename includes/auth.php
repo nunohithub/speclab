@@ -196,6 +196,8 @@ function sanitizeRichText(string $html): string {
     $html = preg_replace('/<\/p>\s*/i', '<br>', $html);
     $html = preg_replace('/<p[^>]*>/i', '', $html);
     $html = strip_tags($html, '<b><strong><u><span><br><em><i><ul><ol><li>');
+    // Remover TODOS os atributos das tags (previne XSS via onmouseover, onclick, style, etc.)
+    $html = preg_replace('/<(\w+)\s+[^>]*>/i', '<$1>', $html);
     $html = preg_replace('/^(<br\s*\/?>)+/i', '', $html);
     $html = preg_replace('/(<br\s*\/?>){3,}/i', '<br><br>', $html);
     return trim($html);

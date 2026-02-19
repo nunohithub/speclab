@@ -83,6 +83,25 @@ if (strpos($fornecedorDisplay, ',') !== false || empty($fornecedorDisplay)) {
 $stmt = $db->prepare('INSERT INTO acessos_log (especificacao_id, ip, user_agent, tipo) VALUES (?, ?, ?, ?)');
 $stmt->execute([$id, $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '', 'pdf']);
 
+// Dados de validação (elaboração + aceitação)
+$elaboradoNome = '';
+$elaboradoData = '';
+$elaboradoAssinatura = '';
+if (!empty($data['publicado_por'])) {
+    $stmtElab = $db->prepare('SELECT nome, assinatura FROM utilizadores WHERE id = ?');
+    $stmtElab->execute([$data['publicado_por']]);
+    $elab = $stmtElab->fetch();
+    if ($elab) {
+        $elaboradoNome = $elab['nome'];
+        $elaboradoAssinatura = $elab['assinatura'] ?? '';
+        $elaboradoData = !empty($data['publicado_em']) ? date('d/m/Y H:i', strtotime($data['publicado_em'])) : '';
+    }
+}
+$stmtAceite = $db->prepare('SELECT a.*, t.tipo_destinatario FROM especificacao_aceitacoes a LEFT JOIN especificacao_tokens t ON a.token_id = t.id WHERE a.especificacao_id = ? AND a.tipo_decisao = "aceite" ORDER BY a.created_at DESC LIMIT 1');
+$stmtAceite->execute([$id]);
+$aceite = $stmtAceite->fetch();
+$tipoDestinatario = $aceite ? ($aceite['tipo_destinatario'] === 'cliente' ? 'Cliente' : 'Fornecedor') : (!empty($data['fornecedor_nome']) ? 'Fornecedor' : 'Cliente');
+
 
 // Tentar mPDF
 $useMpdf = file_exists(__DIR__ . '/vendor/autoload.php');
@@ -412,7 +431,17 @@ if ($useMpdf) {
                         }
                         $html .= '</tbody></table>';
                     }
-                    $html .= '<p style="font-size:7pt; color:#888; margin:2px 0 0 0;">NEI — Nível Especial de Inspeção &nbsp;|&nbsp; NQA — Nível de Qualidade Aceitável &nbsp;(NP 2922)</p>';
+                    $pdfLegenda = $org['ensaios_legenda'] ?? '';
+                    $pdfLegTam = (int)($org['ensaios_legenda_tamanho'] ?? 9);
+                    if (empty($pdfLegenda)) {
+                        $stmtGlob = $db->prepare("SELECT valor FROM configuracoes WHERE chave = 'ensaios_legenda_global'");
+                        $stmtGlob->execute();
+                        $globRow = $stmtGlob->fetch(PDO::FETCH_ASSOC);
+                        if ($globRow) { $gData = json_decode($globRow['valor'], true); $pdfLegenda = $gData['legenda'] ?? ''; $pdfLegTam = (int)($gData['tamanho'] ?? 9); }
+                    }
+                    if (!empty($pdfLegenda)) {
+                        $html .= '<p style="font-size:' . $pdfLegTam . 'pt; color:#888; font-style:italic; margin:2px 0 0 0;">' . san($pdfLegenda) . '</p>';
+                    }
                 }
             } else {
                 $html .= '<div class="section"><h2>' . ($i + 1) . '. ' . san($sec['titulo']) . '</h2>';
@@ -490,11 +519,38 @@ if ($useMpdf) {
         $html .= '</div></div>';
     }
 
-    // Signature block
-    $html .= '<div style="margin-top: 15mm; padding-top: 5mm; border-top: 1px solid #e5e7eb;">';
+    // Signature block dinâmico
+    $html .= '<div style="margin-top: 15mm; padding-top: 5mm;">';
     $html .= '<table width="100%"><tr>';
-    $html .= '<td width="50%" style="text-align: center; padding-top: 15mm; border-top: 1px solid #999; font-size: 9pt;">Elaborado por</td>';
-    $html .= '<td width="50%" style="text-align: center; padding-top: 15mm; border-top: 1px solid #999; font-size: 9pt;">Aprovação Cliente</td>';
+    // Elaborado por
+    $html .= '<td width="50%" style="text-align:center; vertical-align:bottom; padding:0 10px;">';
+    $html .= '<p style="font-weight:bold; font-size:9pt; color:' . $corPrimaria . '; margin-bottom:6px;">Elaborado por</p>';
+    if ($elaboradoAssinatura && file_exists(__DIR__ . '/uploads/assinaturas/' . $elaboradoAssinatura)) {
+        $html .= '<img src="' . __DIR__ . '/uploads/assinaturas/' . $elaboradoAssinatura . '" style="max-height:40px; margin-bottom:4px;"><br>';
+    }
+    if ($elaboradoNome) {
+        $html .= '<p style="margin:0; font-size:9pt; border-top:1px solid #999; padding-top:6px;">' . san($elaboradoNome) . '</p>';
+        $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#888;">' . $elaboradoData . '</p>';
+        $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#16a34a; font-weight:600;">&#10003; Validado</p>';
+    } else {
+        $html .= '<p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;">Pendente</p>';
+    }
+    $html .= '</td>';
+    // Aprovação fornecedor/cliente
+    $html .= '<td width="50%" style="text-align:center; vertical-align:bottom; padding:0 10px;">';
+    $html .= '<p style="font-weight:bold; font-size:9pt; color:' . $corPrimaria . '; margin-bottom:6px;">Aprovação ' . $tipoDestinatario . '</p>';
+    if ($aceite) {
+        if (!empty($aceite['assinatura_signatario']) && file_exists(__DIR__ . '/uploads/assinaturas/' . $aceite['assinatura_signatario'])) {
+            $html .= '<img src="' . __DIR__ . '/uploads/assinaturas/' . $aceite['assinatura_signatario'] . '" style="max-height:40px; margin-bottom:4px;"><br>';
+        }
+        $html .= '<p style="margin:0; font-size:9pt; border-top:1px solid #999; padding-top:6px;">' . san($aceite['nome_signatario']) . '</p>';
+        if ($aceite['cargo_signatario']) $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#888;">' . san($aceite['cargo_signatario']) . '</p>';
+        $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#888;">' . date('d/m/Y H:i', strtotime($aceite['created_at'])) . '</p>';
+        $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#16a34a; font-weight:600;">&#10003; Validado</p>';
+    } else {
+        $html .= '<p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;">Aguarda validação</p>';
+    }
+    $html .= '</td>';
     $html .= '</tr></table></div>';
 
     $mpdf->WriteHTML($html);
@@ -773,7 +829,19 @@ $tamNome    = (int)$cv['tamanho_nome'];
                             <?php endforeach; ?>
                         </tbody>
                     </table>
-                    <p style="font-size:10px; color:#888; margin:2px 0 0 0;">NEI — Nível Especial de Inspeção &nbsp;|&nbsp; NQA — Nível de Qualidade Aceitável &nbsp;(NP 2922)</p>
+                    <?php
+                    $prvLegenda = $org['ensaios_legenda'] ?? '';
+                    $prvLegTam = (int)($org['ensaios_legenda_tamanho'] ?? 9);
+                    if (empty($prvLegenda)) {
+                        $stmtGlob = $db->prepare("SELECT valor FROM configuracoes WHERE chave = 'ensaios_legenda_global'");
+                        $stmtGlob->execute();
+                        $globRow = $stmtGlob->fetch(PDO::FETCH_ASSOC);
+                        if ($globRow) { $gData = json_decode($globRow['valor'], true); $prvLegenda = $gData['legenda'] ?? ''; $prvLegTam = (int)($gData['tamanho'] ?? 9); }
+                    }
+                    if (!empty($prvLegenda)):
+                    ?>
+                    <p style="font-size:<?= $prvLegTam ?>px; color:#888; font-style:italic; margin:2px 0 0 0;"><?= san($prvLegenda) ?></p>
+                    <?php endif; ?>
                     <?php endif; ?>
                 <?php else: ?>
                     <div class="content"><?php
@@ -882,10 +950,37 @@ $tamNome    = (int)$cv['tamanho_nome'];
         <?php endif; endforeach; ?>
     <?php endif; ?>
 
-    <!-- Signatures -->
+    <!-- Validações -->
     <div class="signatures">
-        <div class="sig-box">Elaborado por</div>
-        <div class="sig-box">Aprovação Cliente</div>
+        <div class="sig-box" style="border-top:none; padding-top:0; text-align:center;">
+            <p style="font-weight:bold; margin:0 0 8px; font-size:9pt; color:<?= $corPrimaria ?>;">Elaborado por</p>
+            <?php if ($elaboradoAssinatura && file_exists(__DIR__ . '/uploads/assinaturas/' . $elaboradoAssinatura)): ?>
+                <img src="<?= __DIR__ ?>/uploads/assinaturas/<?= $elaboradoAssinatura ?>" style="max-height:40px; margin-bottom:4px;">
+            <?php endif; ?>
+            <?php if ($elaboradoNome): ?>
+                <p style="margin:0; font-size:9pt; border-top:1px solid #999; padding-top:6px;"><?= san($elaboradoNome) ?></p>
+                <p style="margin:2px 0 0; font-size:8pt; color:#888;"><?= $elaboradoData ?></p>
+                <p style="margin:2px 0 0; font-size:8pt; color:#16a34a; font-weight:600;">&#10003; Validado</p>
+            <?php else: ?>
+                <p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;">Pendente</p>
+            <?php endif; ?>
+        </div>
+        <div class="sig-box" style="border-top:none; padding-top:0; text-align:center;">
+            <p style="font-weight:bold; margin:0 0 8px; font-size:9pt; color:<?= $corPrimaria ?>;">Aprovação <?= $tipoDestinatario ?></p>
+            <?php if ($aceite): ?>
+                <?php if (!empty($aceite['assinatura_signatario']) && file_exists(__DIR__ . '/uploads/assinaturas/' . $aceite['assinatura_signatario'])): ?>
+                    <img src="<?= __DIR__ ?>/uploads/assinaturas/<?= $aceite['assinatura_signatario'] ?>" style="max-height:40px; margin-bottom:4px;">
+                <?php endif; ?>
+                <p style="margin:0; font-size:9pt; border-top:1px solid #999; padding-top:6px;"><?= san($aceite['nome_signatario']) ?></p>
+                <?php if ($aceite['cargo_signatario']): ?>
+                <p style="margin:2px 0 0; font-size:8pt; color:#888;"><?= san($aceite['cargo_signatario']) ?></p>
+                <?php endif; ?>
+                <p style="margin:2px 0 0; font-size:8pt; color:#888;"><?= date('d/m/Y H:i', strtotime($aceite['created_at'])) ?></p>
+                <p style="margin:2px 0 0; font-size:8pt; color:#16a34a; font-weight:600;">&#10003; Validado</p>
+            <?php else: ?>
+                <p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;">Aguarda validação</p>
+            <?php endif; ?>
+        </div>
     </div>
 
     <div class="footer">

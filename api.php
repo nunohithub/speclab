@@ -50,7 +50,7 @@ if ($action === '') {
 // CSRF validation (exceto ações de leitura e uploads com FormData)
 // ---------------------------------------------------------------------------
 $csrfExempt = ['get_especificacao', 'get_templates', 'get_legislacao_banco',
-    'get_legislacao_log', 'get_ensaios_banco', 'get_banco_merges', 'list_ficheiros'];
+    'get_legislacao_log', 'get_ensaios_banco', 'get_banco_merges', 'get_ensaios_colunas', 'get_ensaios_legenda', 'get_ensaio_valores_custom', 'list_ficheiros'];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !in_array($action, $csrfExempt)) {
     // Para uploads multipart, token vem em $_POST; para JSON, vem no header
     if (!validateCsrf()) {
@@ -90,6 +90,17 @@ function jsonError(string $error, int $httpCode = 400): void {
     http_response_code($httpCode);
     echo json_encode(['success' => false, 'error' => $error], JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+// Verificar se super admin pode modificar uma especificação (só da própria org)
+function checkSaOrgAccess(PDO $db, array $user, int $especId): void {
+    if ($user['role'] !== 'super_admin' || empty($user['org_id'])) return;
+    $stmt = $db->prepare('SELECT organizacao_id FROM especificacoes WHERE id = ?');
+    $stmt->execute([$especId]);
+    $row = $stmt->fetch();
+    if ($row && $row['organizacao_id'] != $user['org_id']) {
+        jsonError('Sem permissão para alterar especificações de outra organização.', 403);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +164,7 @@ try {
         // ===================================================================
         case 'save_especificacao':
             $id            = (int)($_POST['id'] ?? 0);
+            if ($id > 0) checkSaOrgAccess($db, $user, $id);
             $numero        = sanitize($_POST['numero'] ?? '');
             $titulo        = sanitize($_POST['titulo'] ?? '');
             $cliente_id    = !empty($_POST['cliente_id']) ? (int)$_POST['cliente_id'] : null;
@@ -815,21 +827,32 @@ try {
         // 7. DELETE ESPECIFICAÇÃO
         // ===================================================================
         case 'delete_especificacao':
-            requireAdminApi($user);
-
             $id = (int)($_POST['id'] ?? 0);
             if ($id <= 0) {
                 jsonError('ID da especificação inválido.');
             }
 
-            // Verificar se existe
-            $stmt = $db->prepare('SELECT id FROM especificacoes WHERE id = ?');
+            // Verificar se existe e quem criou
+            $stmt = $db->prepare('SELECT id, criado_por FROM especificacoes WHERE id = ?');
             $stmt->execute([$id]);
-            if (!$stmt->fetch()) {
+            $specDel = $stmt->fetch();
+            if (!$specDel) {
                 jsonError('Especificação não encontrada.', 404);
             }
 
-            verifySpecAccess($db, $id, $user);
+            // Permissão: criador ou admin da mesma org
+            $isCriador = ((int)$specDel['criado_por'] === (int)$user['id']);
+            if (!$isCriador && $user['role'] === 'user') {
+                jsonError('Só pode eliminar especificações que criou.', 403);
+            }
+            if (!$isCriador && in_array($user['role'], ['org_admin', 'super_admin'])) {
+                $stmtOrg = $db->prepare('SELECT organizacao_id FROM especificacoes WHERE id = ?');
+                $stmtOrg->execute([$id]);
+                $specOrg = $stmtOrg->fetch();
+                if (!$specOrg || $specOrg['organizacao_id'] != $user['org_id']) {
+                    jsonError('Só pode eliminar especificações da sua organização.', 403);
+                }
+            }
 
             // Obter ficheiros associados para apagar do disco
             $stmt = $db->prepare('SELECT nome_servidor FROM especificacao_ficheiros WHERE especificacao_id = ?');
@@ -839,6 +862,8 @@ try {
             $db->beginTransaction();
             try {
                 // Apagar dados relacionados
+                $db->prepare('DELETE FROM especificacao_aceitacoes WHERE especificacao_id = ?')->execute([$id]);
+                $db->prepare('DELETE FROM especificacao_tokens WHERE especificacao_id = ?')->execute([$id]);
                 $db->prepare('DELETE FROM especificacao_produtos WHERE especificacao_id = ?')->execute([$id]);
                 $db->prepare('DELETE FROM especificacao_fornecedores WHERE especificacao_id = ?')->execute([$id]);
                 $db->prepare('DELETE FROM especificacao_parametros WHERE especificacao_id = ?')->execute([$id]);
@@ -1301,11 +1326,15 @@ try {
             $f = $stmt->fetch();
             if (!$f) jsonError('Ficheiro não encontrado.', 404);
 
+            // Verificar acesso multi-tenant
+            verifySpecAccess($db, (int)$f['especificacao_id'], $user);
+
             $filepath = UPLOAD_DIR . $f['nome_servidor'];
             if (!file_exists($filepath)) jsonError('Ficheiro não encontrado no servidor.', 404);
 
+            $safeFilename = str_replace(["\r", "\n", '"'], '', $f['nome_original']);
             header('Content-Type: ' . ($f['tipo_ficheiro'] ?: 'application/octet-stream'));
-            header('Content-Disposition: attachment; filename="' . $f['nome_original'] . '"');
+            header('Content-Disposition: attachment; filename="' . $safeFilename . '"');
             header('Content-Length: ' . filesize($filepath));
             readfile($filepath);
             exit;
@@ -1802,8 +1831,9 @@ try {
                 $maxOrdem = $db->query('SELECT COALESCE(MAX(ordem),0)+1 FROM ensaios_banco')->fetchColumn();
                 $stmt = $db->prepare('INSERT INTO ensaios_banco (categoria, ensaio, metodo, nivel_especial, nqa, exemplo, ativo, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
                 $stmt->execute([$cat, $ens, $met, $niv, $nqa, $ex, $ativoE, $maxOrdem]);
+                $eid = (int)$db->lastInsertId();
             }
-            jsonSuccess('Ensaio guardado.');
+            jsonSuccess('Ensaio guardado.', ['id' => $eid]);
             break;
 
         case 'delete_ensaio_banco':
@@ -1836,12 +1866,172 @@ try {
             break;
 
         // ===================================================================
+        // COLUNAS CONFIGURÁVEIS DO BANCO DE ENSAIOS
+        // ===================================================================
+        case 'get_ensaios_colunas':
+            $orgId = isset($_GET['org_id']) ? (int)$_GET['org_id'] : ($user['org_id'] ?? 0);
+            $stmt = $db->query('SELECT c.*, GROUP_CONCAT(DISTINCT co.org_id) as org_ids FROM ensaios_colunas c LEFT JOIN ensaios_colunas_org co ON co.coluna_id = c.id GROUP BY c.id ORDER BY c.ordem');
+            $colunas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            // Carregar nomes custom da org
+            $nomesCustom = [];
+            if ($orgId) {
+                $stmtNc = $db->prepare('SELECT coluna_id, nome_custom FROM ensaios_colunas_org WHERE org_id = ? AND nome_custom IS NOT NULL AND nome_custom != ""');
+                $stmtNc->execute([$orgId]);
+                foreach ($stmtNc->fetchAll(PDO::FETCH_ASSOC) as $nc) {
+                    $nomesCustom[$nc['coluna_id']] = $nc['nome_custom'];
+                }
+            }
+            // Se não é super admin, filtrar só as visíveis para a org
+            if (!isSuperAdmin() && $orgId) {
+                $colunas = array_values(array_filter($colunas, function($c) use ($orgId) {
+                    if ($c['todas_orgs']) return $c['ativo'];
+                    $ids = $c['org_ids'] ? explode(',', $c['org_ids']) : [];
+                    return $c['ativo'] && in_array($orgId, $ids);
+                }));
+            }
+            // Aplicar nomes custom
+            foreach ($colunas as &$c) {
+                $c['nome_custom'] = $nomesCustom[$c['id']] ?? '';
+                $c['nome_display'] = $c['nome_custom'] ?: $c['nome'];
+            }
+            unset($c);
+            jsonSuccess('OK', ['colunas' => $colunas]);
+            break;
+
+        case 'save_ensaio_coluna':
+            if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+            $cid = (int)($jsonBody['id'] ?? 0);
+            $nome = trim($jsonBody['nome'] ?? '');
+            $tipo = $jsonBody['tipo'] ?? 'texto';
+            $ordem = (int)($jsonBody['ordem'] ?? 0);
+            $todasOrgs = (int)($jsonBody['todas_orgs'] ?? 1);
+            $ativo = (int)($jsonBody['ativo'] ?? 1);
+            $orgIds = $jsonBody['org_ids'] ?? [];
+            if (!$nome) jsonError('Nome da coluna é obrigatório.');
+            if ($cid > 0) {
+                // Não permitir alterar campo_fixo
+                $stmt = $db->prepare('UPDATE ensaios_colunas SET nome = ?, tipo = ?, ordem = ?, todas_orgs = ?, ativo = ? WHERE id = ?');
+                $stmt->execute([$nome, $tipo, $ordem, $todasOrgs, $ativo, $cid]);
+            } else {
+                $stmt = $db->prepare('INSERT INTO ensaios_colunas (nome, campo_fixo, tipo, ordem, todas_orgs, ativo) VALUES (?, NULL, ?, ?, ?, ?)');
+                $stmt->execute([$nome, $tipo, $ordem, $todasOrgs, $ativo]);
+                $cid = (int)$db->lastInsertId();
+            }
+            // Gerir orgs associadas
+            $db->prepare('DELETE FROM ensaios_colunas_org WHERE coluna_id = ?')->execute([$cid]);
+            if (!$todasOrgs && !empty($orgIds)) {
+                $ins = $db->prepare('INSERT INTO ensaios_colunas_org (coluna_id, org_id) VALUES (?, ?)');
+                foreach ($orgIds as $oid) $ins->execute([$cid, (int)$oid]);
+            }
+            jsonSuccess('Coluna guardada.', ['id' => $cid]);
+            break;
+
+        case 'delete_ensaio_coluna':
+            if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+            $cid = (int)($jsonBody['id'] ?? 0);
+            if ($cid <= 0) jsonError('ID inválido.');
+            // Não permitir eliminar colunas fixas
+            $fixo = $db->prepare('SELECT campo_fixo FROM ensaios_colunas WHERE id = ?');
+            $fixo->execute([$cid]);
+            if ($fixo->fetchColumn()) jsonError('Não é possível eliminar colunas fixas. Pode desativá-las.');
+            $db->prepare('DELETE FROM ensaios_colunas WHERE id = ?')->execute([$cid]);
+            jsonSuccess('Coluna eliminada.');
+            break;
+
+        case 'save_ensaio_valor_custom':
+            if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+            $ensaioId = (int)($jsonBody['ensaio_id'] ?? 0);
+            $colunaId = (int)($jsonBody['coluna_id'] ?? 0);
+            $valor = trim($jsonBody['valor'] ?? '');
+            if (!$ensaioId || !$colunaId) jsonError('Dados inválidos.');
+            $stmt = $db->prepare('INSERT INTO ensaios_valores_custom (ensaio_id, coluna_id, valor) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)');
+            $stmt->execute([$ensaioId, $colunaId, $valor]);
+            jsonSuccess('Valor guardado.');
+            break;
+
+        case 'get_ensaio_valores_custom':
+            $stmt = $db->query('SELECT ensaio_id, coluna_id, valor FROM ensaios_valores_custom');
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $map = [];
+            foreach ($rows as $r) $map[$r['ensaio_id']][$r['coluna_id']] = $r['valor'];
+            jsonSuccess('OK', ['valores' => $map]);
+            break;
+
+        case 'save_colunas_legendas':
+            if ($user['role'] !== 'super_admin' && $user['role'] !== 'org_admin') jsonError('Acesso negado.', 403);
+            $orgId = (int)($user['org_id'] ?? 0);
+            if (!$orgId) jsonError('Organização não definida.');
+            $legendas = $jsonBody['legendas'] ?? [];
+            foreach ($legendas as $leg) {
+                $colId = (int)($leg['coluna_id'] ?? 0);
+                $nomeCustom = trim($leg['nome_custom'] ?? '');
+                if (!$colId) continue;
+                // Upsert: se já existe registo para esta org+coluna, atualizar; senão inserir
+                $exists = $db->prepare('SELECT COUNT(*) FROM ensaios_colunas_org WHERE coluna_id = ? AND org_id = ?');
+                $exists->execute([$colId, $orgId]);
+                if ($exists->fetchColumn() > 0) {
+                    $db->prepare('UPDATE ensaios_colunas_org SET nome_custom = ? WHERE coluna_id = ? AND org_id = ?')->execute([$nomeCustom ?: null, $colId, $orgId]);
+                } else {
+                    $db->prepare('INSERT INTO ensaios_colunas_org (coluna_id, org_id, nome_custom) VALUES (?, ?, ?)')->execute([$colId, $orgId, $nomeCustom ?: null]);
+                }
+            }
+            jsonSuccess('Legendas guardadas.');
+            break;
+
+        case 'save_ensaios_legenda':
+            if ($user['role'] !== 'super_admin' && $user['role'] !== 'org_admin') jsonError('Acesso negado.', 403);
+            $orgId = (int)($jsonBody['org_id'] ?? $user['org_id'] ?? 0);
+            if ($user['role'] === 'org_admin') $orgId = (int)$user['org_id'];
+            if (!$orgId) jsonError('Organização não definida.');
+            $legenda = trim($jsonBody['legenda'] ?? '');
+            $tamanho = (int)($jsonBody['tamanho'] ?? 9);
+            if ($tamanho < 6) $tamanho = 6;
+            if ($tamanho > 14) $tamanho = 14;
+            $db->prepare('UPDATE organizacoes SET ensaios_legenda = ?, ensaios_legenda_tamanho = ? WHERE id = ?')->execute([$legenda ?: null, $tamanho, $orgId]);
+            jsonSuccess('Legenda guardada.');
+            break;
+
+        case 'get_ensaios_legenda':
+            if (isset($_GET['global']) && $_GET['global'] == '1') {
+                $stmt = $db->prepare("SELECT valor FROM configuracoes WHERE chave = 'ensaios_legenda_global'");
+                $stmt->execute();
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                $gData = $row ? json_decode($row['valor'], true) : [];
+                jsonSuccess('OK', ['legenda' => $gData['legenda'] ?? '', 'tamanho' => (int)($gData['tamanho'] ?? 9)]);
+            }
+            $orgId = isset($_GET['org_id']) ? (int)$_GET['org_id'] : ($user['org_id'] ?? 0);
+            if (!$orgId) jsonSuccess('OK', ['legenda' => '', 'tamanho' => 9]);
+            $stmt = $db->prepare('SELECT ensaios_legenda, ensaios_legenda_tamanho FROM organizacoes WHERE id = ?');
+            $stmt->execute([$orgId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            jsonSuccess('OK', ['legenda' => $row['ensaios_legenda'] ?? '', 'tamanho' => (int)($row['ensaios_legenda_tamanho'] ?? 9)]);
+            break;
+
+        case 'save_ensaios_legenda_global':
+            if ($user['role'] !== 'super_admin') jsonError('Acesso negado.', 403);
+            $legenda = trim($jsonBody['legenda'] ?? '');
+            $tamanho = (int)($jsonBody['tamanho'] ?? 9);
+            if ($tamanho < 6) $tamanho = 6;
+            if ($tamanho > 14) $tamanho = 14;
+            $valor = json_encode(['legenda' => $legenda, 'tamanho' => $tamanho]);
+            $stmt = $db->prepare("SELECT id FROM configuracoes WHERE chave = 'ensaios_legenda_global'");
+            $stmt->execute();
+            if ($stmt->fetch()) {
+                $db->prepare("UPDATE configuracoes SET valor = ? WHERE chave = 'ensaios_legenda_global'")->execute([$valor]);
+            } else {
+                $db->prepare("INSERT INTO configuracoes (chave, valor) VALUES ('ensaios_legenda_global', ?)")->execute([$valor]);
+            }
+            jsonSuccess('Legenda global guardada.');
+            break;
+
+        // ===================================================================
         // VERSIONAMENTO
         // ===================================================================
         case 'publicar_versao':
-            $id = (int)($_POST['id'] ?? 0);
+            $id = (int)($jsonBody['id'] ?? $_POST['id'] ?? 0);
             if ($id <= 0) jsonError('ID inválido.');
-            $notas = sanitize($_POST['notas'] ?? '');
+            checkSaOrgAccess($db, $user, $id);
+            $notas = sanitize($jsonBody['notas'] ?? $_POST['notas'] ?? '');
             if (!publicarVersao($db, $id, $user['id'], $notas ?: null)) {
                 jsonError('Não foi possível publicar. Versão já bloqueada ou não encontrada.');
             }
@@ -1849,36 +2039,45 @@ try {
             break;
 
         case 'nova_versao':
-            $id = (int)($_POST['id'] ?? 0);
+            $id = (int)($jsonBody['id'] ?? $_POST['id'] ?? 0);
             if ($id <= 0) jsonError('ID inválido.');
+            checkSaOrgAccess($db, $user, $id);
             $novoId = criarNovaVersao($db, $id, $user['id']);
             if (!$novoId) jsonError('Erro ao criar nova versão.');
             echo json_encode(['success' => true, 'novo_id' => $novoId]);
             exit;
 
         case 'gerar_token':
-            $especId = (int)($_POST['especificacao_id'] ?? 0);
-            $nome = sanitize($_POST['nome'] ?? '');
-            $email = sanitize($_POST['email'] ?? '');
-            $tipo = sanitize($_POST['tipo'] ?? 'outro');
+            $especId = (int)($jsonBody['especificacao_id'] ?? $_POST['especificacao_id'] ?? 0);
+            if ($especId > 0) checkSaOrgAccess($db, $user, $especId);
+            $nome = sanitize($jsonBody['nome'] ?? $_POST['nome'] ?? '');
+            $email = sanitize($jsonBody['email'] ?? $_POST['email'] ?? '');
+            $tipo = sanitize($jsonBody['tipo'] ?? $_POST['tipo'] ?? 'outro');
             if (!$especId || !$nome || !$email) jsonError('Dados incompletos.');
             $token = gerarTokenDestinatario($db, $especId, $user['id'], $nome, $email, $tipo);
             echo json_encode(['success' => true, 'token' => $token]);
             exit;
 
         case 'revogar_token':
-            $tokenId = (int)($_POST['token_id'] ?? 0);
+            $tokenId = (int)($jsonBody['token_id'] ?? $_POST['token_id'] ?? 0);
             if (!$tokenId) jsonError('Token inválido.');
+            // Verificar acesso multi-tenant
+            $stmtTk = $db->prepare('SELECT especificacao_id FROM especificacao_tokens WHERE id = ?');
+            $stmtTk->execute([$tokenId]);
+            $tkRow = $stmtTk->fetch();
+            if (!$tkRow) jsonError('Token não encontrado.', 404);
+            verifySpecAccess($db, (int)$tkRow['especificacao_id'], $user);
             $db->prepare('UPDATE especificacao_tokens SET ativo = 0 WHERE id = ?')->execute([$tokenId]);
             jsonSuccess('Token revogado.');
             break;
 
         case 'enviar_link_aceitacao':
             require_once __DIR__ . '/includes/email.php';
-            $tokenId = (int)($_POST['token_id'] ?? 0);
-            $especId = (int)($_POST['especificacao_id'] ?? 0);
+            $tokenId = (int)($jsonBody['token_id'] ?? $_POST['token_id'] ?? 0);
+            $especId = (int)($jsonBody['especificacao_id'] ?? $_POST['especificacao_id'] ?? 0);
             if (!$tokenId || !$especId) jsonError('Dados incompletos.');
-            $baseUrl = rtrim(($_POST['base_url'] ?? ''), '/');
+            checkSaOrgAccess($db, $user, $especId);
+            $baseUrl = rtrim(($jsonBody['base_url'] ?? $_POST['base_url'] ?? ''), '/');
             if (!$baseUrl) $baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_PATH;
             $result = enviarLinkAceitacao($db, $especId, $tokenId, $baseUrl, $user['id']);
             if ($result['success']) {

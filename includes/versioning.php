@@ -159,7 +159,7 @@ function gerarTokenDestinatario(PDO $db, int $especId, int $userId, string $nome
 function getTokensEspecificacao(PDO $db, int $especId): array {
     $stmt = $db->prepare('
         SELECT t.*,
-               a.tipo_decisao, a.nome_signatario, a.created_at as decisao_em
+               a.tipo_decisao, a.nome_signatario, a.cargo_signatario, a.comentario as decisao_comentario, a.created_at as decisao_em
         FROM especificacao_tokens t
         LEFT JOIN especificacao_aceitacoes a ON a.token_id = t.id
         WHERE t.especificacao_id = ? AND t.ativo = 1
@@ -172,15 +172,15 @@ function getTokensEspecificacao(PDO $db, int $especId): array {
 /**
  * Registar aceitação/rejeição
  */
-function registarDecisao(PDO $db, int $especId, int $tokenId, string $decisao, string $nome, ?string $cargo, ?string $comentario): bool {
+function registarDecisao(PDO $db, int $especId, int $tokenId, string $decisao, string $nome, ?string $cargo, ?string $comentario, ?string $assinatura = null): bool {
     // Verificar se já existe decisão para este token
     $stmt = $db->prepare('SELECT id FROM especificacao_aceitacoes WHERE token_id = ?');
     $stmt->execute([$tokenId]);
     if ($stmt->fetch()) return false; // Já decidiu
 
-    $db->prepare('INSERT INTO especificacao_aceitacoes (especificacao_id, token_id, tipo_decisao, nome_signatario, cargo_signatario, comentario, ip_address, user_agent)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$especId, $tokenId, $decisao, $nome, $cargo, $comentario, $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '']);
+    $db->prepare('INSERT INTO especificacao_aceitacoes (especificacao_id, token_id, tipo_decisao, nome_signatario, cargo_signatario, assinatura_signatario, comentario, ip_address, user_agent)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$especId, $tokenId, $decisao, $nome, $cargo, $assinatura, $comentario, $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '']);
 
     // Log
     $db->prepare('INSERT INTO especificacao_token_log (token_id, especificacao_id, acao, ip_address, user_agent)
