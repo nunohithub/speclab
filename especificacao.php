@@ -1331,6 +1331,26 @@ $pageSubtitle = 'Editor de Especificação';
                     <?php endif; ?>
 
                     <?php if (!$isNew): ?>
+                    <?php
+                        $smtpConfigurado = !empty(getConfiguracao('smtp_host')) && !empty(getConfiguracao('smtp_user'));
+                        // Recolher emails de fornecedores e cliente
+                        $emailsForn = [];
+                        foreach (($espec['fornecedores_lista'] ?? []) as $f) {
+                            if (!empty($f['email'])) {
+                                foreach (array_map('trim', explode(',', $f['email'])) as $em) {
+                                    if ($em) $emailsForn[] = $em;
+                                }
+                            }
+                        }
+                        $emailsCli = [];
+                        if (!empty($espec['cliente_email'])) {
+                            foreach (array_map('trim', explode(',', $espec['cliente_email'])) as $em) {
+                                if ($em) $emailsCli[] = $em;
+                            }
+                        }
+                        $nForn = count($espec['fornecedores_lista'] ?? []);
+                        $nCli = !empty($espec['cliente_id']) ? 1 : 0;
+                    ?>
                     <div class="card">
                         <div class="card-header">
                             <span class="card-title">Enviar por Email</span>
@@ -1338,7 +1358,27 @@ $pageSubtitle = 'Editor de Especificação';
                         </div>
                         <div class="form-group">
                             <label for="email_destinatario">Destinatário</label>
-                            <input type="email" id="email_destinatario" placeholder="email@exemplo.com">
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                <input type="text" id="email_destinatario" placeholder="email@exemplo.com" style="flex:1;">
+                                <button type="button" id="btnLimparDest" class="btn btn-sm btn-ghost" onclick="limparDestinatarios()" style="display:none;" title="Limpar">&times;</button>
+                            </div>
+                            <?php if ($emailsForn || $emailsCli): ?>
+                            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+                                <?php if ($emailsForn): ?>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="preencherDestinatarios('fornecedores')">
+                                    <?= $nForn === 1 ? sanitize($espec['fornecedores_lista'][0]['nome']) : 'Fornecedores ('.$nForn.')' ?>
+                                </button>
+                                <?php endif; ?>
+                                <?php if ($emailsCli): ?>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="preencherDestinatarios('cliente')">
+                                    <?= sanitize($espec['cliente_nome']) ?>
+                                </button>
+                                <?php endif; ?>
+                                <?php if ($emailsForn && $emailsCli): ?>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="preencherDestinatarios('todos')">Todos</button>
+                                <?php endif; ?>
+                            </div>
+                            <?php endif; ?>
                         </div>
                         <div class="form-group">
                             <label for="email_assunto">Assunto</label>
@@ -1348,22 +1388,23 @@ $pageSubtitle = 'Editor de Especificação';
                             <label for="email_mensagem">Mensagem personalizada (opcional)</label>
                             <textarea id="email_mensagem" rows="3" placeholder="Adicionar mensagem ao email..."></textarea>
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-                                    <input type="checkbox" id="email_incluir_link" checked> Incluir link de visualização online
-                                </label>
-                            </div>
-                            <div class="form-group">
-                                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-                                    <input type="checkbox" id="email_anexar_pdf"> Anexar PDF ao email
-                                </label>
-                            </div>
+                        <div class="form-group">
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                <input type="checkbox" id="email_incluir_link" checked> Incluir link de visualização online
+                            </label>
                         </div>
-                        <div style="display:flex; align-items:center; gap: var(--spacing-sm); margin-top: var(--spacing-md);">
-                            <button class="btn btn-primary" onclick="enviarEmailEspec()" id="btnEnviarEmail">Enviar Email</button>
+                        <div style="display:flex; align-items:center; gap: var(--spacing-sm); flex-wrap:wrap; margin-top: var(--spacing-md);">
+                            <button class="btn btn-primary" onclick="abrirEmailCliente()" id="btnAbrirEmail">Abrir no Email</button>
+                            <?php if ($smtpConfigurado): ?>
+                            <button class="btn btn-secondary" onclick="enviarEmailEspec()" id="btnEnviarEmail">Enviar via Servidor</button>
+                            <?php endif; ?>
                             <span class="muted" id="emailStatus"></span>
                         </div>
+                        <?php if (!$smtpConfigurado): ?>
+                        <div class="alert alert-info" style="margin-top: var(--spacing-sm);">
+                            O email será aberto no seu programa de email (Outlook, Gmail, etc.). Para enviar diretamente pelo servidor, configure o SMTP nas definições.
+                        </div>
+                        <?php endif; ?>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -1457,8 +1498,8 @@ $pageSubtitle = 'Editor de Especificação';
                                     <?php endif; ?>
                                 </div>
                                 <div>
-                                    <input type="file" id="cfg_logo_file" accept="image/png,image/jpeg,image/svg+xml" style="font-size: var(--font-size-sm);">
-                                    <p class="muted" style="margin-top:4px; font-size:11px;">PNG, JPG ou SVG. Tamanho recomendado: 300x150px</p>
+                                    <input type="file" id="cfg_logo_file" accept="image/png,image/jpeg" style="font-size: var(--font-size-sm);">
+                                    <p class="muted" style="margin-top:4px; font-size:11px;">PNG ou JPG. Tamanho recomendado: 300x150px</p>
                                     <?php if (!empty($configVisual['logo_custom'])): ?>
                                         <button class="btn btn-ghost btn-sm" onclick="removerLogoCustom()" style="color:var(--color-error); margin-top:4px;">Remover logo</button>
                                     <?php endif; ?>
@@ -1475,7 +1516,12 @@ $pageSubtitle = 'Editor de Especificação';
                 <div class="preview-container">
                     <div class="preview-header">
                         <h3>Pré-visualização</h3>
-                        <button class="btn btn-sm" style="background:rgba(255,255,255,0.2); color:white; border:none;" onclick="atualizarPreview()">&#8635; Atualizar</button>
+                        <div style="display:flex; gap:4px;">
+                            <button class="btn btn-sm" style="background:rgba(255,255,255,0.2); color:white; border:none;" onclick="atualizarPreview()" title="Atualizar">&#8635;</button>
+                            <?php if (!$isNew): ?>
+                            <button class="btn btn-sm" style="background:rgba(255,255,255,0.2); color:white; border:none;" onclick="abrirPreviewReal()" title="Preview real (nova aba)">&#128065; Preview Real</button>
+                            <?php endif; ?>
+                        </div>
                     </div>
                     <div class="preview-body" id="previewBody">
                         <div class="preview-logo">
@@ -1626,11 +1672,51 @@ $pageSubtitle = 'Editor de Especificação';
     // CONFIGURAÇÃO GLOBAL
     // ============================================================
     const BASE_PATH = '<?= BASE_PATH ?>';
+    const CSRF_TOKEN = '<?= getCsrfToken() ?>';
     const IS_NEW = <?= $isNew ? 'true' : 'false' ?>;
     let especId = <?= $espec['id'] ?: 0 ?>;
     let autoSaveTimer = null;
     let isDirty = false;
     let isSaving = false;
+
+    // Helper para fetch POST com CSRF automático
+    function apiPost(data) {
+        return fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify(data)
+        });
+    }
+    function apiPostForm(formData) {
+        formData.append('csrf_token', CSRF_TOKEN);
+        return fetch(BASE_PATH + '/api.php', { method: 'POST', body: formData });
+    }
+
+    // Emails de fornecedores/cliente para pré-preenchimento
+    var emailDataForn = <?= json_encode($emailsForn ?? []) ?>;
+    var emailDataCli = <?= json_encode($emailsCli ?? []) ?>;
+    var emailUsaBcc = false;
+
+    function preencherDestinatarios(tipo) {
+        var emails = [];
+        if (tipo === 'fornecedores' || tipo === 'todos') emails = emails.concat(emailDataForn);
+        if (tipo === 'cliente' || tipo === 'todos') emails = emails.concat(emailDataCli);
+        emailUsaBcc = emails.length > 1;
+        var campo = document.getElementById('email_destinatario');
+        campo.value = emailUsaBcc ? 'Destinatários ocultos (' + emails.length + ')' : emails.join(', ');
+        campo.readOnly = emailUsaBcc;
+        var btnLimpar = document.getElementById('btnLimparDest');
+        if (btnLimpar) btnLimpar.style.display = emailUsaBcc ? 'inline' : 'none';
+    }
+    function limparDestinatarios() {
+        emailUsaBcc = false;
+        var campo = document.getElementById('email_destinatario');
+        campo.value = '';
+        campo.readOnly = false;
+        campo.focus();
+        var btnLimpar = document.getElementById('btnLimparDest');
+        if (btnLimpar) btnLimpar.style.display = 'none';
+    }
 
     // ============================================================
     // RICH TEXT EDITOR (TinyMCE) - DINÂMICO PARA SECÇÕES
@@ -2622,17 +2708,13 @@ $pageSubtitle = 'Editor de Especificação';
         // Adicionar loading aos botões da secção
         aiCurrentBlock.querySelectorAll('.btn-ai').forEach(function(b) { b.classList.add('loading'); });
 
-        fetch(BASE_PATH + '/api.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        apiPost({
                 action: 'ai_assist',
                 mode: aiCurrentMode,
                 prompt: prompt,
                 conteudo: conteudo,
                 titulo: titulo
             })
-        })
         .then(function(r) { return r.json(); })
         .then(function(result) {
             submitBtn.disabled = false;
@@ -2795,10 +2877,7 @@ $pageSubtitle = 'Editor de Especificação';
         formData.append('especificacao_id', especId);
         formData.append('logo', file);
 
-        fetch(BASE_PATH + '/api.php', {
-            method: 'POST',
-            body: formData
-        })
+        apiPostForm(formData)
         .then(function(r) { return r.json(); })
         .then(function(result) {
             if (result.success && result.data && result.data.filename) {
@@ -3155,11 +3234,7 @@ $pageSubtitle = 'Editor de Especificação';
         var action = IS_NEW && especId === 0 ? 'criar_especificacao' : 'atualizar_especificacao';
 
         // 1. Save main spec data
-        fetch(BASE_PATH + '/api.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: action, data: data })
-        })
+        apiPost({ action: action, data: data })
         .then(function(response) { return response.json(); })
         .then(function(result) {
             if (result.success) {
@@ -3179,15 +3254,11 @@ $pageSubtitle = 'Editor de Especificação';
 
                 if (data.classes.length > 0 || document.querySelectorAll('#classRows .class-row').length === 0) {
                     promises.push(
-                        fetch(BASE_PATH + '/api.php', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
+                        apiPost({
                                 action: 'save_classes',
                                 especificacao_id: especId,
                                 classes: data.classes
-                            })
-                        }).then(function(r) { return r.json(); })
+                            }).then(function(r) { return r.json(); })
                     );
                 }
 
@@ -3201,29 +3272,21 @@ $pageSubtitle = 'Editor de Especificação';
                         };
                     });
                     promises.push(
-                        fetch(BASE_PATH + '/api.php', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
+                        apiPost({
                                 action: 'save_defeitos',
                                 especificacao_id: especId,
                                 defeitos: defeitosForApi
-                            })
-                        }).then(function(r) { return r.json(); })
+                            }).then(function(r) { return r.json(); })
                     );
                 }
 
                 // Save sections
                 promises.push(
-                    fetch(BASE_PATH + '/api.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
+                    apiPost({
                             action: 'save_seccoes',
                             especificacao_id: especId,
                             seccoes: data.seccoes
-                        })
-                    }).then(function(r) { return r.json(); })
+                        }).then(function(r) { return r.json(); })
                 );
 
                 return Promise.all(promises).then(function() {
@@ -3592,11 +3655,7 @@ $pageSubtitle = 'Editor de Especificação';
     function removerFicheiro(id) {
         if (!confirm('Tem a certeza que deseja remover este ficheiro?')) return;
 
-        fetch(BASE_PATH + '/api.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'remover_ficheiro', id: id })
-        })
+        apiPost({ action: 'remover_ficheiro', id: id })
         .then(function(r) { return r.json(); })
         .then(function(result) {
             if (result.success) {
@@ -3656,7 +3715,77 @@ $pageSubtitle = 'Editor de Especificação';
     }
 
     // ============================================================
-    // EMAIL - ENVIAR
+    // PREVIEW REAL
+    // ============================================================
+    function abrirPreviewReal() {
+        if (especId === 0) {
+            showToast('Guarde a especificação primeiro.', 'warning');
+            return;
+        }
+        if (isDirty) {
+            showToast('Tem alterações por guardar. A abrir com a última versão guardada.', 'info');
+        }
+        window.open(BASE_PATH + '/ver.php?id=' + especId, '_blank');
+    }
+
+    // ============================================================
+    // EMAIL - ABRIR NO CLIENTE
+    // ============================================================
+    function abrirEmailCliente() {
+        var assunto = document.getElementById('email_assunto').value.trim();
+        var mensagem = document.getElementById('email_mensagem').value.trim();
+        var incluirLink = document.getElementById('email_incluir_link').checked;
+
+        if (!assunto) assunto = 'Caderno de Encargos';
+
+        // Determinar emails reais
+        var allEmails = [];
+        if (emailUsaBcc) {
+            allEmails = emailDataForn.concat(emailDataCli);
+        } else {
+            var manual = document.getElementById('email_destinatario').value.trim();
+            if (manual) allEmails = manual.split(',').map(function(e){ return e.trim(); });
+        }
+
+        if (!allEmails.length) {
+            showToast('Introduza o email do destinatário.', 'warning');
+            document.getElementById('email_destinatario').focus();
+            return;
+        }
+
+        var corpo = '';
+        if (mensagem) corpo += mensagem + '\n\n';
+
+        if (incluirLink) {
+            var code = document.getElementById('codigo_acesso').value;
+            if (code) {
+                var link = window.location.origin + BASE_PATH + '/publico.php?code=' + code;
+                corpo += 'Pode consultar o documento no seguinte link:\n' + link + '\n\n';
+            } else {
+                showToast('Gere um código de acesso primeiro (tab Partilha) para incluir o link.', 'warning');
+                return;
+            }
+        }
+
+        corpo += 'Com os melhores cumprimentos.';
+
+        var mailto;
+        if (emailUsaBcc) {
+            mailto = 'mailto:?bcc=' + encodeURIComponent(allEmails.join(','))
+                + '&subject=' + encodeURIComponent(assunto)
+                + '&body=' + encodeURIComponent(corpo);
+        } else {
+            mailto = 'mailto:' + encodeURIComponent(allEmails.join(','))
+                + '?subject=' + encodeURIComponent(assunto)
+                + '&body=' + encodeURIComponent(corpo);
+        }
+
+        window.location.href = mailto;
+        showToast('A abrir o seu programa de email...', 'info');
+    }
+
+    // ============================================================
+    // EMAIL - ENVIAR VIA SERVIDOR (SMTP)
     // ============================================================
     function enviarEmailEspec() {
         var destinatario = document.getElementById('email_destinatario').value.trim();
@@ -3682,10 +3811,7 @@ $pageSubtitle = 'Editor de Especificação';
         btn.textContent = 'A enviar...';
         status.textContent = '';
 
-        fetch(BASE_PATH + '/api.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        apiPost({
                 action: 'enviar_email',
                 especificacao_id: especId,
                 destinatario: destinatario,
@@ -3694,7 +3820,6 @@ $pageSubtitle = 'Editor de Especificação';
                 incluir_link: incluirLink ? 1 : 0,
                 anexar_pdf: anexarPdf ? 1 : 0
             })
-        })
         .then(function(r) { return r.json(); })
         .then(function(result) {
             btn.disabled = false;

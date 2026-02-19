@@ -327,7 +327,7 @@ $activeNav = 'especificacoes';
 
         fetch('<?= BASE_PATH ?>/api.php', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '<?= getCsrfToken() ?>' },
             body: JSON.stringify({ action: 'duplicate_especificacao', id: id })
         })
         .then(function(r) { return r.json(); })

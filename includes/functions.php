@@ -10,7 +10,7 @@
 function getEspecificacaoCompleta(PDO $db, int $id): ?array {
     $stmt = $db->prepare('
         SELECT e.*,
-               c.nome as cliente_nome, c.sigla as cliente_sigla,
+               c.nome as cliente_nome, c.sigla as cliente_sigla, c.email as cliente_email,
                u.nome as criado_por_nome
         FROM especificacoes e
         LEFT JOIN clientes c ON e.cliente_id = c.id
@@ -38,7 +38,7 @@ function getEspecificacaoCompleta(PDO $db, int $id): ?array {
 
     // Fornecedores (muitos-para-muitos)
     $stmt = $db->prepare('
-        SELECT f.id, f.nome, f.sigla
+        SELECT f.id, f.nome, f.sigla, f.email
         FROM especificacao_fornecedores ef
         INNER JOIN fornecedores f ON ef.fornecedor_id = f.id
         WHERE ef.especificacao_id = ?

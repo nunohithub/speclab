@@ -30,6 +30,10 @@ if ($isSuperAdminUser) {
 
 // Processar formulários
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!validateCsrf()) {
+        header('Location: ' . BASE_PATH . '/admin.php?msg=' . urlencode('Erro de segurança. Recarregue a página.'));
+        exit;
+    }
     $action = $_POST['action'] ?? '';
 
     if ($action === 'save_user') {
@@ -63,6 +67,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($uid) {
+            // Verificar que o utilizador pertence à organização (exceto super_admin)
+            if (!$isSuperAdminUser) {
+                $checkStmt = $db->prepare('SELECT organizacao_id FROM utilizadores WHERE id = ?');
+                $checkStmt->execute([$uid]);
+                $checkOrg = $checkStmt->fetchColumn();
+                if ($checkOrg != $orgId) {
+                    header('Location: ' . BASE_PATH . '/admin.php?tab=utilizadores&msg=Acesso+negado');
+                    exit;
+                }
+            }
             $sql = 'UPDATE utilizadores SET nome = ?, username = ?, role = ?, ativo = ?, organizacao_id = ? WHERE id = ?';
             $params = [$nome, $username, $role, $ativo, $userOrgId, $uid];
             $db->prepare($sql)->execute($params);
@@ -71,7 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $db->prepare('UPDATE utilizadores SET password = ? WHERE id = ?')->execute([$hash, $uid]);
             }
         } else {
-            $hash = password_hash($password ?: 'exi2026', PASSWORD_DEFAULT);
+            if (empty($password)) $password = bin2hex(random_bytes(4));
+            $hash = password_hash($password, PASSWORD_DEFAULT);
             $db->prepare('INSERT INTO utilizadores (nome, username, password, role, ativo, organizacao_id) VALUES (?, ?, ?, ?, ?, ?)')
                 ->execute([$nome, $username, $hash, $role, $ativo, $userOrgId]);
             $uid = (int)$db->lastInsertId();
@@ -128,6 +143,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($cid) {
+            if (!$isSuperAdminUser) {
+                $checkStmt = $db->prepare('SELECT organizacao_id FROM clientes WHERE id = ?');
+                $checkStmt->execute([$cid]);
+                if ($checkStmt->fetchColumn() != $orgId) {
+                    header('Location: ' . BASE_PATH . '/admin.php?tab=clientes&msg=Acesso+negado');
+                    exit;
+                }
+            }
             $sql = 'UPDATE clientes SET nome=?, sigla=?, morada=?, telefone=?, email=?, nif=?, contacto=? WHERE id=?';
             $db->prepare($sql)->execute([...$values, $cid]);
         } else {
@@ -153,6 +176,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($pid) {
+            if (!$isSuperAdminUser) {
+                $checkStmt = $db->prepare('SELECT organizacao_id FROM produtos WHERE id = ?');
+                $checkStmt->execute([$pid]);
+                if ($checkStmt->fetchColumn() != $orgId) {
+                    header('Location: ' . BASE_PATH . '/admin.php?tab=produtos&msg=Acesso+negado');
+                    exit;
+                }
+            }
             $db->prepare('UPDATE produtos SET nome=?, tipo=?, descricao=?, organizacao_id=? WHERE id=?')
                 ->execute([$nome, $tipo, $descricao, $produtoOrgId, $pid]);
         } else {
@@ -210,7 +241,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mkdir($uploadDir, 0755, true);
             }
             $ext = strtolower(pathinfo($_FILES['logo_file']['name'], PATHINFO_EXTENSION));
-            if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'svg'])) {
+            if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif'])) {
                 $filename = 'org_' . $oid . '_' . time() . '.' . $ext;
                 if (move_uploaded_file($_FILES['logo_file']['tmp_name'], $uploadDir . $filename)) {
                     // Remover logo anterior
@@ -241,6 +272,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($fid) {
+            if (!$isSuperAdminUser) {
+                $checkStmt = $db->prepare('SELECT organizacao_id FROM fornecedores WHERE id = ?');
+                $checkStmt->execute([$fid]);
+                if ($checkStmt->fetchColumn() != $orgId) {
+                    header('Location: ' . BASE_PATH . '/admin.php?tab=fornecedores&msg=Acesso+negado');
+                    exit;
+                }
+            }
             $sql = 'UPDATE fornecedores SET nome=?, sigla=?, morada=?, telefone=?, email=?, nif=?, contacto=? WHERE id=?';
             $db->prepare($sql)->execute([...$values, $fid]);
         } else {
@@ -342,6 +381,7 @@ $activeNav = $tab;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Administração - SpecLab</title>
     <link rel="stylesheet" href="<?= asset('assets/css/style.css') ?>">
+    <script>var CSRF_TOKEN = '<?= getCsrfToken() ?>';</script>
 </head>
 <body>
     <?php include __DIR__ . '/includes/header.php'; ?>
@@ -414,6 +454,7 @@ $activeNav = $tab;
                         <button class="modal-close" onclick="document.getElementById('orgModal').style.display='none'">&times;</button>
                     </div>
                     <form method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
                         <input type="hidden" name="action" value="save_organizacao">
                         <input type="hidden" name="id" id="org_id" value="0">
 
@@ -487,7 +528,7 @@ $activeNav = $tab;
                             <div id="org_logo_preview" style="margin-bottom: 8px; display: none;">
                                 <img id="org_logo_img" src="" alt="Logo" style="max-height: 60px; border: 1px solid #e5e7eb; border-radius: 6px; padding: 4px; background: white;">
                             </div>
-                            <input type="file" name="logo_file" id="org_logo_file" accept="image/png,image/jpeg,image/gif,image/svg+xml" style="font-size: 13px;">
+                            <input type="file" name="logo_file" id="org_logo_file" accept="image/png,image/jpeg,image/gif" style="font-size: 13px;">
                             <small class="muted">Formatos: PNG, JPG, GIF, SVG</small>
                         </div>
 
@@ -618,6 +659,7 @@ $activeNav = $tab;
                         <button class="modal-close" onclick="document.getElementById('userModal').style.display='none'">&times;</button>
                     </div>
                     <form method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
                         <input type="hidden" name="action" value="save_user">
                         <input type="hidden" name="user_id" id="user_id" value="0">
                         <div class="form-group">
@@ -742,6 +784,7 @@ $activeNav = $tab;
                         <button class="modal-close" onclick="document.getElementById('clienteModal').style.display='none'">&times;</button>
                     </div>
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
                         <input type="hidden" name="action" value="save_cliente">
                         <input type="hidden" name="cliente_id" id="cliente_id" value="0">
 
@@ -840,6 +883,7 @@ $activeNav = $tab;
                         <button class="modal-close" onclick="document.getElementById('fornecedorModal').style.display='none'">&times;</button>
                     </div>
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
                         <input type="hidden" name="action" value="save_fornecedor">
                         <input type="hidden" name="fornecedor_id" id="fornecedor_id" value="0">
 
@@ -935,6 +979,7 @@ $activeNav = $tab;
                         <button class="modal-close" onclick="document.getElementById('produtoModal').style.display='none'">&times;</button>
                     </div>
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
                         <input type="hidden" name="action" value="save_produto">
                         <input type="hidden" name="produto_id" id="produto_id" value="0">
 
@@ -1195,6 +1240,7 @@ $activeNav = $tab;
                 fd.append('resumo', document.getElementById('leg_resumo').value);
                 fd.append('link_url', document.getElementById('leg_link_url').value);
                 fd.append('ativo', document.getElementById('leg_ativo').checked ? '1' : '0');
+                fd.append('csrf_token', CSRF_TOKEN);
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(data => {
@@ -1207,6 +1253,7 @@ $activeNav = $tab;
                 var fd = new FormData();
                 fd.append('action', 'delete_legislacao_banco');
                 fd.append('id', id);
+                fd.append('csrf_token', CSRF_TOKEN);
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(data => { if (data.success) carregarLeg(); else alert(data.error || 'Erro.'); });
@@ -1224,6 +1271,7 @@ $activeNav = $tab;
 
                 var fd = new FormData();
                 fd.append('action', 'verificar_legislacao_ai');
+                fd.append('csrf_token', CSRF_TOKEN);
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
                 .then(function(r) {
                     if (!r.ok) return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t.substring(0, 300)); });
@@ -1277,6 +1325,7 @@ $activeNav = $tab;
                 fd.append('rolhas_aplicaveis', s.rolhas_aplicaveis || '');
                 fd.append('resumo', s.resumo || '');
                 fd.append('notas', 'IA: ' + (s.notas || ''));
+                fd.append('csrf_token', CSRF_TOKEN);
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(function(data) {
@@ -1308,6 +1357,7 @@ $activeNav = $tab;
                 var fd = new FormData();
                 fd.append('action', 'chat_legislacao');
                 fd.append('pergunta', pergunta);
+                fd.append('csrf_token', CSRF_TOKEN);
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(function(data) {
@@ -1734,7 +1784,7 @@ $activeNav = $tab;
             function salvarBancoMerges() {
                 fetch('<?= BASE_PATH ?>/api.php', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
                     body: JSON.stringify({ action: 'save_banco_merges', merges: { merges: bancoMerges, colWidths: bancoColWidths } })
                 });
             }
@@ -1796,6 +1846,7 @@ $activeNav = $tab;
                 fd.append('nqa', document.getElementById('ens_nqa').value);
                 fd.append('exemplo', document.getElementById('ens_exemplo').value);
                 fd.append('ativo', document.getElementById('ens_ativo').checked ? '1' : '0');
+                fd.append('csrf_token', CSRF_TOKEN);
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
                 .then(function(r){return r.json();})
                 .then(function(data) {
@@ -1808,6 +1859,7 @@ $activeNav = $tab;
                 var fd = new FormData();
                 fd.append('action', 'delete_ensaio_banco');
                 fd.append('id', id);
+                fd.append('csrf_token', CSRF_TOKEN);
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
                 .then(function(r){return r.json();})
                 .then(function(data) {
@@ -1883,6 +1935,7 @@ $activeNav = $tab;
             <h2 class="mb-md">Configurações</h2>
             <div class="card">
                 <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
                     <input type="hidden" name="action" value="save_config">
                     <div class="form-row">
                         <div class="form-group"><label>Nome da Empresa</label><input type="text" name="cfg_empresa_nome" value="<?= sanitize(getConfiguracao('empresa_nome', 'SpecLab')) ?>"></div>
@@ -1977,6 +2030,7 @@ $activeNav = $tab;
                         <button class="modal-close" onclick="document.getElementById('planoModal').style.display='none'">&times;</button>
                     </div>
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
                         <input type="hidden" name="action" value="save_plano">
                         <input type="hidden" name="plano_id" id="pl_id" value="">
 
@@ -2161,6 +2215,7 @@ $activeNav = $tab;
         var formData = new FormData();
         formData.append('logo', fileInput.files[0]);
         formData.append('organizacao_id', orgId);
+        formData.append('csrf_token', CSRF_TOKEN);
 
         fetch('<?= BASE_PATH ?>/api.php?action=upload_org_logo', {
             method: 'POST',
@@ -2398,7 +2453,7 @@ $activeNav = $tab;
 
         fetch('<?= BASE_PATH ?>/api.php', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
             body: JSON.stringify(data)
         })
         .then(function(r) { return r.json(); })
@@ -2420,7 +2475,7 @@ $activeNav = $tab;
         var produtoId = document.getElementById('tmpl_produto_id').value;
         fetch('<?= BASE_PATH ?>/api.php', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
             body: JSON.stringify({ action: 'delete_template', id: id })
         })
         .then(function(r) { return r.json(); })

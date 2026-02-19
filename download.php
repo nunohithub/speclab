@@ -4,8 +4,11 @@
  */
 require_once __DIR__ . '/config/database.php';
 
-ini_set('session.gc_maxlifetime', 86400);
-ini_set('session.cookie_lifetime', 86400);
+ini_set('session.gc_maxlifetime', 28800);
+ini_set('session.cookie_lifetime', 28800);
+ini_set('session.cookie_httponly', 1);
+ini_set('session.cookie_samesite', 'Lax');
+ini_set('session.use_strict_mode', 1);
 session_start();
 
 $db = getDB();
@@ -44,6 +47,23 @@ if (!$authenticated) {
     exit('Acesso negado.');
 }
 
+// Verificar acesso multi-tenant
+if (!$code && isset($_SESSION['user_id'])) {
+    $userRole = $_SESSION['user_role'] ?? '';
+    $userOrgId = $_SESSION['org_id'] ?? null;
+    // Verificar org da especificação
+    $stmtOrg = $db->prepare('SELECT organizacao_id FROM especificacoes WHERE id = ?');
+    $stmtOrg->execute([$file['especificacao_id']]);
+    $specOrgId = $stmtOrg->fetchColumn();
+    if ($userRole !== 'super_admin' && $specOrgId != $userOrgId) {
+        http_response_code(403);
+        exit('Acesso negado.');
+    }
+}
+
+// Sanitizar filename nos headers
+$safeFilename = str_replace(["\r", "\n", '"'], '', $file['nome_original']);
+
 // Enviar ficheiro
 $filepath = UPLOAD_DIR . $file['nome_servidor'];
 if (!file_exists($filepath)) {
@@ -59,9 +79,9 @@ $stmt->execute([$file['especificacao_id'], $_SERVER['REMOTE_ADDR'] ?? '', $_SERV
 $inline = isset($_GET['inline']);
 header('Content-Type: ' . ($file['tipo_ficheiro'] ?: 'application/octet-stream'));
 if ($inline) {
-    header('Content-Disposition: inline; filename="' . $file['nome_original'] . '"');
+    header('Content-Disposition: inline; filename="' . $safeFilename . '"');
 } else {
-    header('Content-Disposition: attachment; filename="' . $file['nome_original'] . '"');
+    header('Content-Disposition: attachment; filename="' . $safeFilename . '"');
 }
 header('Content-Length: ' . filesize($filepath));
 header('Cache-Control: no-cache, must-revalidate');

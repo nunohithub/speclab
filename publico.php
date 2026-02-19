@@ -5,10 +5,14 @@
  */
 ini_set('session.gc_maxlifetime', 86400);
 ini_set('session.cookie_lifetime', 86400);
+ini_set('session.cookie_httponly', 1);
+ini_set('session.cookie_samesite', 'Lax');
+ini_set('session.use_strict_mode', 1);
 session_start();
 
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/includes/auth.php';
 
 // Obter código de acesso
 $code = $_GET['code'] ?? '';
@@ -54,7 +58,7 @@ if ($needsPassword) {
     }
 
     // Verificar password submetida
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['password'])) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['password']) && validateCsrf()) {
         if (password_verify($_POST['password'], $espec['password_acesso'])) {
             $_SESSION[$sessionKey] = true;
             $authenticated = true;
@@ -163,6 +167,7 @@ if ($authenticated) {
             <?php endif; ?>
 
             <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
                 <div class="form-group">
                     <label for="password">Password de Acesso</label>
                     <input type="password" id="password" name="password" required autofocus placeholder="Introduza a password">

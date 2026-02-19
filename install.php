@@ -5,6 +5,13 @@
  *
  * ELIMINAR ESTE FICHEIRO APÓS INSTALAÇÃO!
  */
+
+// Bloquear se já instalado
+if (file_exists(__DIR__ . '/.installed')) {
+    http_response_code(403);
+    exit('Instalação já realizada. Remova este ficheiro ou o ficheiro .installed para reinstalar.');
+}
+
 set_time_limit(300);
 error_reporting(E_ALL);
 ini_set('display_errors', 1);

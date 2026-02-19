@@ -5,8 +5,11 @@
  */
 require_once __DIR__ . '/config/database.php';
 
-ini_set('session.gc_maxlifetime', 86400);
-ini_set('session.cookie_lifetime', 86400);
+ini_set('session.gc_maxlifetime', 28800);
+ini_set('session.cookie_lifetime', 28800);
+ini_set('session.cookie_httponly', 1);
+ini_set('session.cookie_samesite', 'Lax');
+ini_set('session.use_strict_mode', 1);
 session_start();
 
 require_once __DIR__ . '/includes/functions.php';
@@ -46,6 +49,16 @@ $data = getEspecificacaoCompleta($db, $id);
 if (!$data) {
     http_response_code(404);
     exit('Especificação não encontrada.');
+}
+
+// Verificar acesso multi-tenant (utilizadores autenticados sem código público)
+if (!$code && isset($_SESSION['user_id'])) {
+    $userRole = $_SESSION['user_role'] ?? '';
+    $userOrgId = $_SESSION['org_id'] ?? null;
+    if ($userRole !== 'super_admin' && ($data['organizacao_id'] ?? null) != $userOrgId) {
+        http_response_code(403);
+        exit('Acesso negado.');
+    }
 }
 
 // Carregar organização da especificação

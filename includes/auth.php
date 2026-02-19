@@ -4,11 +4,47 @@
  * Autenticação, autorização e funções auxiliares
  */
 
-ini_set('session.gc_maxlifetime', 86400);
-ini_set('session.cookie_lifetime', 86400);
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.gc_maxlifetime', 28800);
+    ini_set('session.cookie_lifetime', 28800);
+    ini_set('session.cookie_httponly', 1);
+    ini_set('session.cookie_samesite', 'Lax');
+    ini_set('session.use_strict_mode', 1);
+    session_start();
+}
 
 require_once __DIR__ . '/../config/database.php';
+
+// =============================================
+// RATE LIMITING (sessão)
+// =============================================
+
+function checkRateLimit(string $key, int $maxPerHour = 20): bool {
+    $now = time();
+    $sessionKey = 'rl_' . $key;
+    if (!isset($_SESSION[$sessionKey])) $_SESSION[$sessionKey] = [];
+    // Limpar entradas com mais de 1h
+    $_SESSION[$sessionKey] = array_filter($_SESSION[$sessionKey], function($t) use ($now) { return ($now - $t) < 3600; });
+    if (count($_SESSION[$sessionKey]) >= $maxPerHour) return false;
+    $_SESSION[$sessionKey][] = $now;
+    return true;
+}
+
+// =============================================
+// CSRF PROTECTION
+// =============================================
+
+function getCsrfToken(): string {
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function validateCsrf(): bool {
+    $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['csrf_token'] ?? '';
+    return $token !== '' && hash_equals(getCsrfToken(), $token);
+}
 
 // =============================================
 // AUTENTICAÇÃO

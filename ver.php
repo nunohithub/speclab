@@ -22,6 +22,12 @@ if (!$data) {
     exit;
 }
 
+// Verificar acesso multi-tenant
+if (!isSuperAdmin() && ($data['organizacao_id'] ?? null) != $user['org_id']) {
+    header('Location: ' . BASE_PATH . '/dashboard.php');
+    exit;
+}
+
 $org = getOrgByEspecificacao($db, $id);
 $temClientes = $org && !empty($org['tem_clientes']);
 $temFornecedores = $org && !empty($org['tem_fornecedores']);

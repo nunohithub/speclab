@@ -8,6 +8,8 @@ require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
 
 header('Content-Type: application/json; charset=utf-8');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
 
 // ---------------------------------------------------------------------------
 // Autenticação obrigatória para todas as ações
@@ -41,6 +43,20 @@ if ($action === '') {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Ação não especificada.']);
     exit;
+}
+
+// ---------------------------------------------------------------------------
+// CSRF validation (exceto ações de leitura e uploads com FormData)
+// ---------------------------------------------------------------------------
+$csrfExempt = ['get_especificacao', 'get_templates', 'get_legislacao_banco',
+    'get_legislacao_log', 'get_ensaios_banco', 'get_banco_merges', 'list_ficheiros'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !in_array($action, $csrfExempt)) {
+    // Para uploads multipart, token vem em $_POST; para JSON, vem no header
+    if (!validateCsrf()) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Token de segurança inválido. Recarregue a página.']);
+        exit;
+    }
 }
 
 // Aliases para compatibilidade frontend ↔ API
@@ -470,7 +486,7 @@ try {
                         $conteudo = $s['conteudo'] ?? '';
                         // Para ensaios, o conteúdo é JSON - não sanitizar como rich text
                         if ($tipo === 'texto') {
-                            $conteudo = $conteudo; // rich text já vem sanitizado do frontend
+                            $conteudo = sanitizeRichText($conteudo);
                         }
                         $stmt->execute([
                             $especificacao_id,
@@ -497,6 +513,7 @@ try {
         // 4C. AI ASSIST (OpenAI proxy)
         // ===================================================================
         case 'ai_assist':
+            if (!checkRateLimit('ai', 20)) jsonError('Limite de IA atingido (20/hora). Aguarde.');
             $mode      = $_POST['mode'] ?? '';       // 'sugerir' ou 'melhorar'
             $prompt    = trim($_POST['prompt'] ?? '');
             $conteudo  = $_POST['conteudo'] ?? '';
@@ -577,8 +594,8 @@ try {
 
             $file = $_FILES['logo'];
             $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            if (!in_array($ext, ['png', 'jpg', 'jpeg', 'svg'])) {
-                jsonError('Formato inválido. Use PNG, JPG ou SVG.');
+            if (!in_array($ext, ['png', 'jpg', 'jpeg'])) {
+                jsonError('Formato inválido. Use PNG ou JPG.');
             }
 
             $logosDir = UPLOAD_DIR . 'logos/';
@@ -1321,6 +1338,7 @@ try {
         // 18. SAVE PRODUCT TEMPLATE
         // ===================================================================
         case 'save_template':
+            requireAdminApi($user);
             $produto_id = (int)($_POST['produto_id'] ?? 0);
             if ($produto_id <= 0) jsonError('ID do produto inválido.');
 
@@ -1347,8 +1365,17 @@ try {
         // 19. DELETE PRODUCT TEMPLATE
         // ===================================================================
         case 'delete_template':
+            requireAdminApi($user);
             $id = (int)($_POST['id'] ?? 0);
             if ($id <= 0) jsonError('ID do template inválido.');
+
+            // Verificar que template pertence a produto acessível
+            $stmt = $db->prepare('SELECT p.organizacao_id FROM produto_parametros_template t JOIN produtos p ON t.produto_id = p.id WHERE t.id = ?');
+            $stmt->execute([$id]);
+            $tplOrg = $stmt->fetchColumn();
+            if (!isSuperAdmin() && $tplOrg != $user['org_id'] && $tplOrg !== null) {
+                jsonError('Acesso negado.', 403);
+            }
 
             $stmt = $db->prepare('DELETE FROM produto_parametros_template WHERE id = ?');
             $stmt->execute([$id]);
@@ -1476,8 +1503,8 @@ try {
 
             $file = $_FILES['logo'];
             $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            if (!in_array($ext, ['png', 'jpg', 'jpeg', 'svg'])) {
-                jsonError('Formato inválido. Use PNG, JPG ou SVG.');
+            if (!in_array($ext, ['png', 'jpg', 'jpeg'])) {
+                jsonError('Formato inválido. Use PNG ou JPG.');
             }
 
             $logosDir = UPLOAD_DIR . 'logos/';
@@ -1556,6 +1583,7 @@ try {
         // LEGISLAÇÃO - VERIFICAÇÃO IA
         // ===================================================================
         case 'verificar_legislacao_ai':
+            if (!checkRateLimit('ai', 20)) jsonError('Limite de IA atingido (20/hora). Aguarde.');
             set_time_limit(120);
             if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
             $apiKey = getConfiguracao('openai_api_key', '');
@@ -1689,6 +1717,7 @@ try {
             break;
 
         case 'chat_legislacao':
+            if (!checkRateLimit('ai', 20)) jsonError('Limite de IA atingido (20/hora). Aguarde.');
             set_time_limit(90);
             if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
             $pergunta = trim($_POST['pergunta'] ?? '');
