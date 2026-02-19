@@ -86,6 +86,9 @@ $activeNav = $activeNav ?? '';
     <?php elseif (in_array($user['role'], ['org_admin', 'user'])): ?>
         <a href="<?= BASE_PATH ?>/admin.php?tab=legislacao" class="nav-item <?= $activeNav === 'legislacao' ? 'active' : '' ?>">Legislação</a>
         <a href="<?= BASE_PATH ?>/admin.php?tab=ensaios" class="nav-item <?= $activeNav === 'ensaios' ? 'active' : '' ?>">Ensaios</a>
+        <?php if ($user['role'] === 'org_admin'): ?>
+            <a href="<?= BASE_PATH ?>/admin.php?tab=configuracoes" class="nav-item <?= $activeNav === 'configuracoes' ? 'active' : '' ?>">Configurações</a>
+        <?php endif; ?>
     <?php endif; ?>
 </div>
 <?php endif; ?>

@@ -12,7 +12,7 @@ function getSmtpConfig(PDO $db, int $especificacaoId): array {
     // Tentar SMTP da organização
     $stmt = $db->prepare('
         SELECT o.smtp_host, o.smtp_port, o.smtp_user, o.smtp_pass, o.smtp_from, o.smtp_from_name,
-               o.email_speclab, o.usar_smtp_speclab, o.nome as org_nome
+               o.email_speclab, o.email_speclab_pass, o.usar_smtp_speclab, o.nome as org_nome
         FROM especificacoes e
         INNER JOIN organizacoes o ON o.id = e.organizacao_id
         WHERE e.id = ?
@@ -20,7 +20,7 @@ function getSmtpConfig(PDO $db, int $especificacaoId): array {
     $stmt->execute([$especificacaoId]);
     $org = $stmt->fetch();
 
-    // Se org tem SMTP próprio configurado e não usa speclab
+    // 1) SMTP próprio da organização (não usa speclab)
     if ($org && !$org['usar_smtp_speclab'] && !empty($org['smtp_host']) && !empty($org['smtp_user'])) {
         return [
             'host' => $org['smtp_host'],
@@ -32,18 +32,32 @@ function getSmtpConfig(PDO $db, int $especificacaoId): array {
         ];
     }
 
-    // SMTP global (speclab.pt) — usar email_speclab da org como From
-    $fromEmail = ($org && $org['email_speclab']) ? $org['email_speclab'] : getConfiguracao('smtp_from');
-    $fromName = ($org) ? $org['org_nome'] : getConfiguracao('smtp_from_name', 'SpecLab');
+    // 2) Email speclab.pt da organização (credenciais próprias)
+    if ($org && !empty($org['email_speclab']) && !empty($org['email_speclab_pass'])) {
+        return [
+            'host' => 'mail.speclab.pt',
+            'port' => 587,
+            'user' => $org['email_speclab'],
+            'pass' => $org['email_speclab_pass'],
+            'from' => $org['email_speclab'],
+            'from_name' => $org['org_nome'],
+        ];
+    }
 
-    return [
-        'host' => getConfiguracao('smtp_host'),
-        'port' => getConfiguracao('smtp_port', '465'),
-        'user' => getConfiguracao('smtp_user'),
-        'pass' => getConfiguracao('smtp_pass'),
-        'from' => $fromEmail,
-        'from_name' => $fromName . ' via SpecLab',
-    ];
+    // 3) Fallback: SMTP global — só para super admin (sem organização)
+    if (!$org) {
+        return [
+            'host' => getConfiguracao('smtp_host'),
+            'port' => getConfiguracao('smtp_port', '465'),
+            'user' => getConfiguracao('smtp_user'),
+            'pass' => getConfiguracao('smtp_pass'),
+            'from' => getConfiguracao('smtp_from'),
+            'from_name' => getConfiguracao('smtp_from_name', 'SpecLab'),
+        ];
+    }
+
+    // Org sem email configurado → não pode enviar
+    return ['error' => 'A sua organização não tem email configurado. Peça ao administrador para configurar o email nas Configurações.'];
 }
 
 /**
@@ -52,6 +66,10 @@ function getSmtpConfig(PDO $db, int $especificacaoId): array {
 function enviarEmail(PDO $db, int $especificacaoId, string $destinatario, string $assunto, string $corpo, bool $anexarPdf = false, ?int $enviadoPor = null): array {
     // Determinar SMTP: organização própria ou global (speclab.pt)
     $smtp = getSmtpConfig($db, $especificacaoId);
+
+    if (isset($smtp['error'])) {
+        return ['success' => false, 'error' => $smtp['error']];
+    }
 
     $smtpHost = $smtp['host'];
     $smtpPort = (int)$smtp['port'];
@@ -119,7 +137,20 @@ function enviarEmail(PDO $db, int $especificacaoId, string $destinatario, string
         $stmt = $db->prepare('INSERT INTO email_log (especificacao_id, destinatario, assunto, tipo, estado, erro_msg, enviado_por) VALUES (?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([$especificacaoId, $destinatario, $assunto, 'manual', 'erro', $e->getMessage(), $enviadoPor]);
 
-        return ['success' => false, 'error' => 'Erro ao enviar: ' . $e->getMessage()];
+        // Traduzir erros técnicos para mensagens amigáveis
+        $msg = $e->getMessage();
+        if (stripos($msg, 'Could not authenticate') !== false || stripos($msg, 'Authentication') !== false) {
+            $userMsg = 'Erro de autenticação no email. Verifique o email e password nas Configurações.';
+        } elseif (stripos($msg, 'connect') !== false || stripos($msg, 'Connection') !== false) {
+            $userMsg = 'Não foi possível ligar ao servidor de email. Tente novamente mais tarde.';
+        } elseif (stripos($msg, 'recipient') !== false || stripos($msg, 'address') !== false) {
+            $userMsg = 'O endereço de email do destinatário parece inválido.';
+        } elseif (stripos($msg, 'timeout') !== false) {
+            $userMsg = 'O servidor de email não respondeu a tempo. Tente novamente.';
+        } else {
+            $userMsg = 'Não foi possível enviar o email. Verifique as configurações de email.';
+        }
+        return ['success' => false, 'error' => $userMsg];
     }
 }
 

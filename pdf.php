@@ -257,51 +257,65 @@ if ($useMpdf) {
             if ($secTipo === 'ficheiros') {
                 if ($ficheirosPos === 'local' && !empty($validFiles)) {
                     $ficheirosRenderedPdf = true;
-                    // Flush HTML acumulado (sem título — será overlay na 1ª página de anexo)
+                    $ficTitulo = ($i + 1) . '. ' . san($sec['titulo'] ?? 'Ficheiros Anexos');
+                    // Título na página do relatório (antes dos anexos)
+                    $html .= '<div class="section"><h2>' . $ficTitulo . '</h2>';
+                    // Lista de ficheiros como referência
+                    foreach ($validFiles as $fi => $f) {
+                        $html .= '<div style="font-size:9pt; color:#444; margin:1mm 0;">&#8226; ' . san($f['nome_original']) . ' (' . formatFileSize($f['tamanho']) . ')</div>';
+                    }
+                    $html .= '</div>';
                     $mpdf->WriteHTML($html);
                     $html = '';
-                    // Preparar título para overlay
-                    $ficTitulo = ($i + 1) . '. ' . san($sec['titulo'] ?? 'Ficheiros Anexos');
-                    $ficTituloHtml = '<div style="background:#fff; padding:2mm 10mm; font-size:' . $tamTitulos . 'pt; font-weight:bold; color:' . san($corTitulos) . '; border-bottom:1px solid ' . san($corLinhas) . ';">' . $ficTitulo . '</div>';
-                    // Header vazio ANTES do AddPage (header aplica-se ao abrir página)
+                    // PDFs: importar páginas tal como são (sem escala, sem título overlay)
                     $mpdf->SetHTMLHeader('');
-                    $ficFirstPage = true;
-                    // Importar páginas PDF anexo (A4 completo, sem header/footer)
                     foreach ($validFiles as $f) {
                         $fExt = strtolower(pathinfo($f['nome_original'], PATHINFO_EXTENSION));
+                        $filepath = UPLOAD_DIR . $f['nome_servidor'];
                         if ($fExt === 'pdf') {
-                            $filepath = UPLOAD_DIR . $f['nome_servidor'];
                             try {
                                 $pageCount = $mpdf->setSourceFile($filepath);
                                 for ($p = 1; $p <= $pageCount; $p++) {
                                     $tplId = $mpdf->importPage($p);
+                                    $size = $mpdf->getTemplateSize($tplId);
+                                    $wMm = $size['width'] * 25.4 / 72;
+                                    $hMm = $size['height'] * 25.4 / 72;
                                     $mpdf->AddPageByArray([
+                                        'orientation' => $wMm > $hMm ? 'L' : 'P',
+                                        'sheet-size' => [$wMm, $hMm],
                                         'margin-left' => 0, 'margin-right' => 0,
                                         'margin-top' => 0, 'margin-bottom' => 0,
                                         'margin-header' => 0, 'margin-footer' => 0,
                                     ]);
                                     $mpdf->SetHTMLFooter('');
                                     $mpdf->SetPageTemplate('');
-                                    if ($ficFirstPage) {
-                                        // 1ª página: título overlay no topo + PDF deslocado 12mm para baixo
-                                        $mpdf->WriteFixedPosHTML($ficTituloHtml, 0, 0, 210, 12, 'hidden');
-                                        $mpdf->useTemplate($tplId, 0, 12, 210, 285);
-                                        $ficFirstPage = false;
-                                    } else {
-                                        $mpdf->useTemplate($tplId, 0, 0, 210, 297);
-                                    }
+                                    $mpdf->useTemplate($tplId, 0, 0, $wMm, $hMm);
                                 }
                             } catch (Exception $e) {}
+                        } elseif (in_array($fExt, ['jpg','jpeg','png','gif','bmp','tif','tiff'])) {
+                            // Imagens: página dedicada com margens
+                            $mpdf->SetHTMLHeader($headerHtml);
+                            $mpdf->AddPageByArray([
+                                'margin-left' => 15, 'margin-right' => 15,
+                                'margin-top' => 30, 'margin-bottom' => 20,
+                                'margin-header' => 10, 'margin-footer' => 10,
+                            ]);
+                            $mpdf->SetHTMLFooter($footerHtml);
+                            $imgHtml = '<div style="text-align:center;">';
+                            $imgHtml .= '<div style="font-size:9pt; color:#666; margin-bottom:3mm;">' . san($f['nome_original']) . '</div>';
+                            $imgHtml .= '<img src="' . $filepath . '" style="max-width:170mm; max-height:230mm;">';
+                            $imgHtml .= '</div>';
+                            $mpdf->WriteHTML($imgHtml);
+                            $mpdf->SetHTMLHeader('');
                         }
                     }
-                    // Header relatório ANTES do AddPage (para a nova página de relatório)
+                    // Restaurar header/footer para continuar o relatório
                     $mpdf->SetHTMLHeader($headerHtml);
                     $mpdf->AddPageByArray([
                         'margin-left' => 15, 'margin-right' => 15,
                         'margin-top' => 30, 'margin-bottom' => 20,
                         'margin-header' => 10, 'margin-footer' => 10,
                     ]);
-                    // Footer relatório DEPOIS do AddPage (para esta página)
                     $mpdf->SetHTMLFooter($footerHtml);
                 }
                 continue;
@@ -487,28 +501,47 @@ if ($useMpdf) {
 
     // Anexos no final (só quando posição = final)
     if (!$ficheirosRenderedPdf && !empty($validFiles)) {
-        // Header vazio ANTES do AddPage (aplica-se ao abrir)
+        // PDFs: importar páginas tal como são
         $mpdf->SetHTMLHeader('');
         foreach ($validFiles as $f) {
             $ext = strtolower(pathinfo($f['nome_original'], PATHINFO_EXTENSION));
+            $filepath = UPLOAD_DIR . $f['nome_servidor'];
             if ($ext === 'pdf') {
-                $filepath = UPLOAD_DIR . $f['nome_servidor'];
                 try {
                     $mpdf->SetPageTemplate('');
                     $pageCount = $mpdf->setSourceFile($filepath);
                     for ($p = 1; $p <= $pageCount; $p++) {
                         $tplId = $mpdf->importPage($p);
+                        $size = $mpdf->getTemplateSize($tplId);
+                        $wMm = $size['width'] * 25.4 / 72;
+                        $hMm = $size['height'] * 25.4 / 72;
                         $mpdf->AddPageByArray([
+                            'orientation' => $wMm > $hMm ? 'L' : 'P',
+                            'sheet-size' => [$wMm, $hMm],
                             'margin-left' => 0, 'margin-right' => 0,
                             'margin-top' => 0, 'margin-bottom' => 0,
                             'margin-header' => 0, 'margin-footer' => 0,
                         ]);
-                        // Footer vazio DEPOIS do AddPage (aplica-se ao fechar)
                         $mpdf->SetHTMLFooter('');
                         $mpdf->SetPageTemplate('');
-                        $mpdf->useTemplate($tplId, 0, 0, 210, 297);
+                        $mpdf->useTemplate($tplId, 0, 0, $wMm, $hMm);
                     }
                 } catch (Exception $e) {}
+            } elseif (in_array($ext, ['jpg','jpeg','png','gif','bmp','tif','tiff'])) {
+                // Imagens: página dedicada com margens
+                $mpdf->SetHTMLHeader($headerHtml);
+                $mpdf->AddPageByArray([
+                    'margin-left' => 15, 'margin-right' => 15,
+                    'margin-top' => 30, 'margin-bottom' => 20,
+                    'margin-header' => 10, 'margin-footer' => 10,
+                ]);
+                $mpdf->SetHTMLFooter($footerHtml);
+                $imgHtml = '<div style="text-align:center;">';
+                $imgHtml .= '<div style="font-size:9pt; color:#666; margin-bottom:3mm;">' . san($f['nome_original']) . '</div>';
+                $imgHtml .= '<img src="' . $filepath . '" style="max-width:170mm; max-height:230mm;">';
+                $imgHtml .= '</div>';
+                $mpdf->WriteHTML($imgHtml);
+                $mpdf->SetHTMLHeader('');
             }
         }
     }
@@ -530,7 +563,15 @@ if ($useMpdf) {
         $sigUser = $stmt->fetch();
         $sigPath = ($sigUser && !empty($sigUser['assinatura'])) ? UPLOAD_DIR . $sigUser['assinatura'] : '';
 
-        $mpdf->AddPage();
+        $mpdf->AddPageByArray([
+            'orientation' => 'P',
+            'sheet-size' => [210, 297],
+            'margin-left' => 15, 'margin-right' => 15,
+            'margin-top' => 30, 'margin-bottom' => 20,
+            'margin-header' => 10, 'margin-footer' => 10,
+        ]);
+        $mpdf->SetHTMLHeader($headerHtml);
+        $mpdf->SetHTMLFooter($footerHtml);
         $sigHtml = '<div style="margin-top: 20mm; text-align: center;">';
         $sigHtml .= '<h2 style="color: ' . san($orgCorPrimaria) . '; font-size: 12pt;">Assinatura / Aprovação</h2>';
         if ($sigPath && file_exists($sigPath)) {

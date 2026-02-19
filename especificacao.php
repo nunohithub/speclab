@@ -1426,7 +1426,18 @@ $pageSubtitle = 'Editor de Especificação';
                     <!-- PARTILHA RÁPIDA -->
                     <?php if (!$isNew): ?>
                     <?php
-                        $smtpConfigurado = !empty(getConfiguracao('smtp_host')) && !empty(getConfiguracao('smtp_user'));
+                        // Verificar se esta org tem email configurado
+                        $orgSmtp = $db->prepare('SELECT email_speclab, email_speclab_pass, smtp_host, smtp_user, usar_smtp_speclab FROM organizacoes WHERE id = ?');
+                        $orgSmtp->execute([$orgId]);
+                        $orgSmtpData = $orgSmtp->fetch();
+                        $orgTemEmail = false;
+                        if ($orgSmtpData) {
+                            // Tem SMTP próprio OU email speclab com password
+                            $orgTemEmail = (!$orgSmtpData['usar_smtp_speclab'] && !empty($orgSmtpData['smtp_host']) && !empty($orgSmtpData['smtp_user']))
+                                || (!empty($orgSmtpData['email_speclab']) && !empty($orgSmtpData['email_speclab_pass']));
+                        }
+                        $isSuperAdmin = ($user['role'] === 'super_admin');
+                        $smtpConfigurado = $isSuperAdmin ? (!empty(getConfiguracao('smtp_host')) && !empty(getConfiguracao('smtp_user'))) : $orgTemEmail;
                         $emailsForn = [];
                         foreach (($espec['fornecedores_lista'] ?? []) as $f) {
                             if (!empty($f['email'])) {
@@ -1499,7 +1510,11 @@ $pageSubtitle = 'Editor de Especificação';
                             </div>
                             <?php if (!$smtpConfigurado): ?>
                             <div class="alert alert-info" style="margin-top: var(--spacing-sm);">
-                                O email será aberto no seu programa de email (Outlook, Gmail, etc.). Para enviar diretamente pelo servidor, configure o SMTP nas definições.
+                                <?php if (!$isSuperAdmin): ?>
+                                    Para enviar emails pelo servidor, configure o email da sua organização em <a href="<?= BASE_PATH ?>/admin.php?tab=configuracoes" style="font-weight:600; text-decoration:underline;">Admin → Configurações</a>.
+                                <?php else: ?>
+                                    Para enviar diretamente pelo servidor, configure o SMTP nas <a href="<?= BASE_PATH ?>/admin.php?tab=configuracoes" style="font-weight:600; text-decoration:underline;">Configurações</a>.
+                                <?php endif; ?>
                             </div>
                             <?php endif; ?>
                         </div>
@@ -1508,21 +1523,16 @@ $pageSubtitle = 'Editor de Especificação';
                         <div style="border-top:1px solid var(--color-border); padding-top:var(--spacing-md);">
                             <div class="section-label" style="margin-bottom:var(--spacing-xs);">Link de Consulta</div>
                             <p class="muted" style="font-size:12px; margin:0 0 var(--spacing-sm);">Link para consulta rápida do documento. Não requer aceitação — ideal para partilha interna ou consultas informais.</p>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>Código de Acesso</label>
-                                    <div class="flex gap-sm" style="align-items: center;">
-                                        <input type="text" id="codigo_acesso" name="codigo_acesso" value="<?= sanitize($espec['codigo_acesso'] ?? '') ?>" readonly style="background: var(--color-bg); font-family: monospace; flex:1;">
-                                        <?php if (!$versaoBloqueada): ?>
-                                        <button class="btn btn-secondary btn-sm" onclick="gerarCodigoAcesso()">Gerar Código</button>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="senha_publica">Palavra-passe (opcional)</label>
-                                    <input type="text" id="senha_publica" name="senha_publica" value="<?= sanitize($espec['senha_publica'] ?? '') ?>" placeholder="Sem palavra-passe"<?= $versaoBloqueada ? ' readonly style="background:var(--color-bg);"' : '' ?>>
+                            <div class="form-group">
+                                <label>Código de Acesso</label>
+                                <div class="flex gap-sm" style="align-items: center;">
+                                    <input type="text" id="codigo_acesso" name="codigo_acesso" value="<?= sanitize($espec['codigo_acesso'] ?? '') ?>" readonly style="background: var(--color-bg); font-family: monospace; flex:1; max-width:300px;">
+                                    <?php if (!$versaoBloqueada): ?>
+                                    <button class="btn btn-secondary btn-sm" onclick="gerarCodigoAcesso()">Gerar Código</button>
+                                    <?php endif; ?>
                                 </div>
                             </div>
+                            <input type="hidden" id="senha_publica" name="senha_publica" value="">
                             <?php if (!empty($espec['codigo_acesso'])): ?>
                                 <div class="form-group">
                                     <label>Link de Partilha</label>
@@ -1725,6 +1735,29 @@ $pageSubtitle = 'Editor de Especificação';
         <button class="btn btn-ghost btn-sm" onclick="cancelarMergeSelection()" style="padding:2px 6px;">&times;</button>
     </div>
 
+    <!-- MODAL: CONFIRMAR PUBLICAÇÃO -->
+    <div class="modal-overlay hidden" id="publicarModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+        <div class="modal-box" style="max-width:460px;">
+            <div class="modal-header">
+                <h3>Publicar Versão</h3>
+                <button class="modal-close" onclick="document.getElementById('publicarModal').style.display='none'">&times;</button>
+            </div>
+            <div style="padding:var(--spacing-lg);">
+                <div class="alert alert-warning" style="margin-bottom:var(--spacing-md);">
+                    <strong>Atenção:</strong> Ao publicar, esta versão fica bloqueada e não poderá ser editada. Para fazer alterações terá de criar uma nova versão.
+                </div>
+                <div class="form-group">
+                    <label for="publicarNotas">Notas desta versão (opcional)</label>
+                    <textarea id="publicarNotas" rows="2" placeholder="Ex: Versão final aprovada pelo cliente..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="document.getElementById('publicarModal').style.display='none'">Cancelar</button>
+                <button class="btn btn-primary" onclick="confirmarPublicar()">Confirmar Publicação</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: SELETOR DE ENSAIOS (para secções de conteúdo) -->
     <div class="modal-overlay hidden" id="modalSelectorEnsaios">
         <div class="modal-box modal-box-lg">
@@ -1838,6 +1871,19 @@ $pageSubtitle = 'Editor de Especificação';
     function apiPostForm(formData) {
         formData.append('csrf_token', CSRF_TOKEN);
         return fetch(BASE_PATH + '/api.php', { method: 'POST', headers: { 'X-CSRF-Token': CSRF_TOKEN }, body: formData });
+    }
+
+    // Deteção de sessão expirada (401/403)
+    function checkSession(response) {
+        if (response.status === 401 || response.status === 403) {
+            showToast('A sua sessão expirou. Vai ser redirecionado para o login.', 'warning');
+            setTimeout(function() { window.location.href = BASE_PATH + '/index.php'; }, 2000);
+            throw new Error('SESSION_EXPIRED');
+        }
+        if (!response.ok) {
+            throw new Error('Erro do servidor (' + response.status + ')');
+        }
+        return response.json();
     }
 
     // Emails de fornecedores/cliente para pré-preenchimento
@@ -2863,7 +2909,7 @@ $pageSubtitle = 'Editor de Especificação';
                 conteudo: conteudo,
                 titulo: titulo
             })
-        .then(function(r) { return r.json(); })
+        .then(function(r) { return checkSession(r); })
         .then(function(result) {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Gerar';
@@ -3026,7 +3072,7 @@ $pageSubtitle = 'Editor de Especificação';
         formData.append('logo', file);
 
         apiPostForm(formData)
-        .then(function(r) { return r.json(); })
+        .then(function(r) { return checkSession(r); })
         .then(function(result) {
             if (result.success && result.data && result.data.filename) {
                 configVisual.logo_custom = result.data.filename;
@@ -3192,7 +3238,7 @@ $pageSubtitle = 'Editor de Especificação';
         var grid = document.getElementById('legSelectorGrid');
         grid.innerHTML = '<div class="muted" style="padding:var(--spacing-md); text-align:center;">A carregar...</div>';
         fetch('<?= BASE_PATH ?>/api.php?action=get_legislacao_banco')
-        .then(function(r) { return r.json(); })
+        .then(function(r) { return checkSession(r); })
         .then(function(resp) {
             var legs = resp.data && resp.data.legislacao ? resp.data.legislacao : [];
             if (!resp.success || legs.length === 0) {
@@ -3406,7 +3452,7 @@ $pageSubtitle = 'Editor de Especificação';
                                 action: 'save_classes',
                                 especificacao_id: especId,
                                 classes: data.classes
-                            }).then(function(r) { return r.json(); })
+                            }).then(function(r) { return checkSession(r); })
                     );
                 }
 
@@ -3424,7 +3470,7 @@ $pageSubtitle = 'Editor de Especificação';
                                 action: 'save_defeitos',
                                 especificacao_id: especId,
                                 defeitos: defeitosForApi
-                            }).then(function(r) { return r.json(); })
+                            }).then(function(r) { return checkSession(r); })
                     );
                 }
 
@@ -3434,7 +3480,7 @@ $pageSubtitle = 'Editor de Especificação';
                             action: 'save_seccoes',
                             especificacao_id: especId,
                             seccoes: data.seccoes
-                        }).then(function(r) { return r.json(); })
+                        }).then(function(r) { return checkSession(r); })
                 );
 
                 return Promise.all(promises).then(function() {
@@ -3453,6 +3499,7 @@ $pageSubtitle = 'Editor de Especificação';
         })
         .catch(function(err) {
             isSaving = false;
+            if (err.message === 'SESSION_EXPIRED') return;
             setSaveState('error', 'Erro de ligação');
             showToast('Erro de ligação ao servidor.', 'error');
             console.error(err);
@@ -3805,7 +3852,7 @@ $pageSubtitle = 'Editor de Especificação';
         if (!confirm('Tem a certeza que deseja remover este ficheiro?')) return;
 
         apiPost({ action: 'remover_ficheiro', id: id })
-        .then(function(r) { return r.json(); })
+        .then(function(r) { return checkSession(r); })
         .then(function(result) {
             if (result.success) {
                 var el = document.querySelector('[data-file-id="' + id + '"]');
@@ -3983,7 +4030,7 @@ $pageSubtitle = 'Editor de Especificação';
                 mensagem: mensagem,
                 incluir_link: incluirLink ? 1 : 0
             })
-        .then(function(r) { return r.json(); })
+        .then(function(r) { return checkSession(r); })
         .then(function(result) {
             btn.disabled = false;
             btn.textContent = 'Enviar Email';
@@ -4310,14 +4357,19 @@ $pageSubtitle = 'Editor de Especificação';
     function publicarVersaoUI() {
         if (!especId) { showToast('Guarde a especificação primeiro.', 'warning'); return; }
         if (isDirty) { showToast('Guarde as alterações antes de publicar.', 'warning'); return; }
-        var notas = prompt('Notas desta versão (opcional):');
-        if (notas === null) return; // cancelou
+        document.getElementById('publicarModal').style.display = 'flex';
+        document.getElementById('publicarNotas').value = '';
+        document.getElementById('publicarNotas').focus();
+    }
+    function confirmarPublicar() {
+        var notas = document.getElementById('publicarNotas').value;
+        document.getElementById('publicarModal').style.display = 'none';
         fetch(BASE_PATH + '/api.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
             body: JSON.stringify({ action: 'publicar_versao', id: especId, notas: notas })
         })
-        .then(function(r) { return r.json(); })
+        .then(function(r) { return checkSession(r); })
         .then(function(data) {
             if (data.success) {
                 showToast('Versão publicada com sucesso!', 'success');
@@ -4325,7 +4377,8 @@ $pageSubtitle = 'Editor de Especificação';
             } else {
                 showToast(data.error || 'Erro ao publicar.', 'danger');
             }
-        });
+        })
+        .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de ligação.', 'error'); });
     }
 
     function criarNovaVersaoUI() {
@@ -4336,7 +4389,7 @@ $pageSubtitle = 'Editor de Especificação';
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
             body: JSON.stringify({ action: 'nova_versao', id: especId })
         })
-        .then(function(r) { return r.json(); })
+        .then(function(r) { return checkSession(r); })
         .then(function(data) {
             if (data.success && data.novo_id) {
                 showToast('Nova versão criada!', 'success');
@@ -4360,7 +4413,7 @@ $pageSubtitle = 'Editor de Especificação';
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
             body: JSON.stringify({ action: 'gerar_token', especificacao_id: especId, nome: nome, email: email, tipo: tipo })
         })
-        .then(function(r) { return r.json(); })
+        .then(function(r) { return checkSession(r); })
         .then(function(data) {
             if (data.success) {
                 showToast('Destinatário adicionado!', 'success');
@@ -4378,7 +4431,7 @@ $pageSubtitle = 'Editor de Especificação';
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
             body: JSON.stringify({ action: 'enviar_link_aceitacao', token_id: tokenId, especificacao_id: especId, base_url: window.location.origin + BASE_PATH })
         })
-        .then(function(r) { return r.json(); })
+        .then(function(r) { return checkSession(r); })
         .then(function(data) {
             if (data.success) {
                 showToast('Email enviado com sucesso!', 'success');
@@ -4416,7 +4469,7 @@ $pageSubtitle = 'Editor de Especificação';
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
             body: JSON.stringify({ action: 'revogar_token', token_id: tokenId })
         })
-        .then(function(r) { return r.json(); })
+        .then(function(r) { return checkSession(r); })
         .then(function(data) {
             if (data.success) {
                 showToast('Acesso revogado.', 'success');

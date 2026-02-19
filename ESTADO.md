@@ -70,6 +70,8 @@
 - [x] Cores da organização (definidas pelo superadmin)
 - [x] Cabeçalho e rodapé com logo e dados da organização
 - [x] Merge cells com rowspan
+- [x] Ficheiros anexos PDF com dimensões originais (conversão pt→mm)
+- [x] Ficheiros anexos imagem (JPG/PNG) com escala proporcional
 
 ### Link Público (publico.php)
 - [x] Partilha via link sem autenticação (código de acesso)
@@ -77,6 +79,7 @@
 - [x] Formulário de aceitação (aceitar/rejeitar com dados)
 - [x] Estilo idêntico ao ver.php
 - [x] Cores da organização
+- [x] Link de Consulta simplificado (código de acesso apenas, sem password)
 
 ### Administração (admin.php)
 - [x] Gestão de organizações (cores, logo, funcionalidades)
@@ -84,6 +87,21 @@
 - [x] Banco de ensaios por categoria
 - [x] Configurações globais
 - [x] Configuração SMTP (global e por organização)
+- [x] Email SpecLab por organização (email + password próprios)
+- [x] Permissão de email para utilizadores (checkbox por org)
+- [x] Configurações acessíveis ao org_admin (tab no menu)
+- [x] Label claro "Email do Super Admin" no SMTP global
+
+### Email SMTP
+- [x] Prioridade: SMTP próprio → email speclab da org → super admin (só se sem org)
+- [x] Org sem email configurado → aviso claro com link para Configurações
+- [x] Erros SMTP traduzidos para mensagens amigáveis (autenticação, conexão, destinatário)
+
+### UX e Robustez
+- [x] Modal de confirmação ao Publicar (aviso de bloqueio de versão)
+- [x] Deteção de sessão expirada (401) em todos os fetch calls
+- [x] Redirecionamento automático para login quando sessão expira
+- [x] Passwords não expostas no HTML/JSON das organizações
 
 ### Deploy Produção
 - [x] Servidor speclab.pt (cPanel, WebTuga)

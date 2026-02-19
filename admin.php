@@ -25,6 +25,9 @@ $organizacoes = [];
 $planos = [];
 if ($isSuperAdminUser) {
     $organizacoes = $db->query('SELECT * FROM organizacoes ORDER BY nome')->fetchAll();
+    // Não expor passwords no HTML/JSON
+    foreach ($organizacoes as &$_org) { unset($_org['email_speclab_pass'], $_org['smtp_pass']); }
+    unset($_org);
     $planos = getPlanos($db);
 }
 
@@ -218,6 +221,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $max_utilizadores = (int)($_POST['max_utilizadores'] ?? 5);
         $max_especificacoes = !empty($_POST['max_especificacoes']) ? (int)$_POST['max_especificacoes'] : null;
         $ativo = isset($_POST['ativo']) ? 1 : 0;
+        $email_speclab = trim($_POST['email_speclab'] ?? '');
+        $email_speclab_pass = trim($_POST['email_speclab_pass'] ?? '');
+        $email_permitido_users = isset($_POST['email_permitido_users']) ? 1 : 0;
 
         if ($slug === '') {
             $slug = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $nome));
@@ -225,8 +231,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($oid) {
-            $db->prepare('UPDATE organizacoes SET nome=?, slug=?, nif=?, morada=?, telefone=?, email=?, website=?, cor_primaria=?, cor_primaria_dark=?, cor_primaria_light=?, numeracao_prefixo=?, tem_clientes=?, tem_fornecedores=?, plano=?, max_utilizadores=?, max_especificacoes=?, ativo=?, updated_at=NOW() WHERE id=?')
-                ->execute([$nome, $slug, $nif, $morada, $telefone, $email, $website, $cor_primaria, $cor_primaria_dark, $cor_primaria_light, $numeracao_prefixo, $tem_clientes, $tem_fornecedores, $plano, $max_utilizadores, $max_especificacoes, $ativo, $oid]);
+            $updateSql = 'UPDATE organizacoes SET nome=?, slug=?, nif=?, morada=?, telefone=?, email=?, website=?, cor_primaria=?, cor_primaria_dark=?, cor_primaria_light=?, numeracao_prefixo=?, tem_clientes=?, tem_fornecedores=?, plano=?, max_utilizadores=?, max_especificacoes=?, ativo=?, email_speclab=?, email_permitido_users=?, updated_at=NOW()';
+            $updateParams = [$nome, $slug, $nif, $morada, $telefone, $email, $website, $cor_primaria, $cor_primaria_dark, $cor_primaria_light, $numeracao_prefixo, $tem_clientes, $tem_fornecedores, $plano, $max_utilizadores, $max_especificacoes, $ativo, $email_speclab, $email_permitido_users];
+            if ($email_speclab_pass !== '') {
+                $updateSql .= ', email_speclab_pass=?';
+                $updateParams[] = $email_speclab_pass;
+            }
+            $updateSql .= ' WHERE id=?';
+            $updateParams[] = $oid;
+            $db->prepare($updateSql)->execute($updateParams);
         } else {
             // Verificar slug único
             $stmt = $db->prepare('SELECT id FROM organizacoes WHERE slug = ?');
@@ -234,8 +247,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($stmt->fetch()) {
                 $slug .= '-' . time();
             }
-            $db->prepare('INSERT INTO organizacoes (nome, slug, nif, morada, telefone, email, website, cor_primaria, cor_primaria_dark, cor_primaria_light, numeracao_prefixo, tem_clientes, tem_fornecedores, plano, max_utilizadores, max_especificacoes, ativo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-                ->execute([$nome, $slug, $nif, $morada, $telefone, $email, $website, $cor_primaria, $cor_primaria_dark, $cor_primaria_light, $numeracao_prefixo, $tem_clientes, $tem_fornecedores, $plano, $max_utilizadores, $max_especificacoes, $ativo]);
+            $db->prepare('INSERT INTO organizacoes (nome, slug, nif, morada, telefone, email, website, cor_primaria, cor_primaria_dark, cor_primaria_light, numeracao_prefixo, tem_clientes, tem_fornecedores, plano, max_utilizadores, max_especificacoes, ativo, email_speclab, email_speclab_pass, email_permitido_users) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+                ->execute([$nome, $slug, $nif, $morada, $telefone, $email, $website, $cor_primaria, $cor_primaria_dark, $cor_primaria_light, $numeracao_prefixo, $tem_clientes, $tem_fornecedores, $plano, $max_utilizadores, $max_especificacoes, $ativo, $email_speclab, $email_speclab_pass, $email_permitido_users]);
             $oid = (int)$db->lastInsertId();
         }
 
@@ -325,6 +338,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: ' . BASE_PATH . '/admin.php?tab=configuracoes&msg=Configura%C3%A7%C3%B5es+guardadas');
         exit;
     }
+}
+
+// Org admin: guardar email speclab da organização
+if ($action === 'save_org_email' && $userRole === 'org_admin' && $orgId) {
+    $orgEmailSpeclab = trim($_POST['email_speclab'] ?? '');
+    $orgEmailPass = trim($_POST['email_speclab_pass'] ?? '');
+    if ($orgEmailSpeclab) {
+        $sql = 'UPDATE organizacoes SET email_speclab = ?';
+        $params = [$orgEmailSpeclab];
+        if ($orgEmailPass !== '') {
+            $sql .= ', email_speclab_pass = ?';
+            $params[] = $orgEmailPass;
+        }
+        $sql .= ' WHERE id = ?';
+        $params[] = $orgId;
+        $db->prepare($sql)->execute($params);
+    }
+    header('Location: ' . BASE_PATH . '/admin.php?tab=configuracoes&msg=Email+guardado');
+    exit;
 }
 
 // Carregar dados filtrados por organização
@@ -585,6 +617,27 @@ $activeNav = $tab;
                             </div>
                         </div>
 
+                        <hr style="margin: 18px 0; border: none; border-top: 1px solid #e5e7eb;">
+                        <h4 style="color: #2596be; font-size: 14px; margin-bottom: 12px;">Email SpecLab</h4>
+                        <p style="font-size: 12px; color: #667085; margin: -8px 0 12px;">Email @speclab.pt desta organização. O administrador da org pode alterar a password nas suas configurações.</p>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Email SpecLab</label>
+                                <input type="email" name="email_speclab" id="org_email_speclab" placeholder="org@speclab.pt">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <input type="password" name="email_speclab_pass" id="org_email_speclab_pass" placeholder="Definida pelo admin da org">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                <input type="checkbox" name="email_permitido_users" id="org_email_permitido_users"> Permitir utilizadores enviarem emails
+                            </label>
+                            <small style="color:#667085;">Se ativo, utilizadores normais (não apenas admins) podem enviar emails</small>
+                        </div>
+
+                        <hr style="margin: 18px 0; border: none; border-top: 1px solid #e5e7eb;">
                         <div class="form-group">
                             <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                                 <input type="checkbox" name="ativo" id="org_ativo" checked> Organização Ativa
@@ -1939,6 +1992,8 @@ $activeNav = $tab;
         <!-- CONFIGURAÇÕES -->
         <?php elseif ($tab === 'configuracoes'): ?>
             <h2 class="mb-md">Configurações</h2>
+
+            <?php if ($isSuperAdminUser): ?>
             <div class="card">
                 <form method="POST">
                     <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
@@ -1959,7 +2014,8 @@ $activeNav = $tab;
                     </div>
 
                     <hr style="margin: 18px 0; border: none; border-top: 1px solid #e5e7eb;">
-                    <h3 style="color: #2596be; font-size: 15px; margin-bottom: 12px;">Configuração de Email (SMTP)</h3>
+                    <h3 style="color: #2596be; font-size: 15px; margin-bottom: 12px;">Email do Super Admin (SMTP)</h3>
+                    <p style="font-size: 12px; color: #667085; margin: -8px 0 12px;">Usado apenas pelo super admin. As organizações configuram o seu próprio email.</p>
                     <div class="form-row">
                         <div class="form-group"><label>Servidor SMTP</label><input type="text" name="cfg_smtp_host" value="<?= sanitize(getConfiguracao('smtp_host')) ?>" placeholder="smtp.gmail.com"></div>
                         <div class="form-group"><label>Porta SMTP</label><input type="text" name="cfg_smtp_port" value="<?= sanitize(getConfiguracao('smtp_port', '587')) ?>" placeholder="587"></div>
@@ -1987,6 +2043,37 @@ $activeNav = $tab;
                     </div>
                 </form>
             </div>
+
+            <?php else: ?>
+            <!-- Org Admin: configuração de email -->
+            <?php
+                $orgData = $db->prepare('SELECT email_speclab FROM organizacoes WHERE id = ?');
+                $orgData->execute([$orgId]);
+                $orgInfo = $orgData->fetch();
+            ?>
+            <div class="card">
+                <h3 style="color: var(--color-primary); font-size: 15px; margin-bottom: 12px;">Email SpecLab</h3>
+                <p style="font-size: 13px; color: #667085; margin-bottom: 16px;">Configure o email @speclab.pt da sua organização para envio de emails. Apenas precisa do email e password.</p>
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
+                    <input type="hidden" name="action" value="save_org_email">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Email SpecLab</label>
+                            <input type="email" name="email_speclab" value="<?= sanitize($orgInfo['email_speclab'] ?? '') ?>" placeholder="org@speclab.pt">
+                        </div>
+                        <div class="form-group">
+                            <label>Password</label>
+                            <input type="password" name="email_speclab_pass" placeholder="<?= !empty($orgInfo['email_speclab']) ? '••••••• (manter atual)' : 'Introduzir password' ?>">
+                            <small style="color:#667085;">Deixe em branco para manter a password atual</small>
+                        </div>
+                    </div>
+                    <div class="mt-lg">
+                        <button type="submit" class="btn btn-primary">Guardar Email</button>
+                    </div>
+                </form>
+            </div>
+            <?php endif; ?>
         <!-- PLANOS (super_admin only) -->
         <?php elseif ($tab === 'planos' && $isSuperAdminUser): ?>
             <div class="flex-between mb-md">
@@ -2127,6 +2214,9 @@ $activeNav = $tab;
         document.getElementById('org_max_utilizadores').value = '5';
         document.getElementById('org_max_especificacoes').value = '100';
         document.getElementById('org_ativo').checked = true;
+        document.getElementById('org_email_speclab').value = '';
+        document.getElementById('org_email_speclab_pass').value = '';
+        document.getElementById('org_email_permitido_users').checked = false;
         document.getElementById('org_logo_preview').style.display = 'none';
         document.getElementById('org_logo_file').value = '';
     }
@@ -2160,6 +2250,9 @@ $activeNav = $tab;
         document.getElementById('org_max_utilizadores').value = o.max_utilizadores || '5';
         document.getElementById('org_max_especificacoes').value = o.max_especificacoes || '100';
         document.getElementById('org_ativo').checked = (o.ativo == 1);
+        document.getElementById('org_email_speclab').value = o.email_speclab || '';
+        document.getElementById('org_email_speclab_pass').value = '';
+        document.getElementById('org_email_permitido_users').checked = (o.email_permitido_users == 1);
         document.getElementById('org_logo_file').value = '';
 
         if (o.logo) {
