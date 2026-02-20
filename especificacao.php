@@ -1402,6 +1402,7 @@ $pageSubtitle = 'Editor de Especificação';
                                     <td>
                                         <?php if ($v['id'] != $espec['id']): ?>
                                         <a href="<?= BASE_PATH ?>/especificacao.php?id=<?= $v['id'] ?>" class="btn btn-ghost btn-sm">Abrir</a>
+                                        <button class="btn btn-outline-primary btn-sm" onclick="compararVersoes(<?= $v['id'] ?>, '<?= sanitize($v['versao']) ?>')" title="Comparar com versão atual">Comparar</button>
                                         <?php else: ?>
                                         <span class="muted">Atual</span>
                                         <?php endif; ?>
@@ -1833,6 +1834,22 @@ $pageSubtitle = 'Editor de Especificação';
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="var m=document.getElementById('publicarModal');m.style.display='none';m.classList.add('hidden')">Cancelar</button>
                 <button class="btn btn-primary" onclick="confirmarPublicar()">Confirmar Publicação</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: COMPARAÇÃO DE VERSÕES -->
+    <div class="modal-overlay hidden" id="diffModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+        <div class="modal-box" style="max-width:800px; max-height:80vh; overflow-y:auto;">
+            <div class="modal-header">
+                <h3 id="diffModalTitle">Comparação de Versões</h3>
+                <button class="modal-close" onclick="document.getElementById('diffModal').style.display='none'">&times;</button>
+            </div>
+            <div class="modal-body" id="diffModalBody" style="padding:var(--spacing-md);">
+                <p class="muted">A carregar...</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="document.getElementById('diffModal').style.display='none'">Fechar</button>
             </div>
         </div>
     </div>
@@ -4565,6 +4582,44 @@ $pageSubtitle = 'Editor de Especificação';
             })
             .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de rede.', 'danger'); });
         }, 'Nova Versão');
+    }
+
+    function compararVersoes(outroId, outraVersao) {
+        var m = document.getElementById('diffModal');
+        m.style.display = 'flex';
+        document.getElementById('diffModalTitle').textContent = 'Comparar: v' + '<?= sanitize($espec['versao']) ?>' + ' vs v' + outraVersao;
+        document.getElementById('diffModalBody').innerHTML = '<p class="muted">A carregar diferenças...</p>';
+
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'comparar_versoes', id1: especId, id2: outroId })
+        })
+        .then(function(r) { return checkSession(r); })
+        .then(function(data) {
+            if (!data.success) { document.getElementById('diffModalBody').innerHTML = '<p class="text-danger">' + (data.error || 'Erro') + '</p>'; return; }
+            if (data.total === 0) {
+                document.getElementById('diffModalBody').innerHTML = '<p class="muted" style="text-align:center;padding:var(--spacing-lg);">Sem diferenças entre as duas versões.</p>';
+                return;
+            }
+            var html = '<table class="table" style="font-size:13px;"><thead><tr><th>Campo</th><th style="width:40%;">v' + data.v1.versao + ' (atual)</th><th style="width:40%;">v' + data.v2.versao + '</th></tr></thead><tbody>';
+            data.diferencas.forEach(function(d) {
+                var v1Short = (d.v1 || '').substring(0, 300) + (d.v1 && d.v1.length > 300 ? '...' : '');
+                var v2Short = (d.v2 || '').substring(0, 300) + (d.v2 && d.v2.length > 300 ? '...' : '');
+                html += '<tr><td><strong>' + d.campo + '</strong></td>';
+                html += '<td style="background:#fef2f2;word-break:break-word;">' + escapeHtml(v1Short) + '</td>';
+                html += '<td style="background:#f0fdf4;word-break:break-word;">' + escapeHtml(v2Short) + '</td></tr>';
+            });
+            html += '</tbody></table><p class="muted" style="margin-top:var(--spacing-sm);">' + data.total + ' diferença(s) encontrada(s).</p>';
+            document.getElementById('diffModalBody').innerHTML = html;
+        })
+        .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') document.getElementById('diffModalBody').innerHTML = '<p class="text-danger">Erro de ligação.</p>'; });
+    }
+
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     function reloadToTab(tab) {

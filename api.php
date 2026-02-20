@@ -2091,6 +2091,60 @@ try {
         // ===================================================================
         // VERSIONAMENTO
         // ===================================================================
+        case 'comparar_versoes':
+            $id1 = (int)($jsonBody['id1'] ?? $_GET['id1'] ?? 0);
+            $id2 = (int)($jsonBody['id2'] ?? $_GET['id2'] ?? 0);
+            if ($id1 <= 0 || $id2 <= 0) jsonError('IDs inválidos.');
+            checkSaOrgAccess($db, $user, $id1);
+            checkSaOrgAccess($db, $user, $id2);
+
+            // Verificar que pertencem ao mesmo grupo
+            $stmt = $db->prepare('SELECT id, grupo_versao, versao, titulo, estado, objetivo, ambito, definicao_material, regulamentacao, processos, embalagem, aceitacao, observacoes FROM especificacoes WHERE id IN (?, ?)');
+            $stmt->execute([$id1, $id2]);
+            $specs = $stmt->fetchAll(PDO::FETCH_UNIQUE);
+            if (count($specs) !== 2) jsonError('Especificações não encontradas.');
+            if ($specs[$id1]['grupo_versao'] !== $specs[$id2]['grupo_versao']) jsonError('As versões não pertencem ao mesmo grupo.');
+
+            $camposComparar = ['titulo', 'objetivo', 'ambito', 'definicao_material', 'regulamentacao', 'processos', 'embalagem', 'aceitacao', 'observacoes'];
+            $camposLabels = ['titulo' => 'Título', 'objetivo' => 'Objetivo', 'ambito' => 'Âmbito', 'definicao_material' => 'Definição do Material', 'regulamentacao' => 'Regulamentação', 'processos' => 'Processos', 'embalagem' => 'Embalagem', 'aceitacao' => 'Aceitação', 'observacoes' => 'Observações'];
+
+            $diferencas = [];
+            foreach ($camposComparar as $campo) {
+                $v1 = trim($specs[$id1][$campo] ?? '');
+                $v2 = trim($specs[$id2][$campo] ?? '');
+                if ($v1 !== $v2) {
+                    $diferencas[] = ['campo' => $camposLabels[$campo], 'v1' => $v1, 'v2' => $v2];
+                }
+            }
+
+            // Comparar secções
+            $sec1 = $db->prepare('SELECT titulo, conteudo FROM especificacao_seccoes WHERE especificacao_id = ? ORDER BY ordem');
+            $sec1->execute([$id1]); $seccoes1 = $sec1->fetchAll(PDO::FETCH_ASSOC);
+            $sec2 = $db->prepare('SELECT titulo, conteudo FROM especificacao_seccoes WHERE especificacao_id = ? ORDER BY ordem');
+            $sec2->execute([$id2]); $seccoes2 = $sec2->fetchAll(PDO::FETCH_ASSOC);
+
+            $maxSec = max(count($seccoes1), count($seccoes2));
+            for ($i = 0; $i < $maxSec; $i++) {
+                $s1 = $seccoes1[$i] ?? null;
+                $s2 = $seccoes2[$i] ?? null;
+                if ($s1 && !$s2) {
+                    $diferencas[] = ['campo' => 'Secção: ' . ($s1['titulo'] ?: 'Sem título'), 'v1' => strip_tags($s1['conteudo']), 'v2' => '(removida)'];
+                } elseif (!$s1 && $s2) {
+                    $diferencas[] = ['campo' => 'Secção: ' . ($s2['titulo'] ?: 'Sem título'), 'v1' => '(nova)', 'v2' => strip_tags($s2['conteudo'])];
+                } elseif ($s1['titulo'] !== $s2['titulo'] || $s1['conteudo'] !== $s2['conteudo']) {
+                    $diferencas[] = ['campo' => 'Secção: ' . ($s1['titulo'] ?: $s2['titulo'] ?: 'Sem título'), 'v1' => strip_tags($s1['conteudo']), 'v2' => strip_tags($s2['conteudo'])];
+                }
+            }
+
+            echo json_encode([
+                'success' => true,
+                'v1' => ['id' => $id1, 'versao' => $specs[$id1]['versao']],
+                'v2' => ['id' => $id2, 'versao' => $specs[$id2]['versao']],
+                'diferencas' => $diferencas,
+                'total' => count($diferencas)
+            ]);
+            exit;
+
         case 'publicar_versao':
             $id = (int)($jsonBody['id'] ?? $_POST['id'] ?? 0);
             if ($id <= 0) jsonError('ID inválido.');
