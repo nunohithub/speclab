@@ -1343,6 +1343,21 @@ try {
         // ===================================================================
         // 17. GET PRODUCT TEMPLATES
         // ===================================================================
+        case 'get_fornecedor_log':
+            requireAdminApi($user);
+            $fornId = (int)($_GET['fornecedor_id'] ?? 0);
+            if ($fornId <= 0) jsonError('ID do fornecedor inválido.');
+            // Verificar acesso multi-tenant
+            if (!isSuperAdmin()) {
+                $chk = $db->prepare('SELECT organizacao_id FROM fornecedores WHERE id = ?');
+                $chk->execute([$fornId]);
+                if ($chk->fetchColumn() != $user['org_id']) jsonError('Acesso negado.');
+            }
+            $stmt = $db->prepare('SELECT fl.*, u.nome as user_nome FROM fornecedores_log fl LEFT JOIN utilizadores u ON u.id = fl.alterado_por WHERE fl.fornecedor_id = ? ORDER BY fl.created_at DESC LIMIT 50');
+            $stmt->execute([$fornId]);
+            jsonSuccess('OK', $stmt->fetchAll(PDO::FETCH_ASSOC));
+            break;
+
         case 'get_templates':
             $produto_id = (int)($_GET['produto_id'] ?? $_POST['produto_id'] ?? 0);
             if ($produto_id <= 0) jsonError('ID do produto inválido.');

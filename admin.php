@@ -283,7 +283,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'save_fornecedor') {
         $fid = (int)($_POST['fornecedor_id'] ?? 0);
-        $fields = ['nome', 'sigla', 'morada', 'telefone', 'email', 'nif', 'contacto'];
+        $fields = ['nome', 'sigla', 'morada', 'telefone', 'email', 'nif', 'contacto', 'certificacoes', 'notas'];
         $values = array_map(fn($f) => trim($_POST[$f] ?? ''), $fields);
 
         if ($isSuperAdminUser) {
@@ -301,11 +301,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     exit;
                 }
             }
-            $sql = 'UPDATE fornecedores SET nome=?, sigla=?, morada=?, telefone=?, email=?, nif=?, contacto=? WHERE id=?';
+            // Capturar dados anteriores para audit log
+            $oldStmt = $db->prepare('SELECT nome, sigla, morada, telefone, email, nif, contacto, certificacoes, notas FROM fornecedores WHERE id = ?');
+            $oldStmt->execute([$fid]);
+            $oldData = $oldStmt->fetch(PDO::FETCH_ASSOC);
+
+            $sql = 'UPDATE fornecedores SET nome=?, sigla=?, morada=?, telefone=?, email=?, nif=?, contacto=?, certificacoes=?, notas=? WHERE id=?';
             $db->prepare($sql)->execute([...$values, $fid]);
+
+            // Registar alterações no log
+            $newData = array_combine($fields, $values);
+            $changed = [];
+            foreach ($fields as $f) {
+                if (($oldData[$f] ?? '') !== ($newData[$f] ?? '')) $changed[] = $f;
+            }
+            if ($changed) {
+                $db->prepare('INSERT INTO fornecedores_log (fornecedor_id, acao, campos_alterados, dados_anteriores, dados_novos, alterado_por, ip_address) VALUES (?, ?, ?, ?, ?, ?, ?)')
+                    ->execute([$fid, 'atualizado', implode(', ', $changed), json_encode($oldData), json_encode($newData), $user['id'], $_SERVER['REMOTE_ADDR'] ?? '']);
+            }
         } else {
-            $sql = 'INSERT INTO fornecedores (nome, sigla, morada, telefone, email, nif, contacto, organizacao_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+            $sql = 'INSERT INTO fornecedores (nome, sigla, morada, telefone, email, nif, contacto, certificacoes, notas, organizacao_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
             $db->prepare($sql)->execute([...$values, $fornOrgId]);
+            $newFid = (int)$db->lastInsertId();
+            // Registar criação no log
+            $db->prepare('INSERT INTO fornecedores_log (fornecedor_id, acao, dados_novos, alterado_por, ip_address) VALUES (?, ?, ?, ?, ?)')
+                ->execute([$newFid, 'criado', json_encode(array_combine($fields, $values)), $user['id'], $_SERVER['REMOTE_ADDR'] ?? '']);
         }
         header('Location: ' . BASE_PATH . '/admin.php?tab=fornecedores&msg=Fornecedor+guardado');
         exit;
@@ -968,8 +988,7 @@ $activeNav = $tab;
                             <th>Nome</th>
                             <th>Sigla</th>
                             <th>Email</th>
-                            <th>Telefone</th>
-                            <th>NIF</th>
+                            <th>Certificações</th>
                             <?php if ($isSuperAdminUser): ?><th>Organização</th><?php endif; ?>
                             <th>Ações</th>
                         </tr>
@@ -980,13 +999,13 @@ $activeNav = $tab;
                             <td><strong><?= sanitize($f['nome']) ?></strong></td>
                             <td><span class="pill pill-primary"><?= sanitize($f['sigla'] ?? '') ?></span></td>
                             <td><?= sanitize($f['email'] ?? '') ?></td>
-                            <td><?= sanitize($f['telefone'] ?? '') ?></td>
-                            <td><?= sanitize($f['nif'] ?? '') ?></td>
+                            <td><?= !empty($f['certificacoes']) ? sanitize($f['certificacoes']) : '<span class="muted">—</span>' ?></td>
                             <?php if ($isSuperAdminUser): ?>
                                 <td><?= sanitize($f['org_nome'] ?? 'Sem org.') ?></td>
                             <?php endif; ?>
-                            <td>
+                            <td style="white-space:nowrap;">
                                 <button class="btn btn-ghost btn-sm" onclick="editFornecedor(<?= htmlspecialchars(json_encode($f)) ?>)">Editar</button>
+                                <button class="btn btn-ghost btn-sm" onclick="verHistoricoFornecedor(<?= $f['id'] ?>, '<?= sanitize($f['nome']) ?>')" title="Ver histórico">Histórico</button>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -1026,11 +1045,32 @@ $activeNav = $tab;
                             <div class="form-group"><label>NIF</label><input type="text" name="nif" id="fn_nif"></div>
                             <div class="form-group"><label>Contacto</label><input type="text" name="contacto" id="fn_contacto"></div>
                         </div>
+                        <div class="form-group"><label>Certificações</label><input type="text" name="certificacoes" id="fn_certificacoes" placeholder="Ex: ISO 9001, FSSC 22000, FSC..."></div>
+                        <div class="form-group"><label>Notas</label><textarea name="notas" id="fn_notas" rows="2" placeholder="Observações internas sobre o fornecedor..."></textarea></div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" onclick="document.getElementById('fornecedorModal').style.display='none'">Cancelar</button>
                             <button type="submit" class="btn btn-primary">Guardar</button>
                         </div>
                     </form>
+                </div>
+            </div>
+
+            <!-- Histórico Fornecedor Modal -->
+            <div id="historicoFornModal" class="modal-overlay" style="display:none;">
+                <div class="modal-box modal-box-lg">
+                    <div class="modal-header">
+                        <h3>Histórico: <span id="histFornNome"></span></h3>
+                        <button class="modal-close" onclick="document.getElementById('historicoFornModal').style.display='none'">&times;</button>
+                    </div>
+                    <div style="max-height:400px; overflow-y:auto;">
+                        <table style="font-size:13px;">
+                            <thead><tr><th>Data</th><th>Ação</th><th>Campos alterados</th><th>Por</th></tr></thead>
+                            <tbody id="histFornBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('historicoFornModal').style.display='none'">Fechar</button>
+                    </div>
                 </div>
             </div>
 
@@ -2918,7 +2958,7 @@ $activeNav = $tab;
     function resetFornecedorForm() {
         document.getElementById('fornecedorModalTitle').textContent = 'Novo Fornecedor';
         document.getElementById('fornecedor_id').value = '0';
-        ['nome','sigla','morada','telefone','email','nif','contacto'].forEach(function(f) {
+        ['nome','sigla','morada','telefone','email','nif','contacto','certificacoes','notas'].forEach(function(f) {
             var el = document.getElementById('fn_' + f);
             if (el) el.value = '';
         });
@@ -2932,7 +2972,7 @@ $activeNav = $tab;
         document.getElementById('fornecedorModal').style.display = 'flex';
         document.getElementById('fornecedorModalTitle').textContent = 'Editar Fornecedor';
         document.getElementById('fornecedor_id').value = f.id;
-        ['nome','sigla','morada','telefone','email','nif','contacto'].forEach(function(field) {
+        ['nome','sigla','morada','telefone','email','nif','contacto','certificacoes','notas'].forEach(function(field) {
             var el = document.getElementById('fn_' + field);
             if (el) el.value = f[field] || '';
         });
@@ -2940,6 +2980,37 @@ $activeNav = $tab;
             var orgField = document.getElementById('fn_organizacao_id');
             if (orgField) orgField.value = f.organizacao_id || '';
         }
+    }
+
+    function verHistoricoFornecedor(fornecedorId, nome) {
+        document.getElementById('histFornNome').textContent = nome;
+        document.getElementById('histFornBody').innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;">A carregar...</td></tr>';
+        document.getElementById('historicoFornModal').style.display = 'flex';
+        fetch('<?= BASE_PATH ?>/api.php?action=get_fornecedor_log&fornecedor_id=' + fornecedorId, {
+            headers: {'X-CSRF-TOKEN': '<?= getCsrfToken() ?>'}
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success || !data.data.length) {
+                document.getElementById('histFornBody').innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;">Sem histórico registado.</td></tr>';
+                return;
+            }
+            var html = '';
+            data.data.forEach(function(log) {
+                var acaoLabel = {criado:'Criado', atualizado:'Atualizado', desativado:'Desativado', reativado:'Reativado'}[log.acao] || log.acao;
+                var acaoClass = {criado:'pill-success', atualizado:'pill-primary', desativado:'pill-error', reativado:'pill-warning'}[log.acao] || 'pill-muted';
+                html += '<tr>';
+                html += '<td>' + (log.created_at || '') + '</td>';
+                html += '<td><span class="pill ' + acaoClass + '" style="font-size:11px;">' + acaoLabel + '</span></td>';
+                html += '<td>' + (log.campos_alterados || '—') + '</td>';
+                html += '<td>' + (log.user_nome || 'Sistema') + '</td>';
+                html += '</tr>';
+            });
+            document.getElementById('histFornBody').innerHTML = html;
+        })
+        .catch(function() {
+            document.getElementById('histFornBody').innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;">Erro ao carregar histórico.</td></tr>';
+        });
     }
 
     // ===================================
