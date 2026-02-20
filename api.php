@@ -2090,6 +2090,73 @@ try {
             break;
 
         // ===================================================================
+        // TEMPLATES
+        // ===================================================================
+        case 'save_template':
+            requireAdminApi($user);
+            $especId = (int)($jsonBody['especificacao_id'] ?? 0);
+            $nome = sanitize($jsonBody['nome'] ?? '');
+            $descricao = sanitize($jsonBody['descricao'] ?? '');
+            if (!$nome) jsonError('Nome do template é obrigatório.');
+            if ($especId <= 0) jsonError('ID da especificação inválido.');
+            checkSaOrgAccess($db, $user, $especId);
+
+            // Carregar dados da spec para o template
+            $spec = getEspecificacaoCompleta($db, $especId);
+            if (!$spec) jsonError('Especificação não encontrada.');
+            $dados = [
+                'titulo' => $spec['titulo'],
+                'objetivo' => $spec['objetivo'] ?? '',
+                'ambito' => $spec['ambito'] ?? '',
+                'definicao_material' => $spec['definicao_material'] ?? '',
+                'regulamentacao' => $spec['regulamentacao'] ?? '',
+                'processos' => $spec['processos'] ?? '',
+                'embalagem' => $spec['embalagem'] ?? '',
+                'aceitacao' => $spec['aceitacao'] ?? '',
+                'observacoes' => $spec['observacoes'] ?? '',
+                'seccoes' => $spec['seccoes'] ?? [],
+                'parametros' => $spec['parametros'] ?? [],
+                'classes' => $spec['classes'] ?? [],
+                'defeitos' => $spec['defeitos'] ?? [],
+            ];
+            $orgIdTpl = isSuperAdmin() ? null : $user['org_id'];
+            $db->prepare('INSERT INTO especificacao_templates (nome, descricao, organizacao_id, dados, criado_por) VALUES (?, ?, ?, ?, ?)')
+               ->execute([$nome, $descricao, $orgIdTpl, json_encode($dados), $user['id']]);
+            jsonSuccess('Template guardado.');
+            break;
+
+        case 'list_templates':
+            if (isSuperAdmin()) {
+                $tpls = $db->query('SELECT id, nome, descricao, created_at FROM especificacao_templates ORDER BY nome')->fetchAll(PDO::FETCH_ASSOC);
+            } else {
+                $stmt = $db->prepare('SELECT id, nome, descricao, created_at FROM especificacao_templates WHERE organizacao_id = ? OR organizacao_id IS NULL ORDER BY nome');
+                $stmt->execute([$user['org_id']]);
+                $tpls = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+            jsonSuccess('OK', $tpls);
+            break;
+
+        case 'get_template':
+            $tplId = (int)($jsonBody['template_id'] ?? $_GET['template_id'] ?? 0);
+            if ($tplId <= 0) jsonError('ID inválido.');
+            $stmt = $db->prepare('SELECT * FROM especificacao_templates WHERE id = ?');
+            $stmt->execute([$tplId]);
+            $tpl = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$tpl) jsonError('Template não encontrado.');
+            if (!isSuperAdmin() && $tpl['organizacao_id'] && $tpl['organizacao_id'] != $user['org_id']) jsonError('Acesso negado.');
+            $tpl['dados'] = json_decode($tpl['dados'], true);
+            jsonSuccess('OK', $tpl);
+            break;
+
+        case 'delete_template':
+            requireAdminApi($user);
+            $tplId = (int)($jsonBody['template_id'] ?? 0);
+            if ($tplId <= 0) jsonError('ID inválido.');
+            $db->prepare('DELETE FROM especificacao_templates WHERE id = ?')->execute([$tplId]);
+            jsonSuccess('Template eliminado.');
+            break;
+
+        // ===================================================================
         // VERSIONAMENTO
         // ===================================================================
         case 'comparar_versoes':

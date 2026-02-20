@@ -875,6 +875,9 @@ $pageSubtitle = 'Editor de Especificação';
                 <button class="btn btn-outline-primary btn-sm" onclick="window.print()" title="Imprimir">Imprimir</button>
                 <a href="<?= BASE_PATH ?>/pdf.php?id=<?= $espec['id'] ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Exportar PDF" id="btnPdf"<?= $isNew ? ' style="display:none"' : '' ?>>PDF</a>
                 <a href="<?= BASE_PATH ?>/ver.php?id=<?= $espec['id'] ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Ver documento completo" id="btnVer"<?= $isNew ? ' style="display:none"' : '' ?>>Ver</a>
+                <?php if (!$isNew && in_array($user['role'], ['super_admin', 'org_admin'])): ?>
+                <button class="btn btn-outline-primary btn-sm" onclick="guardarComoTemplate()" title="Guardar como modelo reutilizável">Template</button>
+                <?php endif; ?>
                 <?php if (!$saOutraOrg): ?>
                 <?php if (!$versaoBloqueada): ?>
                 <?php $isAdminUser = in_array($user['role'], ['super_admin', 'org_admin']); ?>
@@ -949,6 +952,20 @@ $pageSubtitle = 'Editor de Especificação';
 
                 <!-- TAB 1: DADOS GERAIS -->
                 <div class="tab-panel active" id="panel-dados-gerais">
+                    <?php if ($isNew): ?>
+                    <div class="card" id="templateSelector" style="border-left:3px solid var(--color-primary); margin-bottom:var(--spacing-md);">
+                        <div class="card-header">
+                            <span class="card-title">Criar a partir de Template</span>
+                            <span class="muted" style="font-size:12px;">(opcional)</span>
+                        </div>
+                        <div style="padding:var(--spacing-sm) var(--spacing-md); display:flex; gap:var(--spacing-sm); align-items:center;">
+                            <select id="templateSelect" style="flex:1;">
+                                <option value="">— Especificação em branco —</option>
+                            </select>
+                            <button class="btn btn-secondary btn-sm" onclick="carregarTemplate()">Aplicar</button>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                     <div class="card">
                         <div class="card-header">
                             <span class="card-title">Identificação</span>
@@ -2255,11 +2272,11 @@ $pageSubtitle = 'Editor de Especificação';
         });
     }
 
-    function adicionarSeccao() {
+    function adicionarSeccao(tipo, titulo, conteudo) {
         var container = document.getElementById('seccoesContainer');
         var idx = seccaoCounter++;
 
-        var result = criarSeccao('', '', idx);
+        var result = criarSeccao(titulo || '', conteudo || '', idx);
         container.appendChild(result.block);
 
         var empty = document.getElementById('seccoesEmpty');
@@ -4630,6 +4647,95 @@ $pageSubtitle = 'Editor de Especificação';
         div.textContent = text;
         return div.innerHTML;
     }
+
+    // ============================================================
+    // TEMPLATES
+    // ============================================================
+    function guardarComoTemplate() {
+        if (!especId) { showToast('Guarde a especificação primeiro.', 'warning'); return; }
+        var nome = prompt('Nome do template:');
+        if (!nome) return;
+        var descricao = prompt('Descrição breve (opcional):') || '';
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'save_template', especificacao_id: especId, nome: nome, descricao: descricao })
+        })
+        .then(function(r) { return checkSession(r); })
+        .then(function(data) {
+            if (data.success) showToast('Template guardado!', 'success');
+            else showToast(data.error || 'Erro.', 'danger');
+        })
+        .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de ligação.', 'error'); });
+    }
+
+    <?php if ($isNew): ?>
+    // Carregar lista de templates ao abrir nova spec
+    (function() {
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'list_templates' })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success && data.data && data.data.length > 0) {
+                var sel = document.getElementById('templateSelect');
+                data.data.forEach(function(t) {
+                    var opt = document.createElement('option');
+                    opt.value = t.id;
+                    opt.textContent = t.nome + (t.descricao ? ' — ' + t.descricao : '');
+                    sel.appendChild(opt);
+                });
+            } else {
+                var card = document.getElementById('templateSelector');
+                if (card) card.style.display = 'none';
+            }
+        })
+        .catch(function() {});
+    })();
+
+    function carregarTemplate() {
+        var tplId = document.getElementById('templateSelect').value;
+        if (!tplId) return;
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'get_template', template_id: parseInt(tplId) })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.success || !data.data) { showToast(data.error || 'Erro.', 'danger'); return; }
+            var d = data.data.dados;
+            // Preencher campos de texto
+            if (d.titulo) document.getElementById('titulo').value = d.titulo;
+            var campos = ['objetivo', 'ambito', 'definicao_material', 'regulamentacao', 'processos', 'embalagem', 'aceitacao', 'observacoes'];
+            campos.forEach(function(c) {
+                var el = document.getElementById(c);
+                if (el && d[c]) el.value = d[c];
+            });
+            // Preencher secções (limpar existentes e criar novas)
+            if (d.seccoes && d.seccoes.length > 0) {
+                var container = document.getElementById('seccoesContainer');
+                container.innerHTML = '';
+                d.seccoes.forEach(function(sec) {
+                    if (sec.tipo === 'ensaios') {
+                        var ensaiosData = [];
+                        try { ensaiosData = JSON.parse(sec.conteudo || '[]'); } catch(e) {}
+                        if (ensaiosData.rows) ensaiosData = ensaiosData.rows;
+                        adicionarSeccaoEnsaios(ensaiosData, sec.titulo);
+                    } else {
+                        adicionarSeccao(sec.tipo || 'texto', sec.titulo, sec.conteudo);
+                    }
+                });
+            }
+            showToast('Template aplicado!', 'success');
+            marcarAlterado();
+            document.getElementById('templateSelector').style.display = 'none';
+        })
+        .catch(function() { showToast('Erro de ligação.', 'error'); });
+    }
+    <?php endif; ?>
 
     function reloadToTab(tab) {
         var url = window.location.pathname + window.location.search;
