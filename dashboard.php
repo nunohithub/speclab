@@ -217,25 +217,25 @@ $activeNav = 'especificacoes';
         <div class="search-filters no-print">
             <form method="GET">
                 <div class="sf-top">
-                    <input type="search" name="q" placeholder="Pesquisar especificações..." value="<?= sanitize($search) ?>" class="sf-search">
+                    <input type="search" name="q" placeholder="Pesquisar especificações..." value="<?= sanitize($search) ?>" class="sf-search" oninput="filtrarTabela()" id="filtroSearch">
                     <a href="<?= BASE_PATH ?>/especificacao.php?novo=1" class="btn btn-primary">+ Nova Especificação</a>
                 </div>
                 <div class="sf-filters">
-                    <select name="estado" onchange="this.form.submit()">
+                    <select name="estado" id="filtroEstado" onchange="filtrarTabela()">
                         <option value="">Estado</option>
                         <option value="rascunho" <?= $filtro_estado === 'rascunho' ? 'selected' : '' ?>>Rascunho</option>
                         <option value="em_revisao" <?= $filtro_estado === 'em_revisao' ? 'selected' : '' ?>>Em Revisão</option>
                         <option value="ativo" <?= $filtro_estado === 'ativo' ? 'selected' : '' ?>>Ativo</option>
                         <option value="obsoleto" <?= $filtro_estado === 'obsoleto' ? 'selected' : '' ?>>Obsoleto</option>
                     </select>
-                    <select name="produto" onchange="this.form.submit()">
+                    <select name="produto" onchange="filtrarTabela()">
                         <option value="">Produto</option>
                         <?php foreach ($produtos as $p): ?>
                             <option value="<?= $p['id'] ?>" <?= $filtro_produto == $p['id'] ? 'selected' : '' ?>><?= sanitize($p['nome']) ?></option>
                         <?php endforeach; ?>
                     </select>
                     <?php if ($isSA || !empty($_SESSION['org_tem_clientes'])): ?>
-                    <select name="cliente" onchange="this.form.submit()">
+                    <select name="cliente" onchange="filtrarTabela()">
                         <option value="">Cliente</option>
                         <?php foreach ($clientes as $c): ?>
                             <option value="<?= $c['id'] ?>" <?= $filtro_cliente == $c['id'] ? 'selected' : '' ?>><?= sanitize($c['nome']) ?></option>
@@ -243,7 +243,7 @@ $activeNav = 'especificacoes';
                     </select>
                     <?php endif; ?>
                     <?php if ($isSA || !empty($_SESSION['org_tem_fornecedores'])): ?>
-                    <select name="fornecedor" onchange="this.form.submit()">
+                    <select name="fornecedor" onchange="filtrarTabela()">
                         <option value="">Fornecedor</option>
                         <?php foreach ($fornecedores as $fn): ?>
                             <option value="<?= $fn['id'] ?>" <?= $filtro_fornecedor == $fn['id'] ? 'selected' : '' ?>><?= sanitize($fn['nome']) ?></option>
@@ -251,16 +251,14 @@ $activeNav = 'especificacoes';
                     </select>
                     <?php endif; ?>
                     <?php if ($isSA && !empty($organizacoes)): ?>
-                        <select name="org" onchange="this.form.submit()">
+                        <select name="org" onchange="filtrarTabela()">
                             <option value="">Organização</option>
                             <?php foreach ($organizacoes as $o): ?>
                                 <option value="<?= $o['id'] ?>" <?= $filtro_org == $o['id'] ? 'selected' : '' ?>><?= sanitize($o['nome']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     <?php endif; ?>
-                    <?php if ($search || $filtro_estado || $filtro_produto || $filtro_cliente || $filtro_fornecedor || $filtro_org): ?>
-                        <a href="<?= BASE_PATH ?>/dashboard.php" class="btn btn-ghost btn-sm">Limpar filtros</a>
-                    <?php endif; ?>
+                    <a href="<?= BASE_PATH ?>/dashboard.php" class="btn btn-ghost btn-sm" id="btnLimparFiltros" style="display:none;" onclick="limparFiltros(); return false;">Limpar filtros</a>
                 </div>
             </form>
         </div>
@@ -292,7 +290,7 @@ $activeNav = 'especificacoes';
                         </thead>
                         <tbody>
                             <?php foreach ($especificacoes as $e): ?>
-                                <tr>
+                                <tr data-estado="<?= $e['estado'] ?>" data-produto="<?= sanitize($e['produto_nome'] ?? '') ?>" data-cliente="<?= sanitize($e['cliente_nome'] ?? '') ?>" data-fornecedor="<?= sanitize($e['fornecedor_nome'] ?? '') ?>" data-org="<?= (int)($e['organizacao_id'] ?? 0) ?>" data-search="<?= strtolower(sanitize($e['numero'] . ' ' . $e['titulo'] . ' ' . ($e['cliente_nome'] ?? '') . ' ' . ($e['produto_nome'] ?? ''))) ?>">
                                     <td><strong><?= sanitize($e['numero']) ?></strong></td>
                                     <td>
                                         <a href="<?= BASE_PATH ?>/especificacao.php?id=<?= $e['id'] ?>">
@@ -429,6 +427,47 @@ $activeNav = 'especificacoes';
             .catch(function() { showToast('Erro de ligação ao servidor.', 'error'); });
         }, 'Eliminar Especificação');
     }
+    function filtrarTabela() {
+        var search = (document.getElementById('filtroSearch').value || '').toLowerCase();
+        var estado = document.getElementById('filtroEstado').value;
+        var rows = document.querySelectorAll('table tbody tr[data-estado]');
+        var visivel = 0;
+
+        rows.forEach(function(tr) {
+            var show = true;
+            if (estado && tr.getAttribute('data-estado') !== estado) show = false;
+            if (search && tr.getAttribute('data-search').indexOf(search) === -1) show = false;
+            tr.style.display = show ? '' : 'none';
+            if (show) visivel++;
+        });
+
+        // Mostrar/ocultar botão limpar
+        var btnLimpar = document.getElementById('btnLimparFiltros');
+        btnLimpar.style.display = (search || estado) ? '' : 'none';
+
+        // Contador
+        var counter = document.getElementById('filtroCounter');
+        if (!counter) {
+            counter = document.createElement('span');
+            counter.id = 'filtroCounter';
+            counter.className = 'muted';
+            counter.style.fontSize = '12px';
+            counter.style.marginLeft = '8px';
+            btnLimpar.parentNode.appendChild(counter);
+        }
+        counter.textContent = (search || estado) ? visivel + ' de ' + rows.length + ' especificações' : '';
+    }
+
+    function limparFiltros() {
+        document.getElementById('filtroSearch').value = '';
+        document.getElementById('filtroEstado').value = '';
+        filtrarTabela();
+    }
+
+    // Aplicar filtros iniciais se houver
+    <?php if ($search || $filtro_estado): ?>
+    document.addEventListener('DOMContentLoaded', filtrarTabela);
+    <?php endif; ?>
     </script>
     <?php include __DIR__ . '/includes/modals.php'; ?>
     <?php include __DIR__ . '/includes/footer.php'; ?>
