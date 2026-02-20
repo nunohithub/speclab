@@ -1667,6 +1667,25 @@ $breadcrumbs = [
                         </div>
                     </div>
                     <?php endif; ?>
+
+                    <!-- COMENTÁRIOS -->
+                    <?php if (!$isNew): ?>
+                    <div class="card" id="cardComentarios">
+                        <div class="card-header">
+                            <span class="card-title">Comentários</span>
+                            <span class="muted" id="comentariosCount"></span>
+                        </div>
+                        <?php if (!$saOutraOrg): ?>
+                        <div style="margin-bottom:var(--spacing-md);">
+                            <textarea id="novoComentario" rows="2" placeholder="Escrever comentário..." style="width:100%;margin-bottom:var(--spacing-xs);"></textarea>
+                            <button class="btn btn-primary btn-sm" onclick="adicionarComentario()">Comentar</button>
+                        </div>
+                        <?php endif; ?>
+                        <div id="listaComentarios" style="max-height:400px; overflow-y:auto;">
+                            <p class="muted" style="font-size:13px;">A carregar...</p>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- TAB 7: CONFIGURAÇÕES VISUAIS -->
@@ -3265,6 +3284,9 @@ $breadcrumbs = [
         activateTab(window.location.hash.replace('#tab-', ''));
     }
 
+    // Carregar comentários ao abrir
+    if (especId) carregarComentarios();
+
     // ============================================================
     // TOAST NOTIFICATIONS
     // ============================================================
@@ -4752,6 +4774,78 @@ $breadcrumbs = [
         .catch(function() { showToast('Erro de ligação.', 'error'); });
     }
     <?php endif; ?>
+
+    // --- COMENTÁRIOS ---
+    function carregarComentarios() {
+        if (!especId) return;
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'list_comentarios', especificacao_id: especId })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.success) return;
+            var lista = document.getElementById('listaComentarios');
+            var cnt = document.getElementById('comentariosCount');
+            if (!lista) return;
+            var items = d.comentarios || [];
+            cnt.textContent = items.length ? items.length + ' comentário' + (items.length > 1 ? 's' : '') : '';
+            if (!items.length) {
+                lista.innerHTML = '<p class="muted" style="font-size:13px;">Sem comentários.</p>';
+                return;
+            }
+            var html = '';
+            items.forEach(function(c) {
+                var dt = new Date(c.created_at);
+                var dataStr = dt.toLocaleDateString('pt-PT') + ' ' + dt.toLocaleTimeString('pt-PT', {hour:'2-digit',minute:'2-digit'});
+                html += '<div style="border-bottom:1px solid var(--color-border);padding:var(--spacing-sm) 0;">';
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+                html += '<strong style="font-size:13px;">' + escapeHtml(c.nome_utilizador) + '</strong>';
+                html += '<span class="muted" style="font-size:11px;">' + dataStr + '</span>';
+                html += '</div>';
+                html += '<p style="margin:4px 0 0;font-size:13px;white-space:pre-wrap;">' + escapeHtml(c.comentario) + '</p>';
+                if (c.pode_apagar) {
+                    html += '<button class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--color-danger);padding:2px 6px;margin-top:2px;" onclick="apagarComentario(' + c.id + ')">Apagar</button>';
+                }
+                html += '</div>';
+            });
+            lista.innerHTML = html;
+        });
+    }
+    function adicionarComentario() {
+        var ta = document.getElementById('novoComentario');
+        var texto = ta.value.trim();
+        if (!texto) { showToast('Escreva um comentário.', 'warning'); return; }
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'add_comentario', especificacao_id: especId, comentario: texto })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) { ta.value = ''; carregarComentarios(); showToast('Comentário adicionado.', 'success'); }
+            else showToast(d.error || 'Erro.', 'error');
+        })
+        .catch(function() { showToast('Erro de ligação.', 'error'); });
+    }
+    function apagarComentario(id) {
+        if (!confirm('Apagar este comentário?')) return;
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'delete_comentario', comentario_id: id })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) { carregarComentarios(); showToast('Comentário apagado.', 'success'); }
+            else showToast(d.error || 'Erro.', 'error');
+        })
+        .catch(function() { showToast('Erro de ligação.', 'error'); });
+    }
+    function escapeHtml(t) {
+        var d = document.createElement('div'); d.textContent = t; return d.innerHTML;
+    }
 
     function reloadToTab(tab) {
         var url = window.location.pathname + window.location.search;
