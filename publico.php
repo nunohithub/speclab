@@ -229,6 +229,12 @@ if ($authenticated) {
                 </div>
             </div>
 
+            <?php if (in_array($data['estado'], ['rascunho', 'em_revisao'])): ?>
+            <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px 16px;margin-bottom:16px;font-size:14px;color:#92400e;text-align:center;">
+                <strong>&#9888; <?= $data['estado'] === 'rascunho' ? 'RASCUNHO' : 'EM REVISÃO' ?></strong> — Este documento ainda não foi publicado.
+            </div>
+            <?php endif; ?>
+
             <!-- Meta -->
             <div class="doc-meta">
                 <div><span>Produto:</span> <strong><?= san($data['produto_nome'] ?? '-') ?></strong></div>

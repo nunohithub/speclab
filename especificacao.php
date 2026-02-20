@@ -1579,6 +1579,16 @@ $breadcrumbs = [
                             <span class="muted">Enviar documento por email ou gerar link público</span>
                         </div>
 
+                        <!-- Link Interno (colegas da org) -->
+                        <div style="margin-bottom:var(--spacing-lg);">
+                            <div class="section-label" style="margin-bottom:var(--spacing-xs);">Link Interno</div>
+                            <p class="muted" style="font-size:12px; margin:0 0 var(--spacing-sm);">Partilhar com colegas da sua organização (requer login).</p>
+                            <div class="flex gap-sm" style="align-items:center;">
+                                <input type="text" id="linkInterno" value="<?= rtrim(($_SERVER['REQUEST_SCHEME'] ?? 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'), '/') . BASE_PATH ?>/especificacao.php?id=<?= $espec['id'] ?>" readonly style="font-family:monospace;font-size:12px;flex:1;background:var(--color-bg);">
+                                <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('linkInterno').value).then(function(){showToast('Link copiado!','success')})">Copiar</button>
+                            </div>
+                        </div>
+
                         <!-- Enviar por Email -->
                         <div style="margin-bottom:var(--spacing-lg);">
                             <div class="section-label" style="margin-bottom:var(--spacing-sm);">Enviar por Email</div>
