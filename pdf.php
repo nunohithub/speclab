@@ -180,55 +180,30 @@ if ($useMpdf) {
     }
     $logoHtml = file_exists($logoPath) ? '<img src="' . $logoPath . '" height="35">' : san($orgNome);
 
-    $headerHtml = '
-        <table width="100%" style="border-bottom: 2pt solid ' . san($corLinhas) . '; margin-bottom: 5mm;">
-            <tr>
-                <td width="30%">' . $logoHtml . '</td>
-                <td width="70%" style="text-align: right;">
-                    <span style="font-size: 12pt; font-weight: bold; color: ' . san($corNome) . ';">' . san($data['titulo']) . '</span><br>
-                    <span style="font-size: 8pt; color: #666;">' . san($data['numero']) . ' | ' . $L['versao'] . ' ' . san($data['versao']) . '</span>
-                </td>
-            </tr>
-        </table>';
-    $footerHtml = '
-        <table width="100%" style="border-top: 0.5pt solid #ddd; font-size: 8pt; color: #999;">
-            <tr>
-                <td width="33%">' . san($orgNome) . '</td>
-                <td width="33%" style="text-align: center;">' . $L['pagina'] . ' {PAGENO} ' . $L['de'] . ' {nbpg}</td>
-                <td width="33%" style="text-align: right;">Powered by SpecLab &copy;' . date('Y') . '</td>
-            </tr>
-        </table>';
+    $headerHtml = '<table width="100%" style="border-bottom:2pt solid ' . san($corLinhas) . ';margin-bottom:5mm;"><tr>'
+        . '<td width="30%">' . $logoHtml . '</td>'
+        . '<td width="70%" style="text-align:right;">'
+        . '<span style="font-size:12pt;font-weight:bold;color:' . san($corNome) . ';">' . san($data['titulo']) . '</span><br>'
+        . '<span style="font-size:8pt;color:#666;">' . san($data['numero']) . ' | ' . $L['versao'] . ' ' . san($data['versao']) . '</span>'
+        . '</td></tr></table>';
+    $footerHtml = '<table width="100%" style="border-top:0.5pt solid #ddd;font-size:8pt;color:#999;"><tr>'
+        . '<td width="33%">' . san($orgNome) . '</td>'
+        . '<td width="33%" style="text-align:center;">' . $L['pagina'] . ' {PAGENO} ' . $L['de'] . ' {nbpg}</td>'
+        . '<td width="33%" style="text-align:right;">Powered by SpecLab &copy;' . date('Y') . '</td>'
+        . '</tr></table>';
     $mpdf->SetHTMLHeader($headerHtml);
     $mpdf->SetHTMLFooter($footerHtml);
 
-    // CSS para PDF
-    $css = '
-        <style>
-            body { font-family: dejavusans; font-size: 10pt; color: #111827; line-height: 1.4; }
-            h1 { font-size: ' . $tamNome . 'pt; color: ' . san($corNome) . '; margin-bottom: 5mm; }
-            h2 { font-size: ' . $tamTitulos . 'pt; color: ' . san($corTitulos) . '; border-bottom: 1px solid ' . san($corLinhas) . '; padding-bottom: 2mm; margin-top: 6mm; margin-bottom: 3mm; }
-            .meta-box { background: #f3f4f6; padding: 3mm; border-radius: 2mm; margin-bottom: 5mm; font-size: 9pt; }
-            .meta-grid { width: 100%; }
-            .meta-grid td { padding: 1mm 3mm; }
-            .meta-label { color: #667085; }
-            .meta-value { font-weight: bold; color: #111827; }
-            table.params { width: 100%; border-collapse: collapse; margin: 3mm 0; font-size: 9pt; }
-            table.params th { background-color: ' . san($corTitulos) . '; color: white; padding: 2mm 3mm; text-align: left; font-weight: 600; }
-            table.params td { padding: 1.5mm 3mm; border-bottom: 0.5pt solid #e5e7eb; }
-            table.params tr.cat td { background-color: ' . san($corPrimariaLight) . '; font-weight: 600; color: ' . san($corPrimariaDark) . '; text-align: center; }
-            .section { margin-bottom: 4mm; }
-            .content { font-size: 10pt; line-height: 1.5; }
-            .content p { margin: 0 0 2mm; }
-            .defeito-critico { color: #b42318; font-weight: bold; }
-            .defeito-maior { color: #b35c00; font-weight: bold; }
-            .defeito-menor { color: #667085; font-weight: bold; }
-            .file-list { margin-top: 2mm; }
-            .file-item { padding: 1mm 0; font-size: 9pt; color: #374151; }
-        </style>
-    ';
+    // CSS para PDF — carregado do ficheiro externo
+    $pdfCssRaw = file_get_contents(__DIR__ . '/assets/css/pdf.css');
+    $pdfCssRaw = str_replace(
+        ['{{COR_TITULOS}}', '{{COR_LINHAS}}', '{{COR_NOME}}', '{{COR_PRIMARIA}}', '{{COR_PRIMARIA_LIGHT}}', '{{COR_PRIMARIA_DARK}}', '{{TAM_TITULOS}}', '{{TAM_NOME}}'],
+        [san($corTitulos), san($corLinhas), san($corNome), san($corPrimaria), san($corPrimariaLight), san($corPrimariaDark), $tamTitulos, $tamNome],
+        $pdfCssRaw
+    );
 
     // HTML content
-    $html = $css;
+    $html = '<style>' . $pdfCssRaw . '</style>';
 
     // Meta — full-width rows for Produto/Cliente/Fornecedor, 2-column grid for the rest
     $metaFull = [];
@@ -291,7 +266,7 @@ if ($useMpdf) {
                     $html .= '<div class="section"><h2>' . $ficTitulo . '</h2>';
                     // Lista de ficheiros como referência
                     foreach ($validFiles as $fi => $f) {
-                        $html .= '<div style="font-size:9pt; color:#444; margin:1mm 0;">&#8226; ' . san($f['nome_original']) . ' (' . formatFileSize($f['tamanho']) . ')</div>';
+                        $html .= '<div class="file-item">&#8226; ' . san($f['nome_original']) . ' (' . formatFileSize($f['tamanho']) . ')</div>';
                     }
                     $html .= '</div>';
                     $mpdf->WriteHTML($html);
@@ -331,8 +306,8 @@ if ($useMpdf) {
                             ]);
                             $mpdf->SetHTMLFooter($footerHtml);
                             $imgHtml = '<div style="text-align:center;">';
-                            $imgHtml .= '<div style="font-size:9pt; color:#666; margin-bottom:3mm;">' . san($f['nome_original']) . '</div>';
-                            $imgHtml .= '<img src="' . $filepath . '" style="max-width:170mm; max-height:230mm;">';
+                            $imgHtml .= '<div class="img-caption">' . san($f['nome_original']) . '</div>';
+                            $imgHtml .= '<img src="' . $filepath . '" class="img-anexo">';
                             $imgHtml .= '</div>';
                             $mpdf->WriteHTML($imgHtml);
                             $mpdf->SetHTMLHeader('');
@@ -411,18 +386,17 @@ if ($useMpdf) {
                     // Gerar thead colunas
                     $theadCols = '<tr>';
                     foreach ($headers as $hi => $hName) {
-                        $theadCols .= '<th style="width:' . $cwPct[$hi] . '%; padding:6px 8px; text-align:left; font-weight:600; background-color:' . $corPrimaria . '; color:white;">' . $hName . '</th>';
+                        $theadCols .= '<th class="ensaio-th" style="width:' . $cwPct[$hi] . '%;">' . $hName . '</th>';
                     }
                     $theadCols .= '</tr>';
-                    // Título dentro do thead da 1ª tabela (para não separar)
-                    $theadTitle = '<tr><td colspan="' . $colspanN . '" style="padding:3px 0 5px; font-size:' . $tamTitulos . 'pt; font-weight:bold; color:' . san($corTitulos) . '; border-bottom:1px solid ' . san($corLinhas) . ';">' . ($i + 1) . '. ' . $secTitulo . '</td></tr>';
+                    $theadTitle = '<tr class="ensaio-titulo-row"><td colspan="' . $colspanN . '" style="font-size:' . $tamTitulos . 'pt;">' . ($i + 1) . '. ' . $secTitulo . '</td></tr>';
                     // Uma tabela por categoria
                     foreach ($groups as $gIdx => $group) {
-                        $mt = $gIdx === 0 ? '6px' : '0';
-                        $html .= '<table class="params" repeat_header="1" style="width:100%; border-collapse:collapse; font-size:9pt; margin-top:' . $mt . ';">';
+                        $mt = $gIdx === 0 ? ' style="margin-top:6px;"' : '';
+                        $html .= '<table class="params" repeat_header="1"' . $mt . '>';
                         $html .= '<thead>' . ($gIdx === 0 ? $theadTitle : '') . $theadCols;
                         if ($group['cat']) {
-                            $html .= '<tr><td colspan="' . $colspanN . '" style="background-color:' . $corPrimariaLight . '; font-weight:600; padding:5px 8px; color:' . $corPrimariaDark . '; text-align:center; border-bottom:1px solid #d1d5db;">' . san($group['cat']) . '</td></tr>';
+                            $html .= '<tr class="ensaio-cat-row"><td colspan="' . $colspanN . '">' . san($group['cat']) . '</td></tr>';
                         }
                         $html .= '</thead><tbody>';
                         foreach ($group['rows'] as $row) {
@@ -433,9 +407,9 @@ if ($useMpdf) {
                                 $key = $rIdx . '_' . $cIdx;
                                 if (isset($hiddenCells[$key])) continue;
                                 $rs = isset($spanCells[$key]) ? ' rowspan="' . $spanCells[$key] . '"' : '';
-                                $ms = isset($alignCells[$key]) ? ' vertical-align:' . $alignCells[$key]['v'] . '; text-align:' . $alignCells[$key]['h'] . ';' : '';
-                                $fw = ($field === 'especificacao') ? ' font-weight:bold;' : '';
-                                $html .= '<td' . $rs . ' style="padding:4px 8px; border-bottom:1px solid #e5e7eb;' . $fw . $ms . '">' . san($ens[$field] ?? '') . '</td>';
+                                $alignStyle = isset($alignCells[$key]) ? ' style="vertical-align:' . $alignCells[$key]['v'] . ';text-align:' . $alignCells[$key]['h'] . ';"' : '';
+                                $tdClass = ($field === 'especificacao') ? 'ensaio-td-bold' : 'ensaio-td';
+                                $html .= '<td class="' . $tdClass . '"' . $rs . $alignStyle . '>' . san($ens[$field] ?? '') . '</td>';
                             }
                             $html .= '</tr>';
                         }
@@ -450,7 +424,7 @@ if ($useMpdf) {
                         if ($globRow) { $gData = json_decode($globRow['valor'], true); $pdfLegenda = $gData['legenda'] ?? ''; $pdfLegTam = (int)($gData['tamanho'] ?? 9); }
                     }
                     if (!empty($pdfLegenda)) {
-                        $html .= '<p style="font-size:' . $pdfLegTam . 'pt; color:#888; font-style:italic; margin:2px 0 0 0;">' . san($pdfLegenda) . '</p>';
+                        $html .= '<p class="legenda" style="font-size:' . $pdfLegTam . 'pt;">' . san($pdfLegenda) . '</p>';
                     }
                 }
             } else {
@@ -530,35 +504,35 @@ if ($useMpdf) {
     }
 
     // Signature block dinâmico
-    $html .= '<div style="margin-top: 15mm; padding-top: 5mm;">';
-    $html .= '<table width="100%"><tr>';
+    $html .= '<div class="sig-block">';
+    $html .= '<table class="sig-table"><tr>';
     // Elaborado por
-    $html .= '<td width="50%" style="text-align:center; vertical-align:bottom; padding:0 10px;">';
-    $html .= '<p style="font-weight:bold; font-size:9pt; color:' . $corPrimaria . '; margin-bottom:6px;">' . $L['elaborado_por'] . '</p>';
+    $html .= '<td class="sig-cell">';
+    $html .= '<p class="sig-title">' . $L['elaborado_por'] . '</p>';
     if ($elaboradoAssinatura && file_exists(__DIR__ . '/uploads/assinaturas/' . $elaboradoAssinatura)) {
-        $html .= '<img src="' . __DIR__ . '/uploads/assinaturas/' . $elaboradoAssinatura . '" style="max-height:40px; margin-bottom:4px;"><br>';
+        $html .= '<img src="' . __DIR__ . '/uploads/assinaturas/' . $elaboradoAssinatura . '" class="sig-img"><br>';
     }
     if ($elaboradoNome) {
-        $html .= '<p style="margin:0; font-size:9pt; border-top:1px solid #999; padding-top:6px;">' . san($elaboradoNome) . '</p>';
-        $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#888;">' . $elaboradoData . '</p>';
-        $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#16a34a; font-weight:600;">&#10003; Validado</p>';
+        $html .= '<p class="sig-name">' . san($elaboradoNome) . '</p>';
+        $html .= '<p class="sig-date">' . $elaboradoData . '</p>';
+        $html .= '<p class="sig-validated">&#10003; Validado</p>';
     } else {
-        $html .= '<p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;">' . $L['pendente'] . '</p>';
+        $html .= '<p class="sig-pending">' . $L['pendente'] . '</p>';
     }
     $html .= '</td>';
     // Aprovação fornecedor/cliente
-    $html .= '<td width="50%" style="text-align:center; vertical-align:bottom; padding:0 10px;">';
-    $html .= '<p style="font-weight:bold; font-size:9pt; color:' . $corPrimaria . '; margin-bottom:6px;">' . $L['aprovacao'] . ' ' . $tipoDestinatario . '</p>';
+    $html .= '<td class="sig-cell">';
+    $html .= '<p class="sig-title">' . $L['aprovacao'] . ' ' . $tipoDestinatario . '</p>';
     if ($aceite) {
         if (!empty($aceite['assinatura_signatario']) && file_exists(__DIR__ . '/uploads/assinaturas/' . $aceite['assinatura_signatario'])) {
-            $html .= '<img src="' . __DIR__ . '/uploads/assinaturas/' . $aceite['assinatura_signatario'] . '" style="max-height:40px; margin-bottom:4px;"><br>';
+            $html .= '<img src="' . __DIR__ . '/uploads/assinaturas/' . $aceite['assinatura_signatario'] . '" class="sig-img"><br>';
         }
-        $html .= '<p style="margin:0; font-size:9pt; border-top:1px solid #999; padding-top:6px;">' . san($aceite['nome_signatario']) . '</p>';
-        if ($aceite['cargo_signatario']) $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#888;">' . san($aceite['cargo_signatario']) . '</p>';
-        $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#888;">' . date('d/m/Y H:i', strtotime($aceite['created_at'])) . '</p>';
-        $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#16a34a; font-weight:600;">&#10003; Validado</p>';
+        $html .= '<p class="sig-name">' . san($aceite['nome_signatario']) . '</p>';
+        if ($aceite['cargo_signatario']) $html .= '<p class="sig-date">' . san($aceite['cargo_signatario']) . '</p>';
+        $html .= '<p class="sig-date">' . date('d/m/Y H:i', strtotime($aceite['created_at'])) . '</p>';
+        $html .= '<p class="sig-validated">&#10003; Validado</p>';
     } else {
-        $html .= '<p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;">' . $L['aguarda'] . '</p>';
+        $html .= '<p class="sig-pending">' . $L['aguarda'] . '</p>';
     }
     $html .= '</td>';
     $html .= '</tr></table></div>';
@@ -638,15 +612,23 @@ if ($useMpdf) {
         ]);
         $mpdf->SetHTMLHeader($headerHtml);
         $mpdf->SetHTMLFooter($footerHtml);
-        $sigHtml = '<div style="margin-top: 20mm; text-align: center;">';
-        $sigHtml .= '<h2 style="color: ' . san($orgCorPrimaria) . '; font-size: 12pt;">Assinatura / Aprovação</h2>';
+        $sigHtml = '<div class="sig-page">';
+        $sigHtml .= '<h2>' . $L['assinatura'] . '</h2>';
         if ($sigPath && file_exists($sigPath)) {
-            $sigHtml .= '<div style="margin: 10mm auto;"><img src="' . $sigPath . '" height="60"></div>';
+            $sigHtml .= '<div style="margin:10mm auto;"><img src="' . $sigPath . '" height="60"></div>';
         }
-        $sigHtml .= '<div style="border-top: 1px solid #999; width: 200px; margin: 5mm auto; padding-top: 3mm; font-size: 9pt;">' . san($assinaturaNome) . '</div>';
-        $sigHtml .= '<div style="font-size: 8pt; color: #667085;">' . date('d/m/Y') . '</div>';
+        $sigHtml .= '<div class="sig-page-line">' . san($assinaturaNome) . '</div>';
+        $sigHtml .= '<div class="sig-page-date">' . date('d/m/Y') . '</div>';
         $sigHtml .= '</div>';
         $mpdf->WriteHTML($sigHtml);
+    }
+
+    // Debug: guardar HTML final em tmp/last_pdf.html
+    $debugPdf = getConfiguracao('debug_pdf', '0');
+    if ($debugPdf === '1') {
+        $tmpDir = __DIR__ . '/tmp';
+        if (!is_dir($tmpDir)) mkdir($tmpDir, 0755, true);
+        file_put_contents($tmpDir . '/last_pdf.html', '<html><head><meta charset="utf-8"><style>' . $pdfCssRaw . '</style></head><body>' . $html . '</body></html>');
     }
 
     $filename = 'Caderno_Encargos_' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $data['numero']) . '.pdf';

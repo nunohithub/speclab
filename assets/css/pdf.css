@@ -1,0 +1,319 @@
+/**
+ * SpecLab — CSS exclusivo para geração de PDF via mPDF
+ * NÃO usar flex, grid, CSS variables, ou propriedades CSS modernas.
+ * Apenas propriedades suportadas pelo mPDF 8.x.
+ *
+ * Variáveis dinâmicas (injetadas via str_replace no pdf.php):
+ *   {{COR_TITULOS}}, {{COR_LINHAS}}, {{COR_NOME}},
+ *   {{COR_PRIMARIA}}, {{COR_PRIMARIA_LIGHT}}, {{COR_PRIMARIA_DARK}},
+ *   {{TAM_TITULOS}}, {{TAM_NOME}}
+ */
+
+/* ============================================================
+   TIPOGRAFIA BASE
+   ============================================================ */
+body {
+    font-family: dejavusans, sans-serif;
+    font-size: 10pt;
+    color: #111827;
+    line-height: 1.4;
+}
+
+h1 {
+    font-size: {{TAM_NOME}}pt;
+    color: {{COR_NOME}};
+    margin: 0 0 5mm;
+}
+
+h2 {
+    font-size: {{TAM_TITULOS}}pt;
+    color: {{COR_TITULOS}};
+    border-bottom: 1px solid {{COR_LINHAS}};
+    padding-bottom: 2mm;
+    margin-top: 6mm;
+    margin-bottom: 3mm;
+    page-break-after: avoid;
+}
+
+/* ============================================================
+   META BOX (dados gerais do documento)
+   ============================================================ */
+.meta-box {
+    background: #f3f4f6;
+    padding: 3mm;
+    border-radius: 2mm;
+    margin-bottom: 5mm;
+    font-size: 9pt;
+}
+
+.meta-grid {
+    width: 100%;
+}
+
+.meta-grid td {
+    padding: 1mm 3mm;
+}
+
+.meta-label {
+    color: #667085;
+}
+
+.meta-value {
+    font-weight: bold;
+    color: #111827;
+}
+
+/* ============================================================
+   SECÇÕES DE CONTEÚDO
+   ============================================================ */
+.section {
+    margin-bottom: 4mm;
+}
+
+.content {
+    font-size: 10pt;
+    line-height: 1.5;
+}
+
+.content p {
+    margin: 0 0 2mm;
+}
+
+/* ============================================================
+   TABELAS (ensaios, classes, defeitos)
+   ============================================================ */
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+table.params {
+    margin: 3mm 0;
+    font-size: 9pt;
+}
+
+table.params th {
+    background-color: {{COR_TITULOS}};
+    color: white;
+    padding: 2mm 3mm;
+    text-align: left;
+    font-weight: 600;
+}
+
+table.params td {
+    padding: 1.5mm 3mm;
+    border-bottom: 0.5pt solid #e5e7eb;
+}
+
+table.params tr.cat td {
+    background-color: {{COR_PRIMARIA_LIGHT}};
+    font-weight: 600;
+    color: {{COR_PRIMARIA_DARK}};
+    text-align: center;
+}
+
+/* thead repete em cada página quando a tabela quebra */
+thead {
+    display: table-header-group;
+}
+
+/* evitar cortar linhas a meio */
+tr {
+    page-break-inside: avoid;
+}
+
+/* ============================================================
+   IMAGENS
+   ============================================================ */
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+.img-anexo {
+    max-width: 170mm;
+    max-height: 230mm;
+}
+
+.img-caption {
+    font-size: 9pt;
+    color: #666;
+    margin-bottom: 3mm;
+    text-align: center;
+}
+
+/* ============================================================
+   DEFEITOS (classificação por tipo)
+   ============================================================ */
+.defeito-critico {
+    color: #b42318;
+    font-weight: bold;
+}
+
+.defeito-maior {
+    color: #b35c00;
+    font-weight: bold;
+}
+
+.defeito-menor {
+    color: #667085;
+    font-weight: bold;
+}
+
+/* ============================================================
+   FICHEIROS ANEXOS
+   ============================================================ */
+.file-list {
+    margin-top: 2mm;
+}
+
+.file-item {
+    padding: 1mm 0;
+    font-size: 9pt;
+    color: #374151;
+}
+
+/* ============================================================
+   ASSINATURA / BLOCO FINAL
+   ============================================================ */
+.sig-block {
+    margin-top: 15mm;
+    padding-top: 5mm;
+    page-break-inside: avoid;
+}
+
+.sig-table {
+    width: 100%;
+}
+
+.sig-cell {
+    text-align: center;
+    vertical-align: bottom;
+    padding: 0 10px;
+    width: 50%;
+}
+
+.sig-title {
+    font-weight: bold;
+    font-size: 9pt;
+    color: {{COR_PRIMARIA}};
+    margin-bottom: 6px;
+}
+
+.sig-name {
+    margin: 0;
+    font-size: 9pt;
+    border-top: 1px solid #999;
+    padding-top: 6px;
+}
+
+.sig-date {
+    margin: 2px 0 0;
+    font-size: 8pt;
+    color: #888;
+}
+
+.sig-validated {
+    margin: 2px 0 0;
+    font-size: 8pt;
+    color: #16a34a;
+    font-weight: 600;
+}
+
+.sig-pending {
+    margin: 0;
+    font-size: 8pt;
+    color: #999;
+    padding-top: 15mm;
+    border-top: 1px solid #999;
+}
+
+.sig-img {
+    max-height: 40px;
+    margin-bottom: 4px;
+}
+
+/* Página de assinatura dedicada */
+.sig-page {
+    margin-top: 20mm;
+    text-align: center;
+    page-break-inside: avoid;
+}
+
+.sig-page h2 {
+    color: {{COR_PRIMARIA}};
+    font-size: 12pt;
+    border-bottom: none;
+}
+
+.sig-page-line {
+    border-top: 1px solid #999;
+    width: 200px;
+    margin: 5mm auto;
+    padding-top: 3mm;
+    font-size: 9pt;
+}
+
+.sig-page-date {
+    font-size: 8pt;
+    color: #667085;
+}
+
+/* ============================================================
+   REGRAS DE QUEBRA DE PÁGINA
+   ============================================================ */
+.page-break {
+    page-break-before: always;
+}
+
+.keep-together {
+    page-break-inside: avoid;
+}
+
+/* ============================================================
+   LEGENDA / NOTAS
+   ============================================================ */
+.legenda {
+    font-size: 9pt;
+    color: #888;
+    font-style: italic;
+    margin: 2px 0 0 0;
+}
+
+/* ============================================================
+   ENSAIOS — estilos inline extraídos para classes
+   ============================================================ */
+.ensaio-titulo-row td {
+    padding: 3px 0 5px;
+    font-weight: bold;
+    color: {{COR_TITULOS}};
+    border-bottom: 1px solid {{COR_LINHAS}};
+}
+
+.ensaio-cat-row td {
+    background-color: {{COR_PRIMARIA_LIGHT}};
+    font-weight: 600;
+    padding: 5px 8px;
+    color: {{COR_PRIMARIA_DARK}};
+    text-align: center;
+    border-bottom: 1px solid #d1d5db;
+}
+
+.ensaio-th {
+    padding: 6px 8px;
+    text-align: left;
+    font-weight: 600;
+    background-color: {{COR_PRIMARIA}};
+    color: white;
+}
+
+.ensaio-td {
+    padding: 4px 8px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.ensaio-td-bold {
+    padding: 4px 8px;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: bold;
+}
