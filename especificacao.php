@@ -1147,14 +1147,17 @@ $pageSubtitle = 'Editor de Especificação';
                                         $colWidths = [20, 22, 18, 13, 13, 10];
                                         $mergesData = [];
                                     }
-                                    // Converter para formato 5 colunas editor
-                                    $colShift = (count($colWidths) >= 6) ? 1 : 0;
-                                    $editorCw = ($colShift === 1) ? array_slice($colWidths, 1, 5) : array_slice($colWidths, 0, 5);
-                                    if (count($editorCw) < 5) $editorCw = [26, 22, 18, 15, 14];
+                                    // Converter para formato 6 colunas editor (Ensaio, Espec, Norma, NEI, NQA, Unidade)
+                                    $editorCw = array_slice($colWidths, 0, 6);
+                                    if (count($editorCw) < 6) {
+                                        // Dados antigos com 5 colunas: adicionar Unidade
+                                        if (count($editorCw) < 5) $editorCw = [24, 20, 16, 13, 13];
+                                        $editorCw[] = 10;
+                                    }
                                     $editorMerges = [];
                                     foreach ($mergesData as $m) {
-                                        $nc = ($m['col'] ?? 0) - $colShift;
-                                        if ($nc >= 0 && $nc <= 4) {
+                                        $nc = $m['col'] ?? 0;
+                                        if ($nc >= 0 && $nc <= 5) {
                                             $editorMerges[] = ['col' => $nc, 'row' => $m['row'], 'span' => $m['span'], 'hAlign' => $m['hAlign'] ?? 'center', 'vAlign' => $m['vAlign'] ?? 'middle'];
                                         }
                                     }
@@ -1180,7 +1183,8 @@ $pageSubtitle = 'Editor de Especificação';
                                                     <th style="width:<?= $editorCw[2] ?>%">Norma</th>
                                                     <th style="width:<?= $editorCw[3] ?>%" title="Nível Especial de Inspeção">NEI</th>
                                                     <th style="width:<?= $editorCw[4] ?>%" title="Nível de Qualidade Aceitável">NQA</th>
-                                                    <th style="width:5%"></th>
+                                                    <th style="width:<?= $editorCw[5] ?>%">Unid.</th>
+                                                    <th style="width:4%"></th>
                                                 </tr>
                                             </thead>
                                             <tbody class="ensaios-tbody">
@@ -1190,7 +1194,7 @@ $pageSubtitle = 'Editor de Especificação';
                                                         $prevCat = $cat;
                                                 ?>
                                                 <tr class="ensaio-cat-row">
-                                                    <td colspan="6"><input type="text" value="<?= sanitize($cat) ?>" data-field="cat-header" class="cat-header-input" placeholder="Categoria"><button class="remove-btn cat-remove-btn" onclick="removerCategoriaEnsaio(this)" title="Remover categoria">&times;</button></td>
+                                                    <td colspan="7"><input type="text" value="<?= sanitize($cat) ?>" data-field="cat-header" class="cat-header-input" placeholder="Categoria"><button class="remove-btn cat-remove-btn" onclick="removerCategoriaEnsaio(this)" title="Remover categoria">&times;</button></td>
                                                 </tr>
                                                 <?php endif; ?>
                                                 <tr>
@@ -1199,6 +1203,7 @@ $pageSubtitle = 'Editor de Especificação';
                                                     <td><input type="text" value="<?= sanitize($ens['norma'] ?? '') ?>" data-field="norma"></td>
                                                     <td><input type="text" value="<?= sanitize($ens['nivel_especial'] ?? '') ?>" data-field="nivel_especial"></td>
                                                     <td><input type="text" value="<?= sanitize($ens['nqa'] ?? '') ?>" data-field="nqa"></td>
+                                                    <td><input type="text" value="<?= sanitize($ens['unidade'] ?? '') ?>" data-field="unidade" placeholder="mm, %, ..."></td>
                                                     <td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>
                                                 </tr>
                                                 <?php endforeach; ?>
@@ -1872,7 +1877,7 @@ $pageSubtitle = 'Editor de Especificação';
                         </div>
                         <?php foreach ($params as $p): ?>
                             <label class="ensaio-check-item">
-                                <input type="checkbox" name="sel_ensaio" data-cat="<?= sanitize($categoria) ?>" data-ensaio="<?= sanitize($p['ensaio']) ?>" data-norma="<?= sanitize($p['metodo']) ?>" data-nivel-especial="<?= sanitize($p['nivel_especial'] ?? '') ?>" data-nqa="<?= sanitize($p['nqa'] ?? '') ?>" data-spec="<?= sanitize($p['exemplo']) ?>">
+                                <input type="checkbox" name="sel_ensaio" data-cat="<?= sanitize($categoria) ?>" data-ensaio="<?= sanitize($p['ensaio']) ?>" data-norma="<?= sanitize($p['metodo']) ?>" data-nivel-especial="<?= sanitize($p['nivel_especial'] ?? '') ?>" data-nqa="<?= sanitize($p['nqa'] ?? '') ?>" data-unidade="<?= sanitize($p['unidade'] ?? '') ?>" data-spec="<?= sanitize($p['exemplo']) ?>">
                                 <div class="ensaio-info">
                                     <div class="ensaio-name"><?= sanitize($p['ensaio']) ?></div>
                                     <div class="ensaio-detail"><?= sanitize($p['metodo']) ?> &mdash; <?= sanitize($p['exemplo']) ?></div>
@@ -2114,12 +2119,13 @@ $pageSubtitle = 'Editor de Especificação';
             '<div class="seccao-ensaios-wrap">' +
                 '<table class="seccao-ensaios-table">' +
                     '<thead><tr>' +
-                        '<th style="width:26%">Ensaio</th>' +
-                        '<th style="width:22%">Especificação</th>' +
-                        '<th style="width:18%">Norma</th>' +
-                        '<th style="width:15%" title="Nível Especial de Inspeção">NEI</th>' +
-                        '<th style="width:14%" title="Nível de Qualidade Aceitável">NQA</th>' +
-                        '<th style="width:5%"></th>' +
+                        '<th style="width:24%">Ensaio</th>' +
+                        '<th style="width:20%">Especificação</th>' +
+                        '<th style="width:16%">Norma</th>' +
+                        '<th style="width:13%" title="Nível Especial de Inspeção">NEI</th>' +
+                        '<th style="width:13%" title="Nível de Qualidade Aceitável">NQA</th>' +
+                        '<th style="width:10%">Unid.</th>' +
+                        '<th style="width:4%"></th>' +
                     '</tr></thead>' +
                     '<tbody class="ensaios-tbody">';
 
@@ -2131,7 +2137,7 @@ $pageSubtitle = 'Editor de Especificação';
                     tableHtml += criarEnsaioCatRowHtml(cat);
                     prevCat = cat;
                 }
-                tableHtml += criarEnsaioRowHtml(ens.categoria || '', ens.ensaio || '', ens.especificacao || '', ens.norma || '', ens.nivel_especial || '', ens.nqa || '');
+                tableHtml += criarEnsaioRowHtml(ens.categoria || '', ens.ensaio || '', ens.especificacao || '', ens.norma || '', ens.nivel_especial || '', ens.nqa || '', ens.unidade || '');
             });
         }
 
@@ -2157,16 +2163,17 @@ $pageSubtitle = 'Editor de Especificação';
     }
 
     function criarEnsaioCatRowHtml(cat) {
-        return '<tr class="ensaio-cat-row"><td colspan="6"><input type="text" value="' + escapeHtml(cat) + '" data-field="cat-header" class="cat-header-input" placeholder="Categoria"><button class="remove-btn cat-remove-btn" onclick="removerCategoriaEnsaio(this)" title="Remover categoria">&times;</button></td></tr>';
+        return '<tr class="ensaio-cat-row"><td colspan="7"><input type="text" value="' + escapeHtml(cat) + '" data-field="cat-header" class="cat-header-input" placeholder="Categoria"><button class="remove-btn cat-remove-btn" onclick="removerCategoriaEnsaio(this)" title="Remover categoria">&times;</button></td></tr>';
     }
 
-    function criarEnsaioRowHtml(cat, ensaio, spec, norma, nivelEspecial, nqa) {
+    function criarEnsaioRowHtml(cat, ensaio, spec, norma, nivelEspecial, nqa, unidade) {
         return '<tr>' +
             '<td><input type="text" value="' + escapeHtml(ensaio) + '" data-field="ensaio"></td>' +
             '<td><input type="text" value="' + escapeHtml(spec) + '" data-field="especificacao"></td>' +
             '<td><input type="text" value="' + escapeHtml(norma) + '" data-field="norma"></td>' +
             '<td><input type="text" value="' + escapeHtml(nivelEspecial) + '" data-field="nivel_especial"></td>' +
             '<td><input type="text" value="' + escapeHtml(nqa) + '" data-field="nqa"></td>' +
+            '<td><input type="text" value="' + escapeHtml(unidade || '') + '" data-field="unidade" placeholder="mm, %, ..."></td>' +
             '<td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>' +
         '</tr>';
     }
@@ -2353,6 +2360,7 @@ $pageSubtitle = 'Editor de Especificação';
             '<td><input type="text" value="" data-field="norma" placeholder="Norma"></td>' +
             '<td><input type="text" value="" data-field="nivel_especial" placeholder="NEI"></td>' +
             '<td><input type="text" value="" data-field="nqa" placeholder="NQA"></td>' +
+            '<td><input type="text" value="" data-field="unidade" placeholder="mm, %, ..."></td>' +
             '<td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>';
         tbody.appendChild(tr);
         tr.querySelector('input').focus();
@@ -2429,10 +2437,10 @@ $pageSubtitle = 'Editor de Especificação';
     // MERGE DE CÉLULAS (juntar células) - com rowspan real
     // ============================================================
 
-    // Mapeamento campo <-> coluna (5 colunas: Ensaio, Espec, Norma, NEI, NQA)
-    var fieldToCol = { ensaio: 0, especificacao: 1, norma: 2, nivel_especial: 3, nqa: 4 };
-    var colToField = ['ensaio', 'especificacao', 'norma', 'nivel_especial', 'nqa'];
-    var colPlaceholders = { ensaio: 'Ensaio', especificacao: 'Valor', norma: 'Norma', nivel_especial: 'NEI', nqa: 'NQA' };
+    // Mapeamento campo <-> coluna (6 colunas: Ensaio, Espec, Norma, NEI, NQA, Unidade)
+    var fieldToCol = { ensaio: 0, especificacao: 1, norma: 2, nivel_especial: 3, nqa: 4, unidade: 5 };
+    var colToField = ['ensaio', 'especificacao', 'norma', 'nivel_especial', 'nqa', 'unidade'];
+    var colPlaceholders = { ensaio: 'Ensaio', especificacao: 'Valor', norma: 'Norma', nivel_especial: 'NEI', nqa: 'NQA', unidade: 'Unid.' };
 
     // Obter apenas as data rows (excluir .ensaio-cat-row)
     function getDataRows(tbody) {
@@ -2867,7 +2875,8 @@ $pageSubtitle = 'Editor de Especificação';
                 especificacao: cb.getAttribute('data-spec') || '',
                 norma: cb.getAttribute('data-norma') || '',
                 nivel_especial: cb.getAttribute('data-nivel-especial') || '',
-                nqa: cb.getAttribute('data-nqa') || ''
+                nqa: cb.getAttribute('data-nqa') || '',
+                unidade: cb.getAttribute('data-unidade') || ''
             });
         });
 
@@ -3443,7 +3452,7 @@ $pageSubtitle = 'Editor de Especificação';
                             var catInput = tr.querySelector('input[data-field="cat-header"]');
                             currentCat = catInput ? catInput.value : '';
                         } else {
-                            var row = { categoria: currentCat, ensaio: '', especificacao: '', norma: '', nivel_especial: '', nqa: '' };
+                            var row = { categoria: currentCat, ensaio: '', especificacao: '', norma: '', nivel_especial: '', nqa: '', unidade: '' };
                             tr.querySelectorAll('input[data-field]').forEach(function(input) {
                                 var field = input.getAttribute('data-field');
                                 if (row.hasOwnProperty(field)) row[field] = input.value;

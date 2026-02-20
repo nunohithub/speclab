@@ -343,8 +343,8 @@ try {
                 if (!empty($parametros) && is_array($parametros)) {
                     $stmt = $db->prepare('
                         INSERT INTO especificacao_parametros
-                            (especificacao_id, categoria, ensaio, especificacao_valor, metodo, amostra_nqa, ordem)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                            (especificacao_id, categoria, ensaio, especificacao_valor, metodo, amostra_nqa, unidade, ordem)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ');
                     foreach ($parametros as $i => $p) {
                         $stmt->execute([
@@ -354,6 +354,7 @@ try {
                             sanitize($p['especificacao_valor'] ?? ''),
                             sanitize($p['metodo'] ?? ''),
                             sanitize($p['amostra_nqa'] ?? ''),
+                            sanitize($p['unidade'] ?? ''),
                             (int)($p['ordem'] ?? $i),
                         ]);
                     }
