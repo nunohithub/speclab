@@ -191,6 +191,12 @@ if (!empty($espec['config_visual'])) {
 
 $pageTitle = $isNew ? 'Nova Especificação' : 'Editar: ' . sanitize($espec['numero']);
 $pageSubtitle = 'Editor de Especificação';
+$showNav = true;
+$activeNav = 'especificacoes';
+$breadcrumbs = [
+    ['label' => 'Dashboard', 'url' => BASE_PATH . '/dashboard.php'],
+    ['label' => $isNew ? 'Nova Especificação' : sanitize($espec['numero'])]
+];
 ?>
 <!DOCTYPE html>
 <html lang="pt-PT">

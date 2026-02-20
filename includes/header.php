@@ -92,3 +92,16 @@ $activeNav = $activeNav ?? '';
     <?php endif; ?>
 </div>
 <?php endif; ?>
+
+<?php if (!empty($breadcrumbs) && is_array($breadcrumbs)): ?>
+<div class="breadcrumbs no-print" style="padding:var(--spacing-xs) var(--spacing-lg); font-size:12px; color:#666; background:var(--color-bg-alt); border-bottom:1px solid var(--color-border);">
+    <?php foreach ($breadcrumbs as $i => $bc): ?>
+        <?php if ($i > 0): ?> <span style="margin:0 4px;">&rsaquo;</span> <?php endif; ?>
+        <?php if (!empty($bc['url']) && $i < count($breadcrumbs) - 1): ?>
+            <a href="<?= $bc['url'] ?>" style="color:var(--color-primary); text-decoration:none;"><?= sanitize($bc['label']) ?></a>
+        <?php else: ?>
+            <strong><?= sanitize($bc['label']) ?></strong>
+        <?php endif; ?>
+    <?php endforeach; ?>
+</div>
+<?php endif; ?>

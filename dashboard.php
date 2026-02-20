@@ -151,6 +151,7 @@ $pageTitle = 'Cadernos de Encargos';
 $pageSubtitle = 'Sistema de Especificações Técnicas';
 $showNav = true;
 $activeNav = 'especificacoes';
+$breadcrumbs = [['label' => 'Dashboard']];
 ?>
 <!DOCTYPE html>
 <html lang="pt-PT">

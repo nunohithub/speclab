@@ -477,6 +477,11 @@ $pageTitle = 'Cadernos de Encargos';
 $pageSubtitle = 'Sistema de Especificações Técnicas';
 $showNav = true;
 $activeNav = $tab;
+$tabLabels = ['produtos' => 'Produtos', 'clientes' => 'Clientes', 'fornecedores' => 'Fornecedores', 'utilizadores' => 'Utilizadores', 'organizacoes' => 'Organizações', 'legislacao' => 'Legislação', 'ensaios' => 'Ensaios', 'configuracoes' => 'Configurações', 'planos' => 'Planos'];
+$breadcrumbs = [
+    ['label' => 'Dashboard', 'url' => BASE_PATH . '/dashboard.php'],
+    ['label' => $tabLabels[$tab] ?? ucfirst($tab)]
+];
 ?>
 <!DOCTYPE html>
 <html lang="pt-PT">
