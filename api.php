@@ -214,7 +214,7 @@ try {
             }
 
             // Validar estado
-            if (!in_array($estado, ['rascunho', 'ativo', 'obsoleto'])) {
+            if (!in_array($estado, ['rascunho', 'em_revisao', 'ativo', 'obsoleto'])) {
                 jsonError('Estado inválido.');
             }
 
@@ -2038,6 +2038,54 @@ try {
                 $db->prepare("INSERT INTO configuracoes (chave, valor) VALUES ('ensaios_legenda_global', ?)")->execute([$valor]);
             }
             jsonSuccess('Legenda global guardada.');
+            break;
+
+        // ===================================================================
+        // FLUXO DE APROVAÇÃO
+        // ===================================================================
+        case 'submeter_revisao':
+            $id = (int)($jsonBody['id'] ?? $_POST['id'] ?? 0);
+            if ($id <= 0) jsonError('ID inválido.');
+            checkSaOrgAccess($db, $user, $id);
+            $stmt = $db->prepare('SELECT estado, versao_bloqueada FROM especificacoes WHERE id = ?');
+            $stmt->execute([$id]);
+            $esp = $stmt->fetch();
+            if (!$esp) jsonError('Especificação não encontrada.');
+            if ($esp['versao_bloqueada']) jsonError('Versão já bloqueada.');
+            if ($esp['estado'] !== 'rascunho') jsonError('Só especificações em rascunho podem ser submetidas.');
+            $db->prepare('UPDATE especificacoes SET estado = ? WHERE id = ?')->execute(['em_revisao', $id]);
+            jsonSuccess('Submetida para revisão.');
+            break;
+
+        case 'aprovar_especificacao':
+            $id = (int)($jsonBody['id'] ?? $_POST['id'] ?? 0);
+            if ($id <= 0) jsonError('ID inválido.');
+            requireAdminApi($user);
+            checkSaOrgAccess($db, $user, $id);
+            $stmt = $db->prepare('SELECT estado, versao_bloqueada FROM especificacoes WHERE id = ?');
+            $stmt->execute([$id]);
+            $esp = $stmt->fetch();
+            if (!$esp) jsonError('Especificação não encontrada.');
+            if ($esp['estado'] !== 'em_revisao') jsonError('Só especificações em revisão podem ser aprovadas.');
+            $db->prepare('UPDATE especificacoes SET estado = ?, aprovado_por = ?, aprovado_em = NOW(), motivo_devolucao = NULL WHERE id = ?')
+               ->execute(['ativo', $user['id'], $id]);
+            jsonSuccess('Especificação aprovada.');
+            break;
+
+        case 'devolver_especificacao':
+            $id = (int)($jsonBody['id'] ?? $_POST['id'] ?? 0);
+            if ($id <= 0) jsonError('ID inválido.');
+            requireAdminApi($user);
+            checkSaOrgAccess($db, $user, $id);
+            $motivo = sanitize($jsonBody['motivo'] ?? $_POST['motivo'] ?? '');
+            if (!$motivo) jsonError('Indique o motivo da devolução.');
+            $stmt = $db->prepare('SELECT estado FROM especificacoes WHERE id = ?');
+            $stmt->execute([$id]);
+            $esp = $stmt->fetch();
+            if (!$esp || $esp['estado'] !== 'em_revisao') jsonError('Só especificações em revisão podem ser devolvidas.');
+            $db->prepare('UPDATE especificacoes SET estado = ?, motivo_devolucao = ?, aprovado_por = NULL, aprovado_em = NULL WHERE id = ?')
+               ->execute(['rascunho', $motivo, $id]);
+            jsonSuccess('Especificação devolvida ao autor.');
             break;
 
         // ===================================================================

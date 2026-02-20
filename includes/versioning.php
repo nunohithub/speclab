@@ -8,14 +8,25 @@
  * Bloquear (publicar) uma versão — torna-a imutável
  */
 function publicarVersao(PDO $db, int $especId, int $userId, ?string $notas = null): bool {
-    $stmt = $db->prepare('SELECT id, versao_bloqueada, estado FROM especificacoes WHERE id = ?');
+    $stmt = $db->prepare('SELECT id, versao_bloqueada, estado, aprovado_por FROM especificacoes WHERE id = ?');
     $stmt->execute([$especId]);
     $espec = $stmt->fetch();
     if (!$espec || $espec['versao_bloqueada']) return false;
 
-    $db->prepare('UPDATE especificacoes SET versao_bloqueada = 1, estado = ?, notas_versao = ?, publicado_por = ?, publicado_em = NOW() WHERE id = ?')
-       ->execute(['ativo', $notas, $userId, $especId]);
+    // Se ainda não foi aprovado, registar aprovação implícita pelo admin que publica
+    $aprovadoPor = $espec['aprovado_por'] ?: $userId;
+    $aprovadoEm = $espec['aprovado_por'] ? null : 'NOW()';
 
+    $sql = 'UPDATE especificacoes SET versao_bloqueada = 1, estado = ?, notas_versao = ?, publicado_por = ?, publicado_em = NOW()';
+    $params = ['ativo', $notas, $userId];
+    if (!$espec['aprovado_por']) {
+        $sql .= ', aprovado_por = ?, aprovado_em = NOW()';
+        $params[] = $userId;
+    }
+    $sql .= ' WHERE id = ?';
+    $params[] = $especId;
+
+    $db->prepare($sql)->execute($params);
     return true;
 }
 

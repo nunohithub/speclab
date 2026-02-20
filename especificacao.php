@@ -97,6 +97,7 @@ if ($isNew) {
         'classes' => [],
         'defeitos' => [],
         'config_visual' => null,
+        'motivo_devolucao' => null,
         'seccoes' => [
             ['titulo' => 'Objetivo', 'conteudo' => '', 'tipo' => 'texto', 'ordem' => 0],
         ],
@@ -859,8 +860,8 @@ $pageSubtitle = 'Editor de Especificação';
             <div class="left">
                 <a href="<?= BASE_PATH ?>/dashboard.php" class="btn btn-ghost btn-sm" title="Voltar ao Dashboard">&larr; Voltar</a>
                 <h2><?= $saOutraOrg ? 'Ver Especificação' : ($isNew ? 'Nova Especificação' : 'Editar Especificação') ?></h2>
-                <span class="pill <?= $espec['estado'] === 'ativo' ? 'pill-success' : ($espec['estado'] === 'rascunho' ? 'pill-warning' : 'pill-muted') ?>" id="estadoPill">
-                    <?= ucfirst($espec['estado']) ?>
+                <span class="pill <?= $espec['estado'] === 'ativo' ? 'pill-success' : ($espec['estado'] === 'rascunho' ? 'pill-warning' : ($espec['estado'] === 'em_revisao' ? 'pill-info' : 'pill-muted')) ?>" id="estadoPill">
+                    <?= $espec['estado'] === 'em_revisao' ? 'Em Revisão' : ucfirst($espec['estado']) ?>
                 </span>
                 <span class="muted" id="specNumero"><?= sanitize($espec['numero']) ?></span>
                 <?php if (!$isNew): ?>
@@ -876,18 +877,31 @@ $pageSubtitle = 'Editor de Especificação';
                 <a href="<?= BASE_PATH ?>/ver.php?id=<?= $espec['id'] ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Ver documento completo" id="btnVer"<?= $isNew ? ' style="display:none"' : '' ?>>Ver</a>
                 <?php if (!$saOutraOrg): ?>
                 <?php if (!$versaoBloqueada): ?>
+                <?php $isAdminUser = in_array($user['role'], ['super_admin', 'org_admin']); ?>
+                <?php if ($isAdminUser): ?>
                 <div class="dropdown">
                     <button class="btn btn-secondary btn-sm" onclick="toggleDropdown('estadoMenu')">Estado</button>
                     <div class="dropdown-menu" id="estadoMenu">
                         <button onclick="alterarEstado('rascunho')">Rascunho</button>
+                        <button onclick="alterarEstado('em_revisao')">Em Revisão</button>
                         <button onclick="alterarEstado('ativo')">Ativo</button>
                         <div class="dropdown-divider"></div>
                         <button onclick="alterarEstado('obsoleto')">Obsoleto</button>
                     </div>
                 </div>
+                <?php endif; ?>
                 <button class="btn btn-primary btn-sm" onclick="guardarTudo()">Guardar</button>
                 <?php if (!$isNew): ?>
+                <?php if ($espec['estado'] === 'rascunho'): ?>
+                <button class="btn btn-info btn-sm" onclick="submeterRevisao()" title="Submeter para revisão por um administrador">Submeter Revisão</button>
+                <?php endif; ?>
+                <?php if ($espec['estado'] === 'em_revisao' && $isAdminUser): ?>
+                <button class="btn btn-success btn-sm" onclick="aprovarEspecificacao()" title="Aprovar esta especificação">Aprovar</button>
+                <button class="btn btn-warning btn-sm" onclick="devolverEspecificacao()" title="Devolver ao autor com comentário">Devolver</button>
+                <?php endif; ?>
+                <?php if ($espec['estado'] === 'ativo' || ($espec['estado'] === 'em_revisao' && $isAdminUser)): ?>
                 <button class="btn btn-primary btn-sm" onclick="publicarVersaoUI()" title="Bloquear esta versão e enviar ao cliente">Publicar</button>
+                <?php endif; ?>
                 <?php endif; ?>
                 <?php else: ?>
                 <button class="btn btn-primary btn-sm" onclick="criarNovaVersaoUI()" title="Criar nova versão editável a partir desta">Nova Versão</button>
@@ -903,6 +917,16 @@ $pageSubtitle = 'Editor de Especificação';
         <?php elseif ($versaoBloqueada): ?>
         <div class="alert alert-warning" style="margin: var(--spacing-sm) 0; display:flex; align-items:center; gap:var(--spacing-sm);">
             <strong>Versão bloqueada (v<?= sanitize($espec['versao']) ?>)</strong> &mdash; Esta versão foi publicada e não pode ser editada. Use "Nova Versão" para criar uma cópia editável.
+        </div>
+        <?php endif; ?>
+
+        <?php if (!empty($espec['motivo_devolucao']) && $espec['estado'] === 'rascunho'): ?>
+        <div class="alert alert-warning" style="margin: var(--spacing-sm) 0;">
+            <strong>Devolvida para correção:</strong> <?= sanitize($espec['motivo_devolucao']) ?>
+        </div>
+        <?php elseif ($espec['estado'] === 'em_revisao'): ?>
+        <div class="alert alert-info" style="margin: var(--spacing-sm) 0;">
+            <strong>Em revisão</strong> &mdash; A aguardar aprovação de um administrador.
         </div>
         <?php endif; ?>
 
@@ -3616,10 +3640,76 @@ $pageSubtitle = 'Editor de Especificação';
             pill.classList.add('pill-success');
         } else if (estado === 'rascunho') {
             pill.classList.add('pill-warning');
+        } else if (estado === 'em_revisao') {
+            pill.classList.add('pill-info');
         } else {
             pill.classList.add('pill-muted');
         }
-        pill.textContent = estado.charAt(0).toUpperCase() + estado.slice(1);
+        pill.textContent = estado === 'em_revisao' ? 'Em Revisão' : (estado.charAt(0).toUpperCase() + estado.slice(1));
+    }
+
+    function submeterRevisao() {
+        if (!especId) { showToast('Guarde a especificação primeiro.', 'warning'); return; }
+        if (isDirty) { showToast('Guarde as alterações antes de submeter.', 'warning'); return; }
+        appConfirm('Submeter esta especificação para revisão?<br>Um administrador irá analisar e aprovar ou devolver.', function() {
+            fetch(BASE_PATH + '/api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                body: JSON.stringify({ action: 'submeter_revisao', id: especId })
+            })
+            .then(function(r) { return checkSession(r); })
+            .then(function(data) {
+                if (data.success) {
+                    showToast('Especificação submetida para revisão.', 'success');
+                    setTimeout(function() { location.reload(); }, 800);
+                } else {
+                    showToast(data.error || 'Erro ao submeter.', 'danger');
+                }
+            })
+            .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de ligação.', 'error'); });
+        });
+    }
+
+    function aprovarEspecificacao() {
+        if (!especId) return;
+        appConfirm('Aprovar esta especificação?<br>Após aprovação, pode ser publicada (bloqueada).', function() {
+            fetch(BASE_PATH + '/api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                body: JSON.stringify({ action: 'aprovar_especificacao', id: especId })
+            })
+            .then(function(r) { return checkSession(r); })
+            .then(function(data) {
+                if (data.success) {
+                    showToast('Especificação aprovada!', 'success');
+                    setTimeout(function() { location.reload(); }, 800);
+                } else {
+                    showToast(data.error || 'Erro ao aprovar.', 'danger');
+                }
+            })
+            .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de ligação.', 'error'); });
+        });
+    }
+
+    function devolverEspecificacao() {
+        if (!especId) return;
+        var motivo = prompt('Motivo da devolução:');
+        if (!motivo) return;
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'devolver_especificacao', id: especId, motivo: motivo })
+        })
+        .then(function(r) { return checkSession(r); })
+        .then(function(data) {
+            if (data.success) {
+                showToast('Especificação devolvida ao autor.', 'success');
+                setTimeout(function() { location.reload(); }, 800);
+            } else {
+                showToast(data.error || 'Erro ao devolver.', 'danger');
+            }
+        })
+        .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de ligação.', 'error'); });
     }
 
     // ============================================================

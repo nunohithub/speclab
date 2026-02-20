@@ -186,6 +186,7 @@ $activeNav = 'especificacoes';
                     <select name="estado" onchange="this.form.submit()">
                         <option value="">Estado</option>
                         <option value="rascunho" <?= $filtro_estado === 'rascunho' ? 'selected' : '' ?>>Rascunho</option>
+                        <option value="em_revisao" <?= $filtro_estado === 'em_revisao' ? 'selected' : '' ?>>Em Revisão</option>
                         <option value="ativo" <?= $filtro_estado === 'ativo' ? 'selected' : '' ?>>Ativo</option>
                         <option value="obsoleto" <?= $filtro_estado === 'obsoleto' ? 'selected' : '' ?>>Obsoleto</option>
                     </select>
@@ -281,8 +282,8 @@ $activeNav = 'especificacoes';
                                     <td><?= formatDate($e['data_emissao']) ?></td>
                                     <td>
                                         <?php
-                                        $estadoClass = ['rascunho' => 'pill-warning', 'ativo' => 'pill-success', 'obsoleto' => 'pill-muted'];
-                                        $estadoLabel = ['rascunho' => 'Rascunho', 'ativo' => 'Ativo', 'obsoleto' => 'Obsoleto'];
+                                        $estadoClass = ['rascunho' => 'pill-warning', 'em_revisao' => 'pill-info', 'ativo' => 'pill-success', 'obsoleto' => 'pill-muted'];
+                                        $estadoLabel = ['rascunho' => 'Rascunho', 'em_revisao' => 'Em Revisão', 'ativo' => 'Ativo', 'obsoleto' => 'Obsoleto'];
                                         ?>
                                         <span class="pill <?= $estadoClass[$e['estado']] ?? 'pill-muted' ?>">
                                             <?= $estadoLabel[$e['estado']] ?? $e['estado'] ?>
