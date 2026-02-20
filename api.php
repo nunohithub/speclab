@@ -189,6 +189,8 @@ try {
             $estado        = sanitize($_POST['estado'] ?? 'rascunho');
             $tipo_doc      = sanitize($_POST['tipo_doc'] ?? 'caderno');
             if (!in_array($tipo_doc, ['caderno', 'ficha_tecnica'])) $tipo_doc = 'caderno';
+            $idioma        = sanitize($_POST['idioma'] ?? 'pt');
+            if (!in_array($idioma, ['pt', 'en', 'es', 'fr', 'de', 'it'])) $idioma = 'pt';
 
             // Acesso público
             $codigo_acesso_input = trim($_POST['codigo_acesso'] ?? '');
@@ -235,14 +237,14 @@ try {
 
                 $stmt = $db->prepare('
                     INSERT INTO especificacoes (
-                        numero, titulo, tipo_doc, cliente_id, versao,
+                        numero, titulo, idioma, tipo_doc, cliente_id, versao,
                         data_emissao, data_revisao, data_validade, estado, codigo_acesso,
                         objetivo, ambito, definicao_material, regulamentacao,
                         processos, embalagem, aceitacao, arquivo_texto,
                         indemnizacao, observacoes, config_visual, legislacao_json,
                         criado_por, organizacao_id, created_at, updated_at
                     ) VALUES (
-                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?,
                         ?, ?, ?, ?,
                         ?, ?, ?, ?,
@@ -251,7 +253,7 @@ try {
                     )
                 ');
                 $stmt->execute([
-                    $numero, $titulo, $tipo_doc, $cliente_id, $versao,
+                    $numero, $titulo, $idioma, $tipo_doc, $cliente_id, $versao,
                     $data_emissao, $data_revisao, $data_validade, $estado, $codigo_acesso,
                     $objetivo, $ambito, $definicao_material, $regulamentacao,
                     $processos, $embalagem, $aceitacao, $arquivo_texto,
@@ -290,7 +292,7 @@ try {
 
                 $stmt = $db->prepare('
                     UPDATE especificacoes SET
-                        numero = ?, titulo = ?, tipo_doc = ?, cliente_id = ?, versao = ?,
+                        numero = ?, titulo = ?, idioma = ?, tipo_doc = ?, cliente_id = ?, versao = ?,
                         data_emissao = ?, data_revisao = ?, data_validade = ?, estado = ?,
                         objetivo = ?, ambito = ?, definicao_material = ?, regulamentacao = ?,
                         processos = ?, embalagem = ?, aceitacao = ?, arquivo_texto = ?,
@@ -300,7 +302,7 @@ try {
                     WHERE id = ?
                 ');
                 $executeParams = [
-                    $numero, $titulo, $tipo_doc, $cliente_id, $versao,
+                    $numero, $titulo, $idioma, $tipo_doc, $cliente_id, $versao,
                     $data_emissao, $data_revisao, $data_validade, $estado,
                     $objetivo, $ambito, $definicao_material, $regulamentacao,
                     $processos, $embalagem, $aceitacao, $arquivo_texto,

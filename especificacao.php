@@ -65,6 +65,7 @@ if ($isNew) {
         'id' => 0,
         'numero' => $numero,
         'titulo' => '',
+        'idioma' => 'pt',
         'versao' => '1.0',
         'estado' => 'rascunho',
         'produto_ids' => [],
@@ -982,6 +983,15 @@ $breadcrumbs = [
                                 <select id="tipo_doc" name="tipo_doc">
                                     <option value="caderno" <?= ($espec['tipo_doc'] ?? 'caderno') === 'caderno' ? 'selected' : '' ?>>Caderno de Encargos (Completo)</option>
                                     <option value="ficha_tecnica" <?= ($espec['tipo_doc'] ?? '') === 'ficha_tecnica' ? 'selected' : '' ?>>Ficha Técnica</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="idioma">Idioma</label>
+                                <select id="idioma" name="idioma">
+                                    <?php $idiomas = ['pt' => 'Português', 'en' => 'English', 'es' => 'Español', 'fr' => 'Français', 'de' => 'Deutsch', 'it' => 'Italiano'];
+                                    foreach ($idiomas as $code => $label): ?>
+                                    <option value="<?= $code ?>" <?= ($espec['idioma'] ?? 'pt') === $code ? 'selected' : '' ?>><?= $label ?></option>
+                                    <?php endforeach; ?>
                                 </select>
                             </div>
                         </div>
