@@ -246,7 +246,7 @@ $breadcrumbs = [
             border-bottom: 1px solid var(--color-border, #e5e7eb);
         }
         .editor-toolbar .left { display: flex; align-items: center; gap: var(--spacing-sm); }
-        .editor-toolbar .right { display: flex; align-items: center; gap: var(--spacing-sm); }
+        .editor-toolbar .right { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; justify-content: flex-end; }
         .sticky-header .tabs { background: var(--color-bg, #f3f4f6); margin-bottom: 0; padding-bottom: 0; }
         .sticky-header { box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: var(--spacing-lg); }
 
@@ -879,30 +879,9 @@ $breadcrumbs = [
                 <?php endif; ?>
             </div>
             <div class="right">
-                <button class="btn btn-outline-primary btn-sm" onclick="window.print()" title="Imprimir">Imprimir</button>
-                <a href="<?= BASE_PATH ?>/pdf.php?id=<?= $espec['id'] ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Exportar PDF" id="btnPdf"<?= $isNew ? ' style="display:none"' : '' ?>>PDF</a>
-                <a href="<?= BASE_PATH ?>/ver.php?id=<?= $espec['id'] ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Ver documento completo" id="btnVer"<?= $isNew ? ' style="display:none"' : '' ?>>Ver</a>
-                <?php if (!$isNew && in_array($user['role'], ['super_admin', 'org_admin'])): ?>
-                <button class="btn btn-outline-primary btn-sm" onclick="guardarComoTemplate()" title="Guardar como modelo reutilizável">Template</button>
-                <?php endif; ?>
-                <?php if (!$isNew): ?>
-                <button class="btn btn-outline-primary btn-sm" onclick="traduzirEspecificacao()" title="Traduzir para outro idioma com IA">Traduzir</button>
-                <?php endif; ?>
                 <?php if (!$saOutraOrg): ?>
                 <?php if (!$versaoBloqueada): ?>
                 <?php $isAdminUser = in_array($user['role'], ['super_admin', 'org_admin']); ?>
-                <?php if ($isAdminUser): ?>
-                <div class="dropdown">
-                    <button class="btn btn-secondary btn-sm" onclick="toggleDropdown('estadoMenu')">Estado</button>
-                    <div class="dropdown-menu" id="estadoMenu">
-                        <button onclick="alterarEstado('rascunho')">Rascunho</button>
-                        <button onclick="alterarEstado('em_revisao')">Em Revisão</button>
-                        <button onclick="alterarEstado('ativo')">Ativo</button>
-                        <div class="dropdown-divider"></div>
-                        <button onclick="alterarEstado('obsoleto')">Obsoleto</button>
-                    </div>
-                </div>
-                <?php endif; ?>
                 <button class="btn btn-primary btn-sm" onclick="guardarTudo()">Guardar</button>
                 <?php if (!$isNew): ?>
                 <?php if ($espec['estado'] === 'rascunho'): ?>
@@ -916,9 +895,31 @@ $breadcrumbs = [
                 <button class="btn btn-primary btn-sm" onclick="publicarVersaoUI()" title="Bloquear esta versão e enviar ao cliente">Publicar</button>
                 <?php endif; ?>
                 <?php endif; ?>
+                <?php if ($isAdminUser): ?>
+                <div class="dropdown">
+                    <button class="btn btn-secondary btn-sm" onclick="toggleDropdown('estadoMenu')">Estado</button>
+                    <div class="dropdown-menu" id="estadoMenu">
+                        <button onclick="alterarEstado('rascunho')">Rascunho</button>
+                        <button onclick="alterarEstado('em_revisao')">Em Revisão</button>
+                        <button onclick="alterarEstado('ativo')">Ativo</button>
+                        <div class="dropdown-divider"></div>
+                        <button onclick="alterarEstado('obsoleto')">Obsoleto</button>
+                    </div>
+                </div>
+                <?php endif; ?>
                 <?php else: ?>
                 <button class="btn btn-primary btn-sm" onclick="criarNovaVersaoUI()" title="Criar nova versão editável a partir desta">Nova Versão</button>
                 <?php endif; ?>
+                <?php endif; ?>
+                <span style="border-left:1px solid var(--color-border);height:20px;"></span>
+                <?php if (!$isNew): ?>
+                <button class="btn btn-outline-primary btn-sm" onclick="traduzirEspecificacao()" title="Traduzir para outro idioma com IA">Traduzir</button>
+                <?php endif; ?>
+                <a href="<?= BASE_PATH ?>/pdf.php?id=<?= $espec['id'] ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Exportar PDF" id="btnPdf"<?= $isNew ? ' style="display:none"' : '' ?>>PDF</a>
+                <a href="<?= BASE_PATH ?>/ver.php?id=<?= $espec['id'] ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Ver documento completo" id="btnVer"<?= $isNew ? ' style="display:none"' : '' ?>>Ver</a>
+                <button class="btn btn-outline-primary btn-sm" onclick="window.print()" title="Imprimir">Imprimir</button>
+                <?php if (!$isNew && in_array($user['role'], ['super_admin', 'org_admin'])): ?>
+                <button class="btn btn-outline-primary btn-sm" onclick="guardarComoTemplate()" title="Guardar como modelo reutilizável">Template</button>
                 <?php endif; ?>
             </div>
         </div>
@@ -3479,6 +3480,7 @@ $breadcrumbs = [
             id: especId,
             numero: document.getElementById('numero').value,
             titulo: document.getElementById('titulo').value,
+            idioma: (document.getElementById('idioma') || {}).value || 'pt',
             versao: document.getElementById('versao').value,
             estado: document.getElementById('estado').value,
             tipo_doc: document.getElementById('tipo_doc').value,
@@ -3488,8 +3490,8 @@ $breadcrumbs = [
             data_emissao: document.getElementById('data_emissao').value,
             data_revisao: document.getElementById('data_revisao').value,
             data_validade: document.getElementById('data_validade').value,
-            senha_publica: document.getElementById('senha_publica').value,
-            codigo_acesso: document.getElementById('codigo_acesso').value,
+            senha_publica: (document.getElementById('senha_publica') || {}).value || '',
+            codigo_acesso: (document.getElementById('codigo_acesso') || {}).value || '',
             config_visual: JSON.stringify(recolherConfigVisual()),
             seccoes: [],
             parametros: [],
@@ -4220,7 +4222,7 @@ $breadcrumbs = [
         if (mensagem) corpo += mensagem + '\n\n';
 
         if (incluirLink) {
-            var code = document.getElementById('codigo_acesso').value;
+            var code = (document.getElementById('codigo_acesso') || {}).value || '';
             if (code) {
                 var link = window.location.origin + BASE_PATH + '/publico.php?code=' + code;
                 corpo += 'Pode consultar o documento no seguinte link:\n' + link + '\n\n';
@@ -4306,9 +4308,9 @@ $breadcrumbs = [
 
     // Inicializar share link se código existe
     (function() {
-        var code = document.getElementById('codigo_acesso').value;
-        if (code) {
-            atualizarShareLink(code);
+        var el = document.getElementById('codigo_acesso');
+        if (el && el.value) {
+            atualizarShareLink(el.value);
         }
     })();
 

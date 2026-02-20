@@ -53,6 +53,18 @@ if (!$code && isset($_SESSION['user_id'])) {
     }
 }
 
+// Traduções dos rótulos do PDF conforme idioma da spec
+$lang = $data['idioma'] ?? 'pt';
+$labels = [
+    'pt' => ['produto'=>'Produto','cliente'=>'Cliente','fornecedor'=>'Fornecedor','emissao'=>'Emissão','revisao'=>'Revisão','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovacao'=>'Aprovação','pendente'=>'Pendente','aguarda'=>'Aguarda validação','pagina'=>'Página','de'=>'de','assinatura'=>'Assinatura / Aprovação','versao'=>'Versão'],
+    'en' => ['produto'=>'Product','cliente'=>'Client','fornecedor'=>'Supplier','emissao'=>'Issue Date','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Prepared by','aprovacao'=>'Approval','pendente'=>'Pending','aguarda'=>'Awaiting validation','pagina'=>'Page','de'=>'of','assinatura'=>'Signature / Approval','versao'=>'Version'],
+    'es' => ['produto'=>'Producto','cliente'=>'Cliente','fornecedor'=>'Proveedor','emissao'=>'Emisión','revisao'=>'Revisión','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovacao'=>'Aprobación','pendente'=>'Pendiente','aguarda'=>'En espera de validación','pagina'=>'Página','de'=>'de','assinatura'=>'Firma / Aprobación','versao'=>'Versión'],
+    'fr' => ['produto'=>'Produit','cliente'=>'Client','fornecedor'=>'Fournisseur','emissao'=>'Émission','revisao'=>'Révision','estado'=>'Statut','elaborado_por'=>'Préparé par','aprovacao'=>'Approbation','pendente'=>'En attente','aguarda'=>'En attente de validation','pagina'=>'Page','de'=>'de','assinatura'=>'Signature / Approbation','versao'=>'Version'],
+    'de' => ['produto'=>'Produkt','cliente'=>'Kunde','fornecedor'=>'Lieferant','emissao'=>'Ausgabe','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Erstellt von','aprovacao'=>'Genehmigung','pendente'=>'Ausstehend','aguarda'=>'Warten auf Validierung','pagina'=>'Seite','de'=>'von','assinatura'=>'Unterschrift / Genehmigung','versao'=>'Version'],
+    'it' => ['produto'=>'Prodotto','cliente'=>'Cliente','fornecedor'=>'Fornitore','emissao'=>'Emissione','revisao'=>'Revisione','estado'=>'Stato','elaborado_por'=>'Preparato da','aprovacao'=>'Approvazione','pendente'=>'In sospeso','aguarda'=>'In attesa di validazione','pagina'=>'Pagina','de'=>'di','assinatura'=>'Firma / Approvazione','versao'=>'Versione'],
+];
+$L = $labels[$lang] ?? $labels['pt'];
+
 // Carregar organização da especificação
 $org = null;
 $stmtOrg = $db->prepare('SELECT o.* FROM organizacoes o INNER JOIN especificacoes e ON e.organizacao_id = o.id WHERE e.id = ?');
@@ -168,7 +180,7 @@ if ($useMpdf) {
                 <td width="30%">' . $logoHtml . '</td>
                 <td width="70%" style="text-align: right;">
                     <span style="font-size: 12pt; font-weight: bold; color: ' . san($corNome) . ';">' . san($data['titulo']) . '</span><br>
-                    <span style="font-size: 8pt; color: #666;">' . san($data['numero']) . ' | Versão ' . san($data['versao']) . '</span>
+                    <span style="font-size: 8pt; color: #666;">' . san($data['numero']) . ' | ' . $L['versao'] . ' ' . san($data['versao']) . '</span>
                 </td>
             </tr>
         </table>';
@@ -176,7 +188,7 @@ if ($useMpdf) {
         <table width="100%" style="border-top: 0.5pt solid #ddd; font-size: 8pt; color: #999;">
             <tr>
                 <td width="33%">' . san($orgNome) . '</td>
-                <td width="33%" style="text-align: center;">Página {PAGENO} de {nbpg}</td>
+                <td width="33%" style="text-align: center;">' . $L['pagina'] . ' {PAGENO} ' . $L['de'] . ' {nbpg}</td>
                 <td width="33%" style="text-align: right;">Powered by SpecLab &copy;' . date('Y') . '</td>
             </tr>
         </table>';
@@ -214,14 +226,14 @@ if ($useMpdf) {
 
     // Meta — full-width rows for Produto/Cliente/Fornecedor, 2-column grid for the rest
     $metaFull = [];
-    $metaFull[] = ['Produto', san($data['produto_nome'] ?? '-')];
-    if ($temClientes) $metaFull[] = ['Cliente', san($data['cliente_nome'] ?? 'Geral')];
-    if ($temFornecedores) $metaFull[] = ['Fornecedor', san($fornecedorDisplay)];
+    $metaFull[] = [$L['produto'], san($data['produto_nome'] ?? '-')];
+    if ($temClientes) $metaFull[] = [$L['cliente'], san($data['cliente_nome'] ?? 'Geral')];
+    if ($temFornecedores) $metaFull[] = [$L['fornecedor'], san($fornecedorDisplay)];
     $metaPaired = [];
-    $metaPaired[] = ['Emissão', formatDate($data['data_emissao'])];
-    $metaPaired[] = ['Revisão', $data['data_revisao'] ? formatDate($data['data_revisao']) : '-'];
-    $metaPaired[] = ['Estado', ucfirst($data['estado'])];
-    $metaPaired[] = ['Elaborado por', san($data['criado_por_nome'] ?? '-')];
+    $metaPaired[] = [$L['emissao'], formatDate($data['data_emissao'])];
+    $metaPaired[] = [$L['revisao'], $data['data_revisao'] ? formatDate($data['data_revisao']) : '-'];
+    $metaPaired[] = [$L['estado'], ucfirst($data['estado'])];
+    $metaPaired[] = [$L['elaborado_por'], san($data['criado_por_nome'] ?? '-')];
     $html .= '<div class="meta-box"><table class="meta-grid">';
     foreach ($metaFull as $item) {
         $html .= '<tr><td colspan="2"><span class="meta-label">' . $item[0] . ':</span> <span class="meta-value">' . $item[1] . '</span></td></tr>';
@@ -516,7 +528,7 @@ if ($useMpdf) {
     $html .= '<table width="100%"><tr>';
     // Elaborado por
     $html .= '<td width="50%" style="text-align:center; vertical-align:bottom; padding:0 10px;">';
-    $html .= '<p style="font-weight:bold; font-size:9pt; color:' . $corPrimaria . '; margin-bottom:6px;">Elaborado por</p>';
+    $html .= '<p style="font-weight:bold; font-size:9pt; color:' . $corPrimaria . '; margin-bottom:6px;">' . $L['elaborado_por'] . '</p>';
     if ($elaboradoAssinatura && file_exists(__DIR__ . '/uploads/assinaturas/' . $elaboradoAssinatura)) {
         $html .= '<img src="' . __DIR__ . '/uploads/assinaturas/' . $elaboradoAssinatura . '" style="max-height:40px; margin-bottom:4px;"><br>';
     }
@@ -525,12 +537,12 @@ if ($useMpdf) {
         $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#888;">' . $elaboradoData . '</p>';
         $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#16a34a; font-weight:600;">&#10003; Validado</p>';
     } else {
-        $html .= '<p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;">Pendente</p>';
+        $html .= '<p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;">' . $L['pendente'] . '</p>';
     }
     $html .= '</td>';
     // Aprovação fornecedor/cliente
     $html .= '<td width="50%" style="text-align:center; vertical-align:bottom; padding:0 10px;">';
-    $html .= '<p style="font-weight:bold; font-size:9pt; color:' . $corPrimaria . '; margin-bottom:6px;">Aprovação ' . $tipoDestinatario . '</p>';
+    $html .= '<p style="font-weight:bold; font-size:9pt; color:' . $corPrimaria . '; margin-bottom:6px;">' . $L['aprovacao'] . ' ' . $tipoDestinatario . '</p>';
     if ($aceite) {
         if (!empty($aceite['assinatura_signatario']) && file_exists(__DIR__ . '/uploads/assinaturas/' . $aceite['assinatura_signatario'])) {
             $html .= '<img src="' . __DIR__ . '/uploads/assinaturas/' . $aceite['assinatura_signatario'] . '" style="max-height:40px; margin-bottom:4px;"><br>';
@@ -540,7 +552,7 @@ if ($useMpdf) {
         $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#888;">' . date('d/m/Y H:i', strtotime($aceite['created_at'])) . '</p>';
         $html .= '<p style="margin:2px 0 0; font-size:8pt; color:#16a34a; font-weight:600;">&#10003; Validado</p>';
     } else {
-        $html .= '<p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;">Aguarda validação</p>';
+        $html .= '<p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;">' . $L['aguarda'] . '</p>';
     }
     $html .= '</td>';
     $html .= '</tr></table></div>';
@@ -722,22 +734,22 @@ $tamNome    = (int)$cv['tamanho_nome'];
         <img src="<?= $fallbackLogoSrc ?>" alt="<?= $fallbackLogoAlt ?>" onerror="this.style.display='none'">
         <div class="title">
             <h1><?= san($data['titulo']) ?></h1>
-            <p><?= san($data['numero']) ?> | Versão <?= san($data['versao']) ?></p>
+            <p><?= san($data['numero']) ?> | <?= $L['versao'] ?> <?= san($data['versao']) ?></p>
         </div>
     </div>
 
     <div class="meta">
-        <div class="meta-full"><span>Produto:</span> <strong><?= san($data['produto_nome'] ?? '-') ?></strong></div>
+        <div class="meta-full"><span><?= $L['produto'] ?>:</span> <strong><?= san($data['produto_nome'] ?? '-') ?></strong></div>
         <?php if ($temClientes): ?>
-        <div class="meta-full"><span>Cliente:</span> <strong><?= san($data['cliente_nome'] ?? 'Geral') ?></strong></div>
+        <div class="meta-full"><span><?= $L['cliente'] ?>:</span> <strong><?= san($data['cliente_nome'] ?? 'Geral') ?></strong></div>
         <?php endif; ?>
         <?php if ($temFornecedores): ?>
-        <div class="meta-full"><span>Fornecedor:</span> <strong><?= san($fornecedorDisplay) ?></strong></div>
+        <div class="meta-full"><span><?= $L['fornecedor'] ?>:</span> <strong><?= san($fornecedorDisplay) ?></strong></div>
         <?php endif; ?>
-        <div><span>Emissão:</span> <strong><?= formatDate($data['data_emissao']) ?></strong></div>
-        <div><span>Revisão:</span> <strong><?= $data['data_revisao'] ? formatDate($data['data_revisao']) : '-' ?></strong></div>
-        <div><span>Estado:</span> <strong><?= ucfirst($data['estado']) ?></strong></div>
-        <div><span>Elaborado por:</span> <strong><?= san($data['criado_por_nome'] ?? '-') ?></strong></div>
+        <div><span><?= $L['emissao'] ?>:</span> <strong><?= formatDate($data['data_emissao']) ?></strong></div>
+        <div><span><?= $L['revisao'] ?>:</span> <strong><?= $data['data_revisao'] ? formatDate($data['data_revisao']) : '-' ?></strong></div>
+        <div><span><?= $L['estado'] ?>:</span> <strong><?= ucfirst($data['estado']) ?></strong></div>
+        <div><span><?= $L['elaborado_por'] ?>:</span> <strong><?= san($data['criado_por_nome'] ?? '-') ?></strong></div>
     </div>
 
     <?php if (!empty($data['seccoes'])): ?>
@@ -945,7 +957,7 @@ $tamNome    = (int)$cv['tamanho_nome'];
     <!-- Validações -->
     <div class="signatures">
         <div class="sig-box" style="border-top:none; padding-top:0; text-align:center;">
-            <p style="font-weight:bold; margin:0 0 8px; font-size:9pt; color:<?= $corPrimaria ?>;">Elaborado por</p>
+            <p style="font-weight:bold; margin:0 0 8px; font-size:9pt; color:<?= $corPrimaria ?>;"><?= $L['elaborado_por'] ?></p>
             <?php if ($elaboradoAssinatura && file_exists(__DIR__ . '/uploads/assinaturas/' . $elaboradoAssinatura)): ?>
                 <img src="<?= __DIR__ ?>/uploads/assinaturas/<?= $elaboradoAssinatura ?>" style="max-height:40px; margin-bottom:4px;">
             <?php endif; ?>
@@ -954,11 +966,11 @@ $tamNome    = (int)$cv['tamanho_nome'];
                 <p style="margin:2px 0 0; font-size:8pt; color:#888;"><?= $elaboradoData ?></p>
                 <p style="margin:2px 0 0; font-size:8pt; color:#16a34a; font-weight:600;">&#10003; Validado</p>
             <?php else: ?>
-                <p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;">Pendente</p>
+                <p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;"><?= $L['pendente'] ?></p>
             <?php endif; ?>
         </div>
         <div class="sig-box" style="border-top:none; padding-top:0; text-align:center;">
-            <p style="font-weight:bold; margin:0 0 8px; font-size:9pt; color:<?= $corPrimaria ?>;">Aprovação <?= $tipoDestinatario ?></p>
+            <p style="font-weight:bold; margin:0 0 8px; font-size:9pt; color:<?= $corPrimaria ?>;"><?= $L['aprovacao'] ?> <?= $tipoDestinatario ?></p>
             <?php if ($aceite): ?>
                 <?php if (!empty($aceite['assinatura_signatario']) && file_exists(__DIR__ . '/uploads/assinaturas/' . $aceite['assinatura_signatario'])): ?>
                     <img src="<?= __DIR__ ?>/uploads/assinaturas/<?= $aceite['assinatura_signatario'] ?>" style="max-height:40px; margin-bottom:4px;">
@@ -970,14 +982,14 @@ $tamNome    = (int)$cv['tamanho_nome'];
                 <p style="margin:2px 0 0; font-size:8pt; color:#888;"><?= date('d/m/Y H:i', strtotime($aceite['created_at'])) ?></p>
                 <p style="margin:2px 0 0; font-size:8pt; color:#16a34a; font-weight:600;">&#10003; Validado</p>
             <?php else: ?>
-                <p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;">Aguarda validação</p>
+                <p style="margin:0; font-size:8pt; color:#999; padding-top:15mm; border-top:1px solid #999;">' . $L['aguarda'] . '</p>
             <?php endif; ?>
         </div>
     </div>
 
     <div class="footer">
         <span>&copy; <?= san($orgNome) ?> <?= date('Y') ?> | Powered by SpecLab</span>
-        <span><?= san($data['numero']) ?> | Versão <?= san($data['versao']) ?> | <?= date('d/m/Y') ?></span>
+        <span><?= san($data['numero']) ?> | <?= $L['versao'] ?> <?= san($data['versao']) ?> | <?= date('d/m/Y') ?></span>
     </div>
 </body>
 </html>
