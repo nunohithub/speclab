@@ -28,6 +28,18 @@ if (!isSuperAdmin() && ($data['organizacao_id'] ?? null) != $user['org_id']) {
     exit;
 }
 
+// Traduções dos rótulos conforme idioma da spec
+$lang = $data['idioma'] ?? 'pt';
+$labels = [
+    'pt' => ['produto'=>'Produto','cliente'=>'Cliente','fornecedor'=>'Fornecedor','emissao'=>'Emissão','revisao'=>'Revisão','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovacao'=>'Aprovação','pendente'=>'Pendente','aguarda'=>'Aguarda validação','pagina'=>'Página','de'=>'de','assinatura'=>'Assinatura / Aprovação','versao'=>'Versão','impresso'=>'Impresso'],
+    'en' => ['produto'=>'Product','cliente'=>'Client','fornecedor'=>'Supplier','emissao'=>'Issue Date','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Prepared by','aprovacao'=>'Approval','pendente'=>'Pending','aguarda'=>'Awaiting validation','pagina'=>'Page','de'=>'of','assinatura'=>'Signature / Approval','versao'=>'Version','impresso'=>'Printed'],
+    'es' => ['produto'=>'Producto','cliente'=>'Cliente','fornecedor'=>'Proveedor','emissao'=>'Emisión','revisao'=>'Revisión','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovacao'=>'Aprobación','pendente'=>'Pendiente','aguarda'=>'En espera de validación','pagina'=>'Página','de'=>'de','assinatura'=>'Firma / Aprobación','versao'=>'Versión','impresso'=>'Impreso'],
+    'fr' => ['produto'=>'Produit','cliente'=>'Client','fornecedor'=>'Fournisseur','emissao'=>'Émission','revisao'=>'Révision','estado'=>'Statut','elaborado_por'=>'Préparé par','aprovacao'=>'Approbation','pendente'=>'En attente','aguarda'=>'En attente de validation','pagina'=>'Page','de'=>'de','assinatura'=>'Signature / Approbation','versao'=>'Version','impresso'=>'Imprimé'],
+    'de' => ['produto'=>'Produkt','cliente'=>'Kunde','fornecedor'=>'Lieferant','emissao'=>'Ausgabe','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Erstellt von','aprovacao'=>'Genehmigung','pendente'=>'Ausstehend','aguarda'=>'Warten auf Validierung','pagina'=>'Seite','de'=>'von','assinatura'=>'Unterschrift / Genehmigung','versao'=>'Version','impresso'=>'Gedruckt'],
+    'it' => ['produto'=>'Prodotto','cliente'=>'Cliente','fornecedor'=>'Fornitore','emissao'=>'Emissione','revisao'=>'Revisione','estado'=>'Stato','elaborado_por'=>'Preparato da','aprovacao'=>'Approvazione','pendente'=>'In sospeso','aguarda'=>'In attesa di validazione','pagina'=>'Pagina','de'=>'di','assinatura'=>'Firma / Approvazione','versao'=>'Versione','impresso'=>'Stampato'],
+];
+$L = $labels[$lang] ?? $labels['pt'];
+
 $org = getOrgByEspecificacao($db, $id);
 $temClientes = $org && !empty($org['tem_clientes']);
 $temFornecedores = $org && !empty($org['tem_fornecedores']);
@@ -131,22 +143,22 @@ if ($org && $org['logo']) {
                 <img src="<?= $orgLogo ?>" alt="<?= sanitize($orgNome) ?>" onerror="this.style.display='none'">
                 <div class="doc-title">
                     <h1><?= san($data['titulo']) ?></h1>
-                    <p><?= san($data['numero']) ?> | Versão <?= san($data['versao']) ?></p>
+                    <p><?= san($data['numero']) ?> | <?= $L['versao'] ?> <?= san($data['versao']) ?></p>
                 </div>
             </div>
 
             <!-- Meta -->
             <div class="doc-meta">
-                <div class="meta-full"><span>Produto:</span> <strong><?= san($data['produto_nome'] ?? '-') ?></strong></div>
+                <div class="meta-full"><span><?= $L['produto'] ?>:</span> <strong><?= san($data['produto_nome'] ?? '-') ?></strong></div>
                 <?php if ($temClientes): ?>
-                <div class="meta-full"><span>Cliente:</span> <strong><?= san($data['cliente_nome'] ?? 'Geral') ?></strong></div>
+                <div class="meta-full"><span><?= $L['cliente'] ?>:</span> <strong><?= san($data['cliente_nome'] ?? 'Geral') ?></strong></div>
                 <?php endif; ?>
                 <?php if ($temFornecedores): ?>
-                <div class="meta-full"><span>Fornecedor:</span> <strong><?= san($fornecedorDisplay) ?></strong></div>
+                <div class="meta-full"><span><?= $L['fornecedor'] ?>:</span> <strong><?= san($fornecedorDisplay) ?></strong></div>
                 <?php endif; ?>
-                <div><span>Emissão:</span> <strong><?= formatDate($data['data_emissao']) ?></strong></div>
-                <div><span>Revisão:</span> <strong><?= $data['data_revisao'] ? formatDate($data['data_revisao']) : '-' ?></strong></div>
-                <div><span>Estado:</span> <strong><?= ucfirst($data['estado']) ?></strong></div>
+                <div><span><?= $L['emissao'] ?>:</span> <strong><?= formatDate($data['data_emissao']) ?></strong></div>
+                <div><span><?= $L['revisao'] ?>:</span> <strong><?= $data['data_revisao'] ? formatDate($data['data_revisao']) : '-' ?></strong></div>
+                <div><span><?= $L['estado'] ?>:</span> <strong><?= ucfirst($data['estado']) ?></strong></div>
                 <div><span>Criado por:</span> <strong><?= san($data['criado_por_nome'] ?? '-') ?></strong></div>
             </div>
 
@@ -415,7 +427,7 @@ if ($org && $org['logo']) {
 
             <div class="doc-footer">
                 <span>&copy; <?= sanitize($orgNome) ?> <?= date('Y') ?></span>
-                <span><?= san($data['numero']) ?> | Versão <?= san($data['versao']) ?> | Impresso: <?= date('d/m/Y H:i') ?></span>
+                <span><?= san($data['numero']) ?> | <?= $L['versao'] ?> <?= san($data['versao']) ?> | <?= $L['impresso'] ?>: <?= date('d/m/Y H:i') ?></span>
             </div>
         </div>
     </div>

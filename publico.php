@@ -122,6 +122,18 @@ $data = null;
 if ($authenticated) {
     $data = getEspecificacaoCompleta($db, $espec['id']);
 }
+
+// Traduções dos rótulos conforme idioma
+$lang = $data['idioma'] ?? 'pt';
+$labels = [
+    'pt' => ['produto'=>'Produto','cliente'=>'Cliente','fornecedor'=>'Fornecedor','emissao'=>'Emissão','revisao'=>'Revisão','estado'=>'Estado','elaborado_por'=>'Criado por','versao'=>'Versão','documento'=>'Documento'],
+    'en' => ['produto'=>'Product','cliente'=>'Client','fornecedor'=>'Supplier','emissao'=>'Issue Date','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Created by','versao'=>'Version','documento'=>'Document'],
+    'es' => ['produto'=>'Producto','cliente'=>'Cliente','fornecedor'=>'Proveedor','emissao'=>'Emisión','revisao'=>'Revisión','estado'=>'Estado','elaborado_por'=>'Creado por','versao'=>'Versión','documento'=>'Documento'],
+    'fr' => ['produto'=>'Produit','cliente'=>'Client','fornecedor'=>'Fournisseur','emissao'=>'Émission','revisao'=>'Révision','estado'=>'Statut','elaborado_por'=>'Créé par','versao'=>'Version','documento'=>'Document'],
+    'de' => ['produto'=>'Produkt','cliente'=>'Kunde','fornecedor'=>'Lieferant','emissao'=>'Ausgabe','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Erstellt von','versao'=>'Version','documento'=>'Dokument'],
+    'it' => ['produto'=>'Prodotto','cliente'=>'Cliente','fornecedor'=>'Fornitore','emissao'=>'Emissione','revisao'=>'Revisione','estado'=>'Stato','elaborado_por'=>'Creato da','versao'=>'Versione','documento'=>'Documento'],
+];
+$L = $labels[$lang] ?? $labels['pt'];
 ?>
 <!DOCTYPE html>
 <html lang="pt-PT">
@@ -225,7 +237,7 @@ if ($authenticated) {
                 <img src="<?= $orgLogo ?>" alt="<?= sanitize($orgNome) ?>" onerror="this.style.display='none'">
                 <div class="doc-title">
                     <h1><?= san($data['titulo']) ?></h1>
-                    <p><?= san($data['numero']) ?> | Versão <?= san($data['versao']) ?></p>
+                    <p><?= san($data['numero']) ?> | <?= $L['versao'] ?> <?= san($data['versao']) ?></p>
                 </div>
             </div>
 
@@ -237,17 +249,17 @@ if ($authenticated) {
 
             <!-- Meta -->
             <div class="doc-meta">
-                <div><span>Produto:</span> <strong><?= san($data['produto_nome'] ?? '-') ?></strong></div>
+                <div><span><?= $L['produto'] ?>:</span> <strong><?= san($data['produto_nome'] ?? '-') ?></strong></div>
                 <?php if ($temClientes): ?>
-                <div><span>Cliente:</span> <strong><?= san($data['cliente_nome'] ?? 'Geral') ?></strong></div>
+                <div><span><?= $L['cliente'] ?>:</span> <strong><?= san($data['cliente_nome'] ?? 'Geral') ?></strong></div>
                 <?php endif; ?>
                 <?php if ($temFornecedores): ?>
-                <div><span>Fornecedor:</span> <strong><?= san($data['fornecedor_nome'] ?? 'Todos') ?></strong></div>
+                <div><span><?= $L['fornecedor'] ?>:</span> <strong><?= san($data['fornecedor_nome'] ?? 'Todos') ?></strong></div>
                 <?php endif; ?>
-                <div><span>Emissão:</span> <strong><?= formatDate($data['data_emissao']) ?></strong></div>
-                <div><span>Revisão:</span> <strong><?= $data['data_revisao'] ? formatDate($data['data_revisao']) : '-' ?></strong></div>
-                <div><span>Estado:</span> <strong><?= ucfirst($data['estado']) ?></strong></div>
-                <div><span>Criado por:</span> <strong><?= san($data['criado_por_nome'] ?? '-') ?></strong></div>
+                <div><span><?= $L['emissao'] ?>:</span> <strong><?= formatDate($data['data_emissao']) ?></strong></div>
+                <div><span><?= $L['revisao'] ?>:</span> <strong><?= $data['data_revisao'] ? formatDate($data['data_revisao']) : '-' ?></strong></div>
+                <div><span><?= $L['estado'] ?>:</span> <strong><?= ucfirst($data['estado']) ?></strong></div>
+                <div><span><?= $L['elaborado_por'] ?>:</span> <strong><?= san($data['criado_por_nome'] ?? '-') ?></strong></div>
             </div>
 
             <!-- Secções -->
@@ -494,7 +506,7 @@ if ($authenticated) {
             <!-- Footer -->
             <div class="doc-footer">
                 <span>&copy; <?= getConfiguracao('empresa_nome', 'SpecLab') ?> <?= date('Y') ?></span>
-                <span>Documento: <?= san($data['numero']) ?> | Versão <?= san($data['versao']) ?></span>
+                <span><?= $L['documento'] ?>: <?= san($data['numero']) ?> | <?= $L['versao'] ?> <?= san($data['versao']) ?></span>
             </div>
 
             <?php
