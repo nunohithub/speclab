@@ -885,6 +885,9 @@ $breadcrumbs = [
                 <?php if (!$isNew && in_array($user['role'], ['super_admin', 'org_admin'])): ?>
                 <button class="btn btn-outline-primary btn-sm" onclick="guardarComoTemplate()" title="Guardar como modelo reutilizável">Template</button>
                 <?php endif; ?>
+                <?php if (!$isNew): ?>
+                <button class="btn btn-outline-primary btn-sm" onclick="traduzirEspecificacao()" title="Traduzir para outro idioma com IA">Traduzir</button>
+                <?php endif; ?>
                 <?php if (!$saOutraOrg): ?>
                 <?php if (!$versaoBloqueada): ?>
                 <?php $isAdminUser = in_array($user['role'], ['super_admin', 'org_admin']); ?>
@@ -4694,6 +4697,43 @@ $breadcrumbs = [
         var div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // ============================================================
+    // TRADUÇÃO COM IA
+    // ============================================================
+    function traduzirEspecificacao() {
+        if (!especId) { showToast('Guarde a especificação primeiro.', 'warning'); return; }
+        var idiomas = {'en':'Inglês','es':'Espanhol','fr':'Francês','de':'Alemão','it':'Italiano','pt':'Português'};
+        var idiomaAtual = document.getElementById('idioma') ? document.getElementById('idioma').value : 'pt';
+        var opcoes = [];
+        for (var k in idiomas) {
+            if (k !== idiomaAtual) opcoes.push(k + ' = ' + idiomas[k]);
+        }
+        var escolha = prompt('Traduzir para qual idioma?\n\n' + opcoes.join('\n') + '\n\nEscreva o código (ex: en):');
+        if (!escolha || !idiomas[escolha.trim().toLowerCase()]) {
+            if (escolha) showToast('Idioma inválido.', 'warning');
+            return;
+        }
+        var idiomaDestino = escolha.trim().toLowerCase();
+        showToast('A traduzir com IA... pode demorar até 1 minuto.', 'info');
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'traduzir_especificacao', especificacao_id: especId, idioma_destino: idiomaDestino })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                showToast('Tradução criada! A abrir...', 'success');
+                setTimeout(function() {
+                    window.open(BASE_PATH + '/especificacao.php?id=' + d.data.nova_id, '_blank');
+                }, 500);
+            } else {
+                showToast(d.error || 'Erro na tradução.', 'error');
+            }
+        })
+        .catch(function() { showToast('Erro de ligação.', 'error'); });
     }
 
     // ============================================================

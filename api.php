@@ -2135,6 +2135,169 @@ try {
             break;
 
         // ===================================================================
+        // TRADUÇÃO COM IA
+        // ===================================================================
+        case 'traduzir_especificacao':
+            if (!checkRateLimit('ai', 20)) jsonError('Limite de IA atingido (20/hora). Aguarde.');
+            $especId = (int)($jsonBody['especificacao_id'] ?? 0);
+            $idiomaDest = strtolower(trim($jsonBody['idioma_destino'] ?? ''));
+            $idiomasValidos = ['pt' => 'Português', 'en' => 'English', 'es' => 'Español', 'fr' => 'Français', 'de' => 'Deutsch', 'it' => 'Italiano'];
+            if (!isset($idiomasValidos[$idiomaDest])) jsonError('Idioma inválido.');
+            if ($especId <= 0) jsonError('ID inválido.');
+            checkSaOrgAccess($db, $user, $especId);
+
+            $apiKey = getConfiguracao('openai_api_key', '');
+            if (!$apiKey) jsonError('Chave OpenAI não configurada em Configurações.');
+
+            // Carregar spec original
+            $stmt = $db->prepare('SELECT * FROM especificacoes WHERE id = ?');
+            $stmt->execute([$especId]);
+            $orig = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$orig) jsonError('Especificação não encontrada.');
+
+            // Carregar secções
+            $stmt = $db->prepare('SELECT id, titulo, conteudo, tipo, ordem FROM especificacao_seccoes WHERE especificacao_id = ? ORDER BY ordem');
+            $stmt->execute([$especId]);
+            $seccoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Construir texto para traduzir
+            $paraTraduzir = ['titulo' => $orig['titulo']];
+            $camposTexto = ['objetivo', 'ambito', 'definicao_material', 'regulamentacao', 'processos', 'embalagem', 'aceitacao', 'arquivo_texto', 'indemnizacao', 'observacoes'];
+            foreach ($camposTexto as $campo) {
+                if (!empty($orig[$campo])) $paraTraduzir['campo_' . $campo] = $orig[$campo];
+            }
+            foreach ($seccoes as $i => $sec) {
+                $paraTraduzir['sec_' . $i . '_titulo'] = $sec['titulo'];
+                if ($sec['tipo'] !== 'ensaios' && !empty($sec['conteudo'])) {
+                    $paraTraduzir['sec_' . $i . '_conteudo'] = $sec['conteudo'];
+                }
+            }
+
+            $nomeLang = $idiomasValidos[$idiomaDest];
+            $systemMsg = "You are a professional translator for technical specification documents (cork stoppers industry). Translate to {$nomeLang}. Keep HTML tags intact. Keep technical terms accurate. Return ONLY valid JSON with the same keys.";
+            $userMsg = "Translate the following JSON values (not keys) to {$nomeLang}. Return ONLY the JSON object with translated values:\n\n" . json_encode($paraTraduzir, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+            $payload = [
+                'model' => 'gpt-4o-mini',
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemMsg],
+                    ['role' => 'user', 'content' => $userMsg],
+                ],
+                'max_tokens' => 4000,
+                'temperature' => 0.3,
+            ];
+
+            $ch = curl_init('https://api.openai.com/v1/chat/completions');
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $apiKey],
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 120,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr = curl_error($ch);
+            curl_close($ch);
+
+            if ($curlErr) jsonError('Erro de ligação à API: ' . $curlErr);
+            $result = json_decode($response, true);
+            if ($httpCode !== 200 || !isset($result['choices'][0]['message']['content'])) {
+                $errMsg = $result['error']['message'] ?? 'Erro desconhecido da API OpenAI.';
+                jsonError('OpenAI: ' . $errMsg);
+            }
+
+            $aiText = $result['choices'][0]['message']['content'];
+            // Limpar markdown code blocks se presentes
+            $aiText = preg_replace('/^```json\s*/i', '', trim($aiText));
+            $aiText = preg_replace('/\s*```$/', '', $aiText);
+            $traduzido = json_decode($aiText, true);
+            if (!$traduzido || !isset($traduzido['titulo'])) jsonError('A IA devolveu formato inválido. Tente novamente.');
+
+            // Criar nova spec como clone traduzido
+            $novoNumero = gerarNumeroEspecificacao($db, $orig['organizacao_id']);
+            $db->beginTransaction();
+            try {
+                $novoCodigo = gerarCodigoAcesso();
+                $db->prepare('INSERT INTO especificacoes
+                    (numero, titulo, idioma, tipo_doc, produto_id, cliente_id, fornecedor_id, versao, versao_numero,
+                     versao_bloqueada, data_emissao, data_validade, estado,
+                     objetivo, ambito, definicao_material, regulamentacao, processos, embalagem,
+                     aceitacao, arquivo_texto, indemnizacao, observacoes, config_visual, legislacao_json,
+                     template_pdf, assinatura_nome, pdf_protegido, codigo_acesso, criado_por, organizacao_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0, CURDATE(), ?, ?,
+                            ?, ?, ?, ?, ?, ?,
+                            ?, ?, ?, ?, ?, ?,
+                            ?, ?, ?, ?, ?, ?)')
+                    ->execute([
+                        $novoNumero,
+                        sanitize($traduzido['titulo'] ?? $orig['titulo']),
+                        $idiomaDest,
+                        $orig['tipo_doc'],
+                        $orig['produto_id'],
+                        $orig['cliente_id'],
+                        $orig['fornecedor_id'],
+                        '1.0',
+                        $orig['data_validade'],
+                        'rascunho',
+                        $traduzido['campo_objetivo'] ?? $orig['objetivo'],
+                        $traduzido['campo_ambito'] ?? $orig['ambito'],
+                        $traduzido['campo_definicao_material'] ?? $orig['definicao_material'],
+                        $traduzido['campo_regulamentacao'] ?? $orig['regulamentacao'],
+                        $traduzido['campo_processos'] ?? $orig['processos'],
+                        $traduzido['campo_embalagem'] ?? $orig['embalagem'],
+                        $traduzido['campo_aceitacao'] ?? $orig['aceitacao'],
+                        $traduzido['campo_arquivo_texto'] ?? $orig['arquivo_texto'],
+                        $traduzido['campo_indemnizacao'] ?? $orig['indemnizacao'],
+                        $traduzido['campo_observacoes'] ?? $orig['observacoes'],
+                        $orig['config_visual'],
+                        $orig['legislacao_json'],
+                        $orig['template_pdf'],
+                        $orig['assinatura_nome'],
+                        $orig['pdf_protegido'],
+                        $novoCodigo,
+                        $user['id'],
+                        $orig['organizacao_id'],
+                    ]);
+
+                $novoId = (int)$db->lastInsertId();
+
+                // Clonar secções com tradução
+                foreach ($seccoes as $i => $sec) {
+                    $tituloTrad = $traduzido['sec_' . $i . '_titulo'] ?? $sec['titulo'];
+                    $conteudoTrad = $sec['conteudo'];
+                    if ($sec['tipo'] !== 'ensaios' && isset($traduzido['sec_' . $i . '_conteudo'])) {
+                        $conteudoTrad = $traduzido['sec_' . $i . '_conteudo'];
+                    }
+                    $db->prepare('INSERT INTO especificacao_seccoes (especificacao_id, titulo, conteudo, tipo, ordem) VALUES (?, ?, ?, ?, ?)')
+                        ->execute([$novoId, sanitize($tituloTrad), $conteudoTrad, $sec['tipo'], $sec['ordem']]);
+                }
+
+                // Clonar parametros, classes, defeitos, produtos, fornecedores
+                $cols = getColumnList($db, 'especificacao_parametros', ['id', 'especificacao_id']);
+                if ($cols) {
+                    $db->prepare("INSERT INTO especificacao_parametros (especificacao_id, $cols) SELECT ?, $cols FROM especificacao_parametros WHERE especificacao_id = ?")
+                        ->execute([$novoId, $especId]);
+                }
+                $db->prepare('INSERT INTO especificacao_classes (especificacao_id, classe, defeitos_max, descricao, ordem) SELECT ?, classe, defeitos_max, descricao, ordem FROM especificacao_classes WHERE especificacao_id = ?')
+                    ->execute([$novoId, $especId]);
+                $db->prepare('INSERT INTO especificacao_defeitos (especificacao_id, nome, tipo, descricao, ordem) SELECT ?, nome, tipo, descricao, ordem FROM especificacao_defeitos WHERE especificacao_id = ?')
+                    ->execute([$novoId, $especId]);
+                $db->prepare('INSERT INTO especificacao_produtos (especificacao_id, produto_id) SELECT ?, produto_id FROM especificacao_produtos WHERE especificacao_id = ?')
+                    ->execute([$novoId, $especId]);
+                $db->prepare('INSERT INTO especificacao_fornecedores (especificacao_id, fornecedor_id) SELECT ?, fornecedor_id FROM especificacao_fornecedores WHERE especificacao_id = ?')
+                    ->execute([$novoId, $especId]);
+
+                $db->commit();
+                jsonSuccess('Tradução criada.', ['nova_id' => $novoId]);
+            } catch (Exception $e) {
+                $db->rollBack();
+                error_log('Erro tradução: ' . $e->getMessage());
+                jsonError('Erro ao criar especificação traduzida.');
+            }
+            break;
+
+        // ===================================================================
         // TEMPLATES
         // ===================================================================
         case 'save_template':
