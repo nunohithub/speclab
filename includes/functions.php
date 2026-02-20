@@ -317,6 +317,41 @@ function getPlanos(PDO $db): array {
 }
 
 /**
+ * Validar se uma especificação está completa para publicação/submissão
+ * Retorna array de erros (vazio = ok)
+ */
+function validateForPublish(PDO $db, int $especId): array {
+    $erros = [];
+    $stmt = $db->prepare('SELECT titulo, data_emissao FROM especificacoes WHERE id = ?');
+    $stmt->execute([$especId]);
+    $e = $stmt->fetch();
+    if (!$e) return ['Especificação não encontrada.'];
+
+    if (empty(trim($e['titulo'] ?? ''))) {
+        $erros[] = 'Título é obrigatório.';
+    }
+    if (empty($e['data_emissao'])) {
+        $erros[] = 'Data de emissão é obrigatória.';
+    }
+
+    // Pelo menos 1 produto
+    $stmt = $db->prepare('SELECT COUNT(*) FROM especificacao_produtos WHERE especificacao_id = ?');
+    $stmt->execute([$especId]);
+    if ((int)$stmt->fetchColumn() === 0) {
+        $erros[] = 'Pelo menos 1 produto é obrigatório.';
+    }
+
+    // Pelo menos 1 secção com conteúdo
+    $stmt = $db->prepare('SELECT COUNT(*) FROM especificacao_seccoes WHERE especificacao_id = ? AND conteudo IS NOT NULL AND conteudo != ""');
+    $stmt->execute([$especId]);
+    if ((int)$stmt->fetchColumn() === 0) {
+        $erros[] = 'Pelo menos 1 secção com conteúdo é obrigatória.';
+    }
+
+    return $erros;
+}
+
+/**
  * Gera URL de asset com versão baseada na data de modificação do ficheiro
  */
 function asset(string $path): string {

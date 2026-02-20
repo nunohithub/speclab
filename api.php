@@ -2056,6 +2056,11 @@ try {
             if (!$esp) jsonError('Especificação não encontrada.');
             if ($esp['versao_bloqueada']) jsonError('Versão já bloqueada.');
             if ($esp['estado'] !== 'rascunho') jsonError('Só especificações em rascunho podem ser submetidas.');
+            $errosVal = validateForPublish($db, $id);
+            if (!empty($errosVal)) {
+                echo json_encode(['success' => false, 'error' => 'Documento incompleto:', 'validation_errors' => $errosVal]);
+                exit;
+            }
             $db->prepare('UPDATE especificacoes SET estado = ? WHERE id = ?')->execute(['em_revisao', $id]);
             jsonSuccess('Submetida para revisão.');
             break;
@@ -2070,6 +2075,11 @@ try {
             $esp = $stmt->fetch();
             if (!$esp) jsonError('Especificação não encontrada.');
             if ($esp['estado'] !== 'em_revisao') jsonError('Só especificações em revisão podem ser aprovadas.');
+            $errosVal = validateForPublish($db, $id);
+            if (!empty($errosVal)) {
+                echo json_encode(['success' => false, 'error' => 'Documento incompleto:', 'validation_errors' => $errosVal]);
+                exit;
+            }
             $db->prepare('UPDATE especificacoes SET estado = ?, aprovado_por = ?, aprovado_em = NOW(), motivo_devolucao = NULL WHERE id = ?')
                ->execute(['ativo', $user['id'], $id]);
             jsonSuccess('Especificação aprovada.');
@@ -2426,6 +2436,11 @@ try {
             if ($id <= 0) jsonError('ID inválido.');
             checkSaOrgAccess($db, $user, $id);
             $notas = sanitize($jsonBody['notas'] ?? $_POST['notas'] ?? '');
+            $errosVal = validateForPublish($db, $id);
+            if (!empty($errosVal)) {
+                echo json_encode(['success' => false, 'error' => 'Documento incompleto:', 'validation_errors' => $errosVal]);
+                exit;
+            }
             if (!publicarVersao($db, $id, $user['id'], $notas ?: null)) {
                 jsonError('Não foi possível publicar. Versão já bloqueada ou não encontrada.');
             }

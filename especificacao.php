@@ -414,6 +414,15 @@ $breadcrumbs = [
             opacity: 0.7;
             pointer-events: none;
         }
+        .ai-disclaimer {
+            font-size: 9px;
+            color: #8b5cf6;
+            background: #ede9fe;
+            padding: 2px 5px;
+            border-radius: 3px;
+            cursor: help;
+            font-weight: 600;
+        }
         .seccao-actions {
             display: flex;
             gap: 2px;
@@ -1126,6 +1135,7 @@ $breadcrumbs = [
                                         <div class="seccao-ai-btns">
                                             <button class="btn-ai" onclick="abrirAI(this, 'sugerir')" title="Sugerir conteúdo com IA"><span class="ai-icon">&#10024;</span> Sugerir</button>
                                             <button class="btn-ai" onclick="abrirAI(this, 'melhorar')" title="Melhorar conteúdo com IA"><span class="ai-icon">&#9998;</span> Melhorar</button>
+                                            <span class="ai-disclaimer" title="Conteúdo gerado por IA deve ser revisto antes de usar">IA</span>
                                         </div>
                                         <div class="seccao-actions">
                                             <button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, -1)" title="Mover acima">&#9650;</button>
@@ -1460,8 +1470,8 @@ $breadcrumbs = [
                     <!-- ACEITAÇÃO FORMAL -->
                     <div class="card" style="border-left:3px solid var(--color-primary);">
                         <div class="card-header">
-                            <span class="card-title">Aceitação Formal</span>
-                            <span class="muted">Cada destinatário recebe um link pessoal para aceitar ou rejeitar</span>
+                            <span class="card-title">Enviar para Aceitação</span>
+                            <span class="muted">Cada pessoa recebe um link pessoal para ver, aceitar ou rejeitar o documento</span>
                         </div>
                         <div style="display:flex; gap:var(--spacing-sm); align-items:end; flex-wrap:wrap; margin-bottom:var(--spacing-md);">
                             <div class="form-group" style="flex:1; min-width:150px; margin:0;">
@@ -1653,8 +1663,8 @@ $breadcrumbs = [
 
                         <!-- Link de Consulta -->
                         <div style="border-top:1px solid var(--color-border); padding-top:var(--spacing-md);">
-                            <div class="section-label" style="margin-bottom:var(--spacing-xs);">Link de Consulta</div>
-                            <p class="muted" style="font-size:12px; margin:0 0 var(--spacing-sm);">Link para consulta rápida do documento. Não requer aceitação — ideal para partilha interna ou consultas informais.</p>
+                            <div class="section-label" style="margin-bottom:var(--spacing-xs);">Link Público (só leitura)</div>
+                            <p class="muted" style="font-size:12px; margin:0 0 var(--spacing-sm);">Qualquer pessoa com este link pode ver o documento. Sem registo de quem acedeu.</p>
                             <div class="form-group">
                                 <label>Código de Acesso</label>
                                 <div class="flex gap-sm" style="align-items: center;">
@@ -1675,7 +1685,7 @@ $breadcrumbs = [
                                 </div>
                             <?php else: ?>
                                 <div class="alert alert-info">
-                                    Gere um código de acesso para criar um link de partilha pública.
+                                    Clique em "Gerar Código" para criar um link público de consulta.
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -2005,6 +2015,7 @@ $breadcrumbs = [
                 <label id="aiModalLabel">Descreva o que pretende que a IA gere para esta secção:</label>
                 <textarea id="aiPromptInput" placeholder="Ex: Descreve o objetivo desta especificação para rolhas de cortiça natural..."></textarea>
             </div>
+            <p style="font-size:11px;color:#6b7280;margin:0 0 8px;padding:0 20px">Conteúdo gerado por IA. Revise e valide antes de usar em documentos oficiais.</p>
             <div class="ai-modal-footer">
                 <button class="btn btn-secondary btn-sm" onclick="fecharAIModal()">Cancelar</button>
                 <button class="btn-ai-submit" id="aiSubmitBtn" onclick="executarAI()">Gerar</button>
@@ -3105,7 +3116,7 @@ $breadcrumbs = [
 
                 fecharAIModal();
                 marcarAlterado();
-                showToast('Conteúdo gerado com sucesso.', 'success');
+                showToast('Conteúdo gerado por IA. <strong>Revise antes de usar em documentos oficiais.</strong>', 'warning', 6000);
             } else {
                 showToast(result.error || 'Erro ao gerar conteúdo.', 'error');
             }
@@ -3304,14 +3315,15 @@ $breadcrumbs = [
     // ============================================================
     // TOAST NOTIFICATIONS
     // ============================================================
-    function showToast(msg, type) {
+    function showToast(msg, type, duration) {
         type = type || 'info';
+        duration = duration || 3500;
         var container = document.getElementById('toast-container');
         var toast = document.createElement('div');
         toast.className = 'toast toast-' + type;
-        toast.textContent = msg;
+        toast.innerHTML = msg;
         container.appendChild(toast);
-        setTimeout(function() { toast.remove(); }, 3500);
+        setTimeout(function() { toast.remove(); }, duration);
     }
 
     // ============================================================
@@ -3759,11 +3771,22 @@ $breadcrumbs = [
                     showToast('Especificação submetida para revisão.', 'success');
                     setTimeout(function() { location.reload(); }, 800);
                 } else {
-                    showToast(data.error || 'Erro ao submeter.', 'danger');
+                    showValidationErrors(data);
                 }
             })
             .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de ligação.', 'error'); });
         });
+    }
+
+    function showValidationErrors(data) {
+        if (data.validation_errors && data.validation_errors.length > 0) {
+            var msg = '<strong>' + (data.error || 'Documento incompleto:') + '</strong><ul style="margin:4px 0 0 16px;padding:0">';
+            data.validation_errors.forEach(function(e) { msg += '<li>' + e + '</li>'; });
+            msg += '</ul>';
+            showToast(msg, 'danger', 8000);
+        } else {
+            showToast(data.error || 'Erro.', 'danger');
+        }
     }
 
     function aprovarEspecificacao() {
@@ -3780,7 +3803,7 @@ $breadcrumbs = [
                     showToast('Especificação aprovada!', 'success');
                     setTimeout(function() { location.reload(); }, 800);
                 } else {
-                    showToast(data.error || 'Erro ao aprovar.', 'danger');
+                    showValidationErrors(data);
                 }
             })
             .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de ligação.', 'error'); });
@@ -4634,7 +4657,7 @@ $breadcrumbs = [
                 showToast('Versão publicada com sucesso!', 'success');
                 setTimeout(function() { location.reload(); }, 800);
             } else {
-                showToast(data.error || 'Erro ao publicar.', 'danger');
+                showValidationErrors(data);
             }
         })
         .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de ligação.', 'error'); });

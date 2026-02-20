@@ -129,6 +129,12 @@ if ($useMpdf) {
     $mpdf->SetTitle(san($data['titulo']));
     $mpdf->SetAuthor(san($orgNome));
 
+    // Watermark RASCUNHO se não publicado
+    if (($data['estado'] ?? 'rascunho') !== 'ativo') {
+        $mpdf->SetWatermarkText('RASCUNHO', 0.08);
+        $mpdf->showWatermarkText = true;
+    }
+
     // Apply PDF template background if configured
     $templateFile = $data['template_pdf'] ?? null;
     if ($templateFile) {
