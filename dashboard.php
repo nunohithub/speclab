@@ -131,6 +131,22 @@ if ($isSA) {
     $organizacoes = [];
 }
 
+// Alertas de validade (specs ativas com data_validade próxima ou ultrapassada)
+$alertasValidade = ['expiradas' => [], 'a_expirar' => []];
+foreach ($especificacoes as $e) {
+    if ($e['estado'] === 'ativo' && !empty($e['data_validade'])) {
+        $validade = strtotime($e['data_validade']);
+        $hoje = strtotime('today');
+        $em30dias = strtotime('+30 days');
+        if ($validade < $hoje) {
+            $alertasValidade['expiradas'][] = $e;
+        } elseif ($validade <= $em30dias) {
+            $alertasValidade['a_expirar'][] = $e;
+        }
+    }
+}
+$totalAlertas = count($alertasValidade['expiradas']) + count($alertasValidade['a_expirar']);
+
 $pageTitle = 'Cadernos de Encargos';
 $pageSubtitle = 'Sistema de Especificações Técnicas';
 $showNav = true;
@@ -174,6 +190,28 @@ $activeNav = 'especificacoes';
                 <div class="stat-label">Produtos</div>
             </div>
         </div>
+
+        <!-- ALERTAS DE VALIDADE -->
+        <?php if ($totalAlertas > 0): ?>
+        <div class="no-print" style="margin-bottom: var(--spacing-md);">
+            <?php if (count($alertasValidade['expiradas']) > 0): ?>
+            <div class="alert alert-error" style="margin-bottom: var(--spacing-sm);">
+                <strong><?= count($alertasValidade['expiradas']) ?> especificação(ões) expirada(s):</strong>
+                <?php foreach ($alertasValidade['expiradas'] as $exp): ?>
+                <a href="<?= BASE_PATH ?>/especificacao.php?id=<?= $exp['id'] ?>" style="display:inline-block; margin:2px 4px; text-decoration:underline; color:inherit;"><?= sanitize($exp['numero']) ?></a>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+            <?php if (count($alertasValidade['a_expirar']) > 0): ?>
+            <div class="alert alert-warning" style="margin-bottom: var(--spacing-sm);">
+                <strong><?= count($alertasValidade['a_expirar']) ?> especificação(ões) a expirar em 30 dias:</strong>
+                <?php foreach ($alertasValidade['a_expirar'] as $exp): ?>
+                <a href="<?= BASE_PATH ?>/especificacao.php?id=<?= $exp['id'] ?>" style="display:inline-block; margin:2px 4px; text-decoration:underline; color:inherit;"><?= sanitize($exp['numero']) ?> (<?= date('d/m/Y', strtotime($exp['data_validade'])) ?>)</a>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
 
         <!-- SEARCH & FILTERS -->
         <div class="search-filters no-print">
@@ -288,6 +326,13 @@ $activeNav = 'especificacoes';
                                         <span class="pill <?= $estadoClass[$e['estado']] ?? 'pill-muted' ?>">
                                             <?= $estadoLabel[$e['estado']] ?? $e['estado'] ?>
                                         </span>
+                                        <?php if ($e['estado'] === 'ativo' && !empty($e['data_validade'])):
+                                            $valTs = strtotime($e['data_validade']);
+                                            if ($valTs < strtotime('today')): ?>
+                                            <span class="pill pill-danger" style="font-size:10px;" title="Expirada em <?= date('d/m/Y', $valTs) ?>">Expirada</span>
+                                            <?php elseif ($valTs <= strtotime('+30 days')): ?>
+                                            <span class="pill pill-warning" style="font-size:10px;" title="Expira em <?= date('d/m/Y', $valTs) ?>">Expira breve</span>
+                                            <?php endif; endif; ?>
                                     </td>
                                     <td>
                                         <div class="flex gap-sm">
