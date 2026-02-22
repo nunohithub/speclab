@@ -1774,7 +1774,7 @@ $breadcrumbs = [
             </div>
 
             <!-- Conteúdo do tipo selecionado: Ensaios ou Custom -->
-            <div id="paramEnsaiosContent" style="display:none;">
+            <div id="paramEnsaiosContent" style="display:block;">
                 <!-- O banco de ensaios original fica aqui -->
                 <div class="flex-between mb-sm">
                     <h3 style="margin:0; font-size:16px;" id="paramSubTitle">Ensaios</h3>
@@ -2090,7 +2090,7 @@ $breadcrumbs = [
                     bancoColunas = ((res[2].data && res[2].data.colunas) || []).filter(function(c) { return c.ativo == 1; });
                     bancoCustomValues = (res[3].data && res[3].data.valores) || {};
                     renderBancoTable();
-                });
+                }).catch(function(e) { console.error('Erro ao carregar ensaios:', e); });
             }
 
             function renderBancoTable() {
@@ -2440,7 +2440,8 @@ $breadcrumbs = [
                 });
                 });
             }
-            // Não carregar ensaios automaticamente — esperar seleção de sub-tab
+            // Carregar ensaios automaticamente (conteúdo visível por defeito)
+            carregarEnsaios();
             </script>
             </div><!-- /paramEnsaiosContent -->
 
@@ -2495,7 +2496,7 @@ $breadcrumbs = [
                     paramTipos = (data.data && data.data.tipos) || [];
                     renderTiposTable();
                     renderSubTabs();
-                });
+                }).catch(function(e) { console.error('Erro ao carregar tipos:', e); });
             }
 
             function renderTiposTable() {
@@ -2560,7 +2561,7 @@ $breadcrumbs = [
                 document.getElementById('tipo_slug').value = '';
                 document.getElementById('tipo_legenda').value = '';
                 document.getElementById('tipo_ativo').checked = true;
-                renderTipoColunas([{ nome: '', campo: '' }]);
+                renderTipoColunas([{ nome: '', chave: '' }]);
                 document.getElementById('tipoModal').style.display = 'flex';
             }
 
@@ -2575,7 +2576,7 @@ $breadcrumbs = [
                 document.getElementById('tipo_ativo').checked = t.ativo == 1;
                 var cols = [];
                 try { cols = JSON.parse(t.colunas); } catch(e) {}
-                if (cols.length === 0) cols = [{ nome: '', campo: '' }];
+                if (cols.length === 0) cols = [{ nome: '', chave: '' }];
                 renderTipoColunas(cols);
                 document.getElementById('tipoModal').style.display = 'flex';
             }
