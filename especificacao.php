@@ -1035,11 +1035,15 @@ $breadcrumbs = [
                             <span class="card-title">Criar a partir de Template</span>
                             <span class="muted" style="font-size:12px;">(opcional)</span>
                         </div>
-                        <div style="padding:var(--spacing-sm) var(--spacing-md); display:flex; gap:var(--spacing-sm); align-items:center;">
-                            <select id="templateSelect" style="flex:1;">
-                                <option value="">— Especificação em branco —</option>
-                            </select>
-                            <button class="btn btn-secondary btn-sm" onclick="carregarTemplate()">Aplicar</button>
+                        <div style="padding:var(--spacing-sm) var(--spacing-md);">
+                            <p class="muted" style="font-size:12px; margin-bottom:8px;">Escolha um template para pré-preencher as secções, ou comece em branco.</p>
+                            <div style="display:flex; gap:var(--spacing-sm); align-items:center;">
+                                <select id="templateSelect" style="flex:1;">
+                                    <option value="">— Especificação em branco —</option>
+                                </select>
+                                <button class="btn btn-secondary btn-sm" onclick="carregarTemplate()">Aplicar</button>
+                                <button class="btn btn-danger btn-sm" onclick="eliminarTemplateSelecionado()" title="Eliminar template selecionado">&times;</button>
+                            </div>
                         </div>
                     </div>
                     <?php endif; ?>
@@ -5613,20 +5617,29 @@ $breadcrumbs = [
     // ============================================================
     function guardarComoTemplate() {
         if (!especId) { showToast('Guarde a especificação primeiro.', 'warning'); return; }
-        var nome = prompt('Nome do template:');
-        if (!nome) return;
-        var descricao = prompt('Descrição breve (opcional):') || '';
-        fetch(BASE_PATH + '/api.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
-            body: JSON.stringify({ action: 'save_template', especificacao_id: especId, nome: nome, descricao: descricao })
-        })
-        .then(function(r) { return checkSession(r); })
-        .then(function(data) {
-            if (data.success) showToast('Template guardado!', 'success');
-            else showToast(data.error || 'Erro.', 'danger');
-        })
-        .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de ligação.', 'error'); });
+        var html = '<div style="text-align:left; font-size:14px;">';
+        html += '<p style="color:#666; margin-bottom:16px;">Guarda a estrutura e conteúdo desta especificação como modelo reutilizável. Ao criar uma nova especificação, poderá aplicar este template para pré-preencher as secções automaticamente.</p>';
+        html += '<div style="margin-bottom:12px;"><label style="font-weight:600; display:block; margin-bottom:4px;">Nome do template *</label>';
+        html += '<input type="text" id="tpl_nome" placeholder="Ex: Template Embalagens" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"></div>';
+        html += '<div><label style="font-weight:600; display:block; margin-bottom:4px;">Descrição (opcional)</label>';
+        html += '<input type="text" id="tpl_desc" placeholder="Breve descrição" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"></div>';
+        html += '</div>';
+        appConfirm(html, function() {
+            var nome = (document.getElementById('tpl_nome') || {}).value;
+            if (!nome || !nome.trim()) { showToast('Preencha o nome do template.', 'warning'); return; }
+            var descricao = (document.getElementById('tpl_desc') || {}).value || '';
+            fetch(BASE_PATH + '/api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                body: JSON.stringify({ action: 'save_template', especificacao_id: especId, nome: nome.trim(), descricao: descricao.trim() })
+            })
+            .then(function(r) { return checkSession(r); })
+            .then(function(data) {
+                if (data.success) showToast('Template guardado!', 'success');
+                else showToast(data.error || 'Erro.', 'danger');
+            })
+            .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de ligação.', 'error'); });
+        }, 'Guardar Template');
     }
 
     <?php if ($isNew): ?>
@@ -5654,6 +5667,35 @@ $breadcrumbs = [
         })
         .catch(function() {});
     })();
+
+    function eliminarTemplateSelecionado() {
+        var sel = document.getElementById('templateSelect');
+        var tplId = sel.value;
+        if (!tplId) { showToast('Selecione um template primeiro.', 'warning'); return; }
+        var nome = sel.options[sel.selectedIndex].text;
+        appConfirm('Eliminar o template "' + nome + '"? Esta ação não pode ser desfeita.', function() {
+            fetch(BASE_PATH + '/api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                body: JSON.stringify({ action: 'delete_template', template_id: parseInt(tplId) })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    sel.remove(sel.selectedIndex);
+                    sel.value = '';
+                    showToast('Template eliminado.', 'success');
+                    if (sel.options.length <= 1) {
+                        var card = document.getElementById('templateSelector');
+                        if (card) card.style.display = 'none';
+                    }
+                } else {
+                    showToast(data.error || 'Erro.', 'danger');
+                }
+            })
+            .catch(function() { showToast('Erro de ligação.', 'danger'); });
+        }, 'Eliminar');
+    }
 
     function carregarTemplate() {
         var tplId = document.getElementById('templateSelect').value;
