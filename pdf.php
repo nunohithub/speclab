@@ -22,6 +22,16 @@ require_once __DIR__ . '/includes/auth.php';
 $db = getDB();
 $id = (int)($_GET['id'] ?? 0);
 $code = $_GET['code'] ?? '';
+$tokenStr = $_GET['token'] ?? '';
+$tokenData = null;
+
+// Acesso via token (fornecedor)
+if ($tokenStr && !$id) {
+    $stmtTk = $db->prepare('SELECT t.*, e.id as espec_id FROM especificacao_tokens t INNER JOIN especificacoes e ON e.id = t.especificacao_id WHERE t.token = ? AND t.ativo = 1');
+    $stmtTk->execute([$tokenStr]);
+    $tokenData = $stmtTk->fetch();
+    if ($tokenData) $id = (int)$tokenData['espec_id'];
+}
 
 if (!$id) {
     http_response_code(400);
@@ -31,6 +41,8 @@ if (!$id) {
 // Verificar acesso
 $authenticated = false;
 if (isset($_SESSION['user_id'])) {
+    $authenticated = true;
+} elseif ($tokenData) {
     $authenticated = true;
 } elseif ($code) {
     $stmt = $db->prepare('SELECT id, password_acesso FROM especificacoes WHERE id = ? AND codigo_acesso = ?');
@@ -113,8 +125,14 @@ if (!empty($data['publicado_por'])) {
         $elaboradoData = !empty($data['publicado_em']) ? date('d/m/Y H:i', strtotime($data['publicado_em'])) : '';
     }
 }
-$stmtAceite = $db->prepare('SELECT a.*, t.tipo_destinatario FROM especificacao_aceitacoes a LEFT JOIN especificacao_tokens t ON a.token_id = t.id WHERE a.especificacao_id = ? AND a.tipo_decisao = "aceite" ORDER BY a.created_at DESC LIMIT 1');
-$stmtAceite->execute([$id]);
+// Se acesso via token, mostrar apenas a decisão deste token; senão, todas
+if ($tokenData) {
+    $stmtAceite = $db->prepare('SELECT a.*, t.tipo_destinatario FROM especificacao_aceitacoes a LEFT JOIN especificacao_tokens t ON a.token_id = t.id WHERE a.token_id = ? ORDER BY a.created_at DESC LIMIT 1');
+    $stmtAceite->execute([$tokenData['id']]);
+} else {
+    $stmtAceite = $db->prepare('SELECT a.*, t.tipo_destinatario FROM especificacao_aceitacoes a LEFT JOIN especificacao_tokens t ON a.token_id = t.id WHERE a.especificacao_id = ? AND a.tipo_decisao = "aceite" ORDER BY a.created_at DESC LIMIT 1');
+    $stmtAceite->execute([$id]);
+}
 $aceite = $stmtAceite->fetch();
 $tipoDestinatario = $aceite ? ($aceite['tipo_destinatario'] === 'cliente' ? 'Cliente' : 'Fornecedor') : (!empty($data['fornecedor_nome']) ? 'Fornecedor' : 'Cliente');
 
@@ -234,6 +252,12 @@ if ($useMpdf) {
     $metaPaired[] = [$L['revisao'], $data['data_revisao'] ? formatDate($data['data_revisao']) : '-'];
     $metaPaired[] = [$L['estado'], ucfirst($data['estado'])];
     $metaPaired[] = [$L['elaborado_por'], san($data['criado_por_nome'] ?? '-')];
+    // Aprovação no cabeçalho
+    if ($aceite) {
+        $corDec = $aceite['tipo_decisao'] === 'aceite' ? '#16a34a' : '#dc2626';
+        $txtDec = $aceite['tipo_decisao'] === 'aceite' ? 'Aceite' : 'Rejeitado';
+        $metaPaired[] = [$L['aprovacao'], '<span style="color:' . $corDec . '; font-weight:bold;">' . $txtDec . '</span> — ' . san($aceite['nome_signatario']) . ' ' . date('d/m/Y', strtotime($aceite['created_at']))];
+    }
     $html .= '<div class="meta-box"><table class="meta-grid">';
     foreach ($metaFull as $item) {
         $html .= '<tr><td colspan="2"><span class="meta-label">' . $item[0] . ':</span> <span class="meta-value">' . $item[1] . '</span></td></tr>';
@@ -779,6 +803,16 @@ $tamNome    = (int)$cv['tamanho_nome'];
         <div><span><?= $L['revisao'] ?>:</span> <strong><?= $data['data_revisao'] ? formatDate($data['data_revisao']) : '-' ?></strong></div>
         <div><span><?= $L['estado'] ?>:</span> <strong><?= ucfirst($data['estado']) ?></strong></div>
         <div><span><?= $L['elaborado_por'] ?>:</span> <strong><?= san($data['criado_por_nome'] ?? '-') ?></strong></div>
+        <?php if ($aceite): ?>
+        <div class="meta-full" style="margin-top:4px;">
+            <span><?= $L['aprovacao'] ?>:</span>
+            <strong style="color:<?= $aceite['tipo_decisao'] === 'aceite' ? '#16a34a' : '#dc2626' ?>">
+                <?= $aceite['tipo_decisao'] === 'aceite' ? 'Aceite' : 'Rejeitado' ?>
+            </strong>
+            — <?= san($aceite['nome_signatario']) ?>
+            <span style="color:#888; font-size:11px;"><?= date('d/m/Y', strtotime($aceite['created_at'])) ?></span>
+        </div>
+        <?php endif; ?>
     </div>
 
     <?php if (!empty($data['seccoes'])):

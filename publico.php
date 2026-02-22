@@ -132,12 +132,22 @@ $data = null;
 $aprovacoes = [];
 if ($authenticated) {
     $data = getEspecificacaoCompleta($db, $espec['id']);
-    $stmtAprov = $db->prepare('SELECT a.tipo_decisao, a.nome_signatario, a.cargo_signatario, a.created_at, t.destinatario_nome, t.tipo_destinatario
-        FROM especificacao_aceitacoes a
-        INNER JOIN especificacao_tokens t ON t.id = a.token_id
-        WHERE a.especificacao_id = ?
-        ORDER BY a.created_at DESC');
-    $stmtAprov->execute([$espec['id']]);
+    // Se acesso via token, mostrar apenas a decisão deste token; senão (código), mostrar todas
+    if ($tokenData) {
+        $stmtAprov = $db->prepare('SELECT a.tipo_decisao, a.nome_signatario, a.cargo_signatario, a.created_at, t.destinatario_nome, t.tipo_destinatario
+            FROM especificacao_aceitacoes a
+            INNER JOIN especificacao_tokens t ON t.id = a.token_id
+            WHERE a.token_id = ?
+            ORDER BY a.created_at DESC');
+        $stmtAprov->execute([$tokenData['id']]);
+    } else {
+        $stmtAprov = $db->prepare('SELECT a.tipo_decisao, a.nome_signatario, a.cargo_signatario, a.created_at, t.destinatario_nome, t.tipo_destinatario
+            FROM especificacao_aceitacoes a
+            INNER JOIN especificacao_tokens t ON t.id = a.token_id
+            WHERE a.especificacao_id = ?
+            ORDER BY a.created_at DESC');
+        $stmtAprov->execute([$espec['id']]);
+    }
     $aprovacoes = $stmtAprov->fetchAll();
 }
 
@@ -610,7 +620,7 @@ $L = $labels[$lang] ?? $labels['pt'];
     <!-- Floating Actions -->
     <div class="doc-actions no-print">
         <a href="<?= BASE_PATH ?>/ver.php?id=<?= $data['id'] ?>" class="btn btn-secondary" target="_blank" style="display:none;">&#128065; Preview</a>
-        <a href="<?= BASE_PATH ?>/pdf.php?id=<?= $data['id'] ?>&code=<?= urlencode($code) ?>" class="btn btn-primary" target="_blank">&#128196; PDF</a>
+        <a href="<?= BASE_PATH ?>/pdf.php?id=<?= $data['id'] ?>&code=<?= urlencode($code) ?><?= $tokenData ? '&token=' . urlencode($tokenData['token']) : '' ?>" class="btn btn-primary" target="_blank">&#128196; PDF</a>
         <button class="btn btn-secondary" onclick="window.print()">&#128424; Imprimir</button>
     </div>
 

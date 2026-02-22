@@ -1616,6 +1616,7 @@ $breadcrumbs = [
                                             <span class="muted" style="font-size:11px;" title="Enviado em <?= date('d/m/Y H:i', strtotime($tk['enviado_em'])) ?>">Enviado</span>
                                             <?php endif; ?>
                                             <button class="btn btn-ghost btn-sm" onclick="copiarLinkToken('<?= sanitize($tk['token']) ?>')" title="Copiar link">Copiar</button>
+                                            <a href="<?= BASE_PATH ?>/publico.php?token=<?= urlencode($tk['token']) ?>" target="_blank" class="btn btn-ghost btn-sm" title="Ver como fornecedor">&#128065;</a>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -1818,6 +1819,7 @@ $breadcrumbs = [
                                             <?php endif; ?>
                                         </td>
                                         <td style="display:flex; gap:4px; align-items:center; flex-wrap:nowrap;">
+                                            <a href="<?= BASE_PATH ?>/publico.php?token=<?= urlencode($tk['token']) ?>" target="_blank" class="btn btn-ghost btn-sm" title="Ver como fornecedor">&#128065;</a>
                                             <a href="comprovativo.php?token_id=<?= $tk['id'] ?>" target="_blank" class="btn btn-ghost btn-sm" title="Imprimir comprovativo" style="font-size:11px;">Comprovativo</a>
                                             <button class="btn btn-danger btn-sm" onclick="revogarToken(<?= $tk['id'] ?>)" title="Revogar acesso">&times;</button>
                                         </td>
