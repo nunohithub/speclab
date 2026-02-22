@@ -1661,6 +1661,7 @@ $breadcrumbs = [
                         </div>
                         <!-- FORNECEDORES ASSOCIADOS -->
                         <?php
+                        $tokensPendentes = array_filter($tokensEspec, function($t) { return empty($t['tipo_decisao']); });
                         $fornecedoresLista = $espec['fornecedores_lista'] ?? [];
                         if (!empty($fornecedoresLista)):
                             $emailsPendentes = array_map(function($t) { return strtolower($t['destinatario_email']); }, $tokensPendentes);
@@ -1711,7 +1712,6 @@ $breadcrumbs = [
                         </div>
 
                         <div id="listaDestinatarios">
-                        <?php $tokensPendentes = array_filter($tokensEspec, function($t) { return empty($t['tipo_decisao']); }); ?>
                         <?php if (empty($tokensPendentes)): ?>
                             <p class="muted">Nenhum destinatário pendente.</p>
                         <?php else: ?>
