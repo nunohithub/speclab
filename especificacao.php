@@ -164,8 +164,18 @@ $resumoAceitacao = ['total_tokens' => 0, 'aceites' => 0, 'rejeicoes' => 0, 'pend
 $tokensEspec = [];
 if (!$isNew && $grupoVersao) {
     $versoesGrupo = getVersoesGrupo($db, $grupoVersao);
+}
+if (!$isNew) {
     $resumoAceitacao = getResumoAceitacao($db, $espec['id']);
     $tokensEspec = getTokensEspecificacao($db, $espec['id']);
+    // Última visita ao histórico para badge de "novas decisões"
+    $stmtVis = $db->prepare('SELECT ultima_visita FROM historico_visitas WHERE utilizador_id = ? AND especificacao_id = ?');
+    $stmtVis->execute([$user['id'], $espec['id']]);
+    $ultimaVisita = $stmtVis->fetchColumn() ?: '2000-01-01';
+    $nNovasDecisoes = 0;
+    foreach ($tokensEspec as $t) {
+        if (!empty($t['tipo_decisao']) && $t['decisao_em'] > $ultimaVisita) $nNovasDecisoes++;
+    }
 }
 
 // Templates de parâmetros
@@ -509,6 +519,17 @@ $breadcrumbs = [
             gap: var(--spacing-sm);
             padding: var(--spacing-md);
             border-top: 1px solid var(--color-border);
+        }
+        .ai-result-preview {
+            background: #faf5ff;
+            border: 1px solid #d8b4fe;
+            border-radius: var(--border-radius-sm);
+            padding: var(--spacing-sm);
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: var(--font-size-sm);
+            line-height: 1.5;
+            margin-top: var(--spacing-sm);
         }
         .btn-ai-submit {
             background: #8b5cf6;
@@ -995,6 +1016,7 @@ $breadcrumbs = [
             <button class="tab" data-tab="classes-defeitos">Classes e Defeitos</button>
             <?php if (!$saOutraOrg): ?>
             <button class="tab" data-tab="partilha">Partilha</button>
+            <button class="tab" data-tab="historico">Histórico<?php if (!empty($nNovasDecisoes)): ?> <span style="background:var(--color-primary); color:#fff; font-size:10px; padding:1px 6px; border-radius:10px; margin-left:4px;"><?= $nNovasDecisoes ?></span><?php endif; ?></button>
             <button class="tab" data-tab="configuracoes">Configurações</button>
             <?php endif; ?>
         </div>
@@ -1149,6 +1171,25 @@ $breadcrumbs = [
                             </div>
                         </div>
                     </div>
+
+                    <!-- COMENTÁRIOS INTERNOS -->
+                    <?php if (!$isNew): ?>
+                    <div class="card" id="cardComentarios">
+                        <div class="card-header">
+                            <span class="card-title">Comentários Internos</span>
+                            <span class="muted" id="comentariosCount"></span>
+                        </div>
+                        <?php if (!$saOutraOrg): ?>
+                        <div style="margin-bottom:var(--spacing-md);">
+                            <textarea id="novoComentario" rows="2" placeholder="Escrever comentário..." style="width:100%;margin-bottom:var(--spacing-xs);"></textarea>
+                            <button class="btn btn-primary btn-sm" onclick="adicionarComentario()">Comentar</button>
+                        </div>
+                        <?php endif; ?>
+                        <div id="listaComentarios" style="max-height:400px; overflow-y:auto;">
+                            <p class="muted" style="font-size:13px;">A carregar...</p>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- TAB 2: CONTEUDO -->
@@ -1639,47 +1680,28 @@ $breadcrumbs = [
                         </div>
 
                         <div id="listaDestinatarios">
-                        <?php if (empty($tokensEspec)): ?>
-                            <p class="muted">Nenhum destinatário adicionado.</p>
+                        <?php $tokensPendentes = array_filter($tokensEspec, function($t) { return empty($t['tipo_decisao']); }); ?>
+                        <?php if (empty($tokensPendentes)): ?>
+                            <p class="muted">Nenhum destinatário pendente.</p>
                         <?php else: ?>
                             <table class="table" style="font-size:13px;">
                                 <thead>
-                                    <tr><th>Nome</th><th>Email</th><th>Tipo</th><th>Estado</th><th>Acessos</th><th></th></tr>
+                                    <tr><th>Nome</th><th>Email</th><th>Tipo</th><th>Acessos</th><th></th></tr>
                                 </thead>
                                 <tbody>
-                                <?php foreach ($tokensEspec as $tk): ?>
+                                <?php foreach ($tokensPendentes as $tk): ?>
                                     <tr>
                                         <td><?= sanitize($tk['destinatario_nome'] ?? '-') ?></td>
                                         <td><?= sanitize($tk['destinatario_email'] ?? '-') ?></td>
                                         <td><?= ucfirst(sanitize($tk['tipo_destinatario'])) ?></td>
-                                        <td>
-                                            <?php if ($tk['tipo_decisao'] === 'aceite'): ?>
-                                                <span class="pill pill-success" style="font-size:11px;">Aceite</span>
-                                                <div style="font-size:11px; color:#666; margin-top:2px;">
-                                                    por <?= sanitize($tk['nome_signatario']) ?><?= $tk['cargo_signatario'] ? ' (' . sanitize($tk['cargo_signatario']) . ')' : '' ?><br>
-                                                    <?= date('d/m/Y H:i', strtotime($tk['decisao_em'])) ?>
-                                                    <?php if (!empty($tk['decisao_comentario'])): ?><br><em>"<?= sanitize($tk['decisao_comentario']) ?>"</em><?php endif; ?>
-                                                </div>
-                                            <?php elseif ($tk['tipo_decisao'] === 'rejeitado'): ?>
-                                                <span class="pill pill-danger" style="font-size:11px;">Rejeitado</span>
-                                                <div style="font-size:11px; color:#666; margin-top:2px;">
-                                                    por <?= sanitize($tk['nome_signatario']) ?><?= $tk['cargo_signatario'] ? ' (' . sanitize($tk['cargo_signatario']) . ')' : '' ?><br>
-                                                    <?= date('d/m/Y H:i', strtotime($tk['decisao_em'])) ?>
-                                                    <?php if (!empty($tk['decisao_comentario'])): ?><br><em>"<?= sanitize($tk['decisao_comentario']) ?>"</em><?php endif; ?>
-                                                </div>
-                                            <?php else: ?>
-                                                <span class="pill pill-warning" style="font-size:11px;">Pendente</span>
-                                            <?php endif; ?>
-                                        </td>
                                         <td><?= (int)$tk['total_acessos'] ?></td>
-                                        <td style="display:flex; gap:4px;">
+                                        <td style="display:flex; gap:4px; align-items:center; flex-wrap:nowrap;">
                                             <?php if (empty($tk['enviado_em'])): ?>
                                             <button class="btn btn-primary btn-sm" onclick="enviarLinkToken(<?= $tk['id'] ?>)" title="Enviar email">Enviar</button>
                                             <?php else: ?>
                                             <span class="muted" style="font-size:11px;" title="Enviado em <?= date('d/m/Y H:i', strtotime($tk['enviado_em'])) ?>">Enviado</span>
                                             <?php endif; ?>
                                             <button class="btn btn-ghost btn-sm" onclick="copiarLinkToken('<?= sanitize($tk['token']) ?>')" title="Copiar link">Copiar</button>
-                                            <button class="btn btn-danger btn-sm" onclick="revogarToken(<?= $tk['id'] ?>)" title="Revogar acesso">&times;</button>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -1688,15 +1710,6 @@ $breadcrumbs = [
                         <?php endif; ?>
                         </div>
 
-                        <?php if ($resumoAceitacao['total_tokens'] > 0): ?>
-                        <div style="margin-top:var(--spacing-md); padding:var(--spacing-sm); background:var(--color-bg-alt); border-radius:var(--radius); font-size:13px;">
-                            <strong>Resumo:</strong>
-                            <?= (int)$resumoAceitacao['aceites'] ?> aceites,
-                            <?= (int)$resumoAceitacao['rejeicoes'] ?> rejeições,
-                            <?= (int)$resumoAceitacao['pendentes'] ?> pendentes
-                            de <?= (int)$resumoAceitacao['total_tokens'] ?> destinatários
-                        </div>
-                        <?php endif; ?>
                     </div>
                     <?php endif; ?>
 
@@ -1837,27 +1850,85 @@ $breadcrumbs = [
                     </div>
                     <?php endif; ?>
 
-                    <!-- COMENTÁRIOS -->
+                </div>
+
+                <!-- TAB: HISTÓRICO DE ACEITAÇÕES -->
+                <div class="tab-panel" id="panel-historico">
                     <?php if (!$isNew): ?>
-                    <div class="card" id="cardComentarios">
-                        <div class="card-header">
-                            <span class="card-title">Comentários</span>
-                            <span class="muted" id="comentariosCount"></span>
+                    <?php
+                    $tokensComDecisao = array_filter($tokensEspec, function($t) { return !empty($t['tipo_decisao']); });
+                    $tiposHist = array_unique(array_map(function($t) { return $t['tipo_destinatario']; }, $tokensComDecisao));
+                    ?>
+                    <div class="card">
+                        <div class="card-header" style="flex-wrap:wrap; gap:8px;">
+                            <div>
+                                <span class="card-title">Histórico de Aceitações</span>
+                                <span class="muted" style="display:block; font-size:12px;">Registo permanente — não é apagado ao revogar acesso</span>
+                            </div>
+                            <?php if (count($tiposHist) > 1): ?>
+                            <select id="filtroHistTipo" onchange="filtrarHistorico()" style="font-size:12px; padding:4px 8px; border-radius:4px; border:1px solid var(--color-border);">
+                                <option value="">Todos os tipos</option>
+                                <?php foreach ($tiposHist as $th): ?>
+                                <option value="<?= sanitize($th) ?>"><?= ucfirst(sanitize($th)) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <?php endif; ?>
                         </div>
-                        <?php if (!$saOutraOrg): ?>
-                        <div style="margin-bottom:var(--spacing-md);">
-                            <textarea id="novoComentario" rows="2" placeholder="Escrever comentário..." style="width:100%;margin-bottom:var(--spacing-xs);"></textarea>
-                            <button class="btn btn-primary btn-sm" onclick="adicionarComentario()">Comentar</button>
+                        <?php if (empty($tokensComDecisao)): ?>
+                            <p class="muted">Nenhuma decisão registada.</p>
+                        <?php else: ?>
+                            <table class="table" style="font-size:13px;" id="tabelaHistorico">
+                                <thead>
+                                    <tr><th>Nome</th><th>Email</th><th>Tipo</th><th>Decisão</th><th>Data</th><th>Comentário</th><th></th></tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($tokensComDecisao as $tk): ?>
+                                    <tr data-tipo="<?= sanitize($tk['tipo_destinatario']) ?>">
+                                        <td><?= sanitize($tk['destinatario_nome'] ?? '-') ?></td>
+                                        <td><?= sanitize($tk['destinatario_email'] ?? '-') ?></td>
+                                        <td><?= ucfirst(sanitize($tk['tipo_destinatario'])) ?></td>
+                                        <td>
+                                            <?php if ($tk['tipo_decisao'] === 'aceite'): ?>
+                                                <span class="pill pill-success" style="font-size:11px;">Aceite</span>
+                                            <?php else: ?>
+                                                <span class="pill pill-danger" style="font-size:11px;">Rejeitado</span>
+                                            <?php endif; ?>
+                                            <div style="font-size:11px; color:#666;">por <?= sanitize($tk['nome_signatario']) ?><?= $tk['cargo_signatario'] ? ' (' . sanitize($tk['cargo_signatario']) . ')' : '' ?></div>
+                                        </td>
+                                        <td style="white-space:nowrap; font-size:12px;"><?= date('d/m/Y H:i', strtotime($tk['decisao_em'])) ?></td>
+                                        <td>
+                                            <?php if (!empty($tk['decisao_comentario'])): ?>
+                                                <a href="#" onclick="verMotivoRejeicao(this)" data-nome="<?= sanitize($tk['nome_signatario']) ?>" data-data="<?= date('d/m/Y H:i', strtotime($tk['decisao_em'])) ?>" data-motivo="<?= sanitize($tk['decisao_comentario']) ?>" style="color:var(--color-primary); text-decoration:underline;">Ver</a>
+                                            <?php else: ?>
+                                                <span class="muted">—</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td style="display:flex; gap:4px; align-items:center; flex-wrap:nowrap;">
+                                            <a href="comprovativo.php?token_id=<?= $tk['id'] ?>" target="_blank" class="btn btn-ghost btn-sm" title="Imprimir comprovativo" style="font-size:11px;">Comprovativo</a>
+                                            <button class="btn btn-danger btn-sm" onclick="revogarToken(<?= $tk['id'] ?>)" title="Revogar acesso">&times;</button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        <?php endif; ?>
+
+                        <?php if ($resumoAceitacao['total_tokens'] > 0): ?>
+                        <div style="margin-top:var(--spacing-md); padding:var(--spacing-sm); background:var(--color-bg-alt); border-radius:var(--radius); font-size:13px;">
+                            <strong>Resumo:</strong>
+                            <?= (int)$resumoAceitacao['aceites'] ?> aceites,
+                            <?= (int)$resumoAceitacao['rejeicoes'] ?> rejeições,
+                            <?= (int)$resumoAceitacao['pendentes'] ?> pendentes
+                            de <?= (int)$resumoAceitacao['total_tokens'] ?> destinatários
                         </div>
                         <?php endif; ?>
-                        <div id="listaComentarios" style="max-height:400px; overflow-y:auto;">
-                            <p class="muted" style="font-size:13px;">A carregar...</p>
-                        </div>
                     </div>
+                    <?php else: ?>
+                        <p class="muted">Guarde a especificação para ver o histórico.</p>
                     <?php endif; ?>
                 </div>
 
-                <!-- TAB 7: CONFIGURAÇÕES VISUAIS -->
+                <!-- TAB: CONFIGURAÇÕES VISUAIS -->
                 <div class="tab-panel" id="panel-configuracoes">
                     <?php if (!$isNew): ?>
                     <div class="card">
@@ -3645,7 +3716,21 @@ $breadcrumbs = [
     }
 
     function fecharAIModal() {
-        document.getElementById('aiModal').classList.add('hidden');
+        var modal = document.getElementById('aiModal');
+        modal.classList.add('hidden');
+        // Restaurar estado original do modal
+        var body = modal.querySelector('.ai-modal-body');
+        var preview = body.querySelector('.ai-result-preview');
+        if (preview) preview.remove();
+        var ta = body.querySelector('textarea');
+        ta.style.display = '';
+        ta.value = '';
+        var submitBtn = document.getElementById('aiSubmitBtn');
+        submitBtn.textContent = 'Gerar';
+        submitBtn.disabled = false;
+        submitBtn.onclick = executarAI;
+        var cancelBtn = modal.querySelector('.ai-modal-footer .btn-secondary');
+        cancelBtn.textContent = 'Cancelar';
         aiCurrentBlock = null;
         aiCurrentMode = '';
     }
@@ -3688,17 +3773,32 @@ $breadcrumbs = [
             if (result.success && result.data && result.data.content) {
                 var newContent = result.data.content;
 
-                // Inserir conteúdo no editor TinyMCE
-                if (tinyEditors[editorId]) {
-                    tinyEditors[editorId].setContent(newContent);
-                    tinyEditors[editorId].save();
-                } else {
-                    document.getElementById(editorId).value = newContent;
-                }
+                // Mostrar preview com opção de aplicar ou descartar
+                var body = document.querySelector('#aiModal .ai-modal-body');
+                body.querySelector('label').textContent = 'Resultado da IA:';
+                body.querySelector('textarea').style.display = 'none';
+                var preview = document.createElement('div');
+                preview.className = 'ai-result-preview';
+                preview.innerHTML = newContent;
+                body.appendChild(preview);
 
-                fecharAIModal();
-                marcarAlterado();
-                showToast('Conteúdo gerado por IA. <strong>Revise antes de usar em documentos oficiais.</strong>', 'warning', 6000);
+                // Mudar botões para Aplicar / Manter atual
+                submitBtn.textContent = 'Aplicar sugestão';
+                submitBtn.disabled = false;
+                submitBtn.onclick = function() {
+                    if (tinyEditors[editorId]) {
+                        tinyEditors[editorId].setContent(newContent);
+                        tinyEditors[editorId].save();
+                    } else {
+                        document.getElementById(editorId).value = newContent;
+                    }
+                    fecharAIModal();
+                    marcarAlterado();
+                    showToast('Sugestão da IA aplicada. <strong>Revise antes de usar em documentos oficiais.</strong>', 'warning', 6000);
+                };
+
+                var cancelBtn = document.querySelector('#aiModal .ai-modal-footer .btn-secondary');
+                cancelBtn.textContent = 'Manter atual';
             } else {
                 showToast(result.error || 'Erro ao gerar conteúdo.', 'error');
             }
@@ -3913,7 +4013,14 @@ $breadcrumbs = [
     }
     document.querySelectorAll('#mainTabs .tab').forEach(function(tab) {
         tab.addEventListener('click', function() {
-            activateTab(this.getAttribute('data-tab'));
+            var tabId = this.getAttribute('data-tab');
+            activateTab(tabId);
+            if (tabId === 'historico' && especId) {
+                // Marcar histórico como visto — remove badge
+                apiPost({ action: 'marcar_historico_visto', especificacao_id: especId });
+                var badge = this.querySelector('span');
+                if (badge) badge.remove();
+            }
         });
     });
     // Restaurar tab via hash (ex: #tab-partilha)
@@ -5637,6 +5744,21 @@ $breadcrumbs = [
         window.location.href = url.replace(/#.*/, '#tab-' + tab);
         window.location.reload();
     }
+    function verMotivoRejeicao(el) {
+        event.preventDefault();
+        var nome = el.getAttribute('data-nome');
+        var data = el.getAttribute('data-data');
+        var motivo = el.getAttribute('data-motivo');
+        appAlert('<div style="text-align:left;"><strong>Por:</strong> ' + escapeHtml(nome) + '<br><strong>Data:</strong> ' + escapeHtml(data) + '<br><br><strong>Comentário:</strong><div style="background:#f9fafb; border:1px solid var(--color-border); border-radius:6px; padding:10px; margin-top:6px; white-space:pre-wrap;">' + escapeHtml(motivo) + '</div></div>', 'Detalhe da Decisão');
+    }
+
+    function filtrarHistorico() {
+        var filtro = document.getElementById('filtroHistTipo').value;
+        document.querySelectorAll('#tabelaHistorico tbody tr').forEach(function(tr) {
+            tr.style.display = (!filtro || tr.getAttribute('data-tipo') === filtro) ? '' : 'none';
+        });
+    }
+
     function adicionarDestinatario() {
         var nome = document.getElementById('dest_nome').value.trim();
         var email = document.getElementById('dest_email').value.trim();

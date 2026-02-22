@@ -37,4 +37,16 @@ switch ($action) {
         $db->prepare('UPDATE especificacao_tokens SET ativo = 0 WHERE id = ?')->execute([$tokenId]);
         jsonSuccess('Token revogado.');
         break;
+
+    // ===================================================================
+    // MARCAR HISTÓRICO COMO VISTO
+    // ===================================================================
+    case 'marcar_historico_visto':
+        $especId = (int)($jsonBody['especificacao_id'] ?? 0);
+        if (!$especId) jsonError('ID em falta.');
+        verifySpecAccess($db, $especId, $user);
+        $db->prepare('INSERT INTO historico_visitas (utilizador_id, especificacao_id, ultima_visita) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE ultima_visita = NOW()')
+            ->execute([$user['id'], $especId]);
+        jsonSuccess('ok');
+        break;
 }

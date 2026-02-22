@@ -234,6 +234,7 @@ $handlers = [
     // Tokens
     'gerar_token'             => 'tokens',
     'revogar_token'           => 'tokens',
+    'marcar_historico_visto'  => 'tokens',
 
     // AI
     'ai_assist'               => 'ai',
