@@ -201,6 +201,45 @@ switch ($action) {
         break;
 
     // ===================================================================
+    // SAVE PARAMETROS BANCO BULK (guardar toda a tabela de uma vez)
+    // ===================================================================
+    case 'save_parametros_banco_bulk':
+        if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+        $tipoId = (int)($jsonBody['tipo_id'] ?? 0);
+        $registos = $jsonBody['registos'] ?? [];
+        if (!$tipoId) jsonError('Tipo não especificado.');
+
+        $stmtExist = $db->prepare('SELECT id FROM parametros_banco WHERE tipo_id = ?');
+        $stmtExist->execute([$tipoId]);
+        $existingIds = $stmtExist->fetchAll(PDO::FETCH_COLUMN);
+        $receivedIds = [];
+        $ordem = 0;
+
+        foreach ($registos as $reg) {
+            $id = (int)($reg['id'] ?? 0);
+            $categoria = trim($reg['categoria'] ?? '');
+            $valores = $reg['valores'] ?? [];
+            $ativo = (int)($reg['ativo'] ?? 1);
+            $valoresJson = json_encode($valores, JSON_UNESCAPED_UNICODE);
+            $ordem++;
+            if ($id > 0) {
+                $receivedIds[] = $id;
+                $stmt = $db->prepare('UPDATE parametros_banco SET categoria = ?, valores = ?, ativo = ?, ordem = ? WHERE id = ? AND tipo_id = ?');
+                $stmt->execute([$categoria, $valoresJson, $ativo, $ordem, $id, $tipoId]);
+            } else {
+                $stmt = $db->prepare('INSERT INTO parametros_banco (tipo_id, organizacao_id, categoria, valores, ativo, ordem) VALUES (?, 0, ?, ?, ?, ?)');
+                $stmt->execute([$tipoId, $categoria, $valoresJson, $ativo, $ordem]);
+            }
+        }
+        $toDelete = array_diff($existingIds, $receivedIds);
+        if (!empty($toDelete)) {
+            $ph = implode(',', array_fill(0, count($toDelete), '?'));
+            $db->prepare("DELETE FROM parametros_banco WHERE id IN ($ph) AND tipo_id = ?")->execute(array_merge($toDelete, [$tipoId]));
+        }
+        jsonSuccess('Registos guardados.', ['count' => count($registos)]);
+        break;
+
+    // ===================================================================
     // DELETE PARAMETRO BANCO
     // ===================================================================
     case 'delete_parametro_banco':

@@ -219,6 +219,7 @@ $handlers = [
     'save_parametro_tipo_config'  => 'parametros',
     'get_parametros_banco'        => 'parametros',
     'save_parametro_banco'        => 'parametros',
+    'save_parametros_banco_bulk'  => 'parametros',
     'delete_parametro_banco'      => 'parametros',
 
     // Admin (clientes, produtos, orgs, fornecedores)

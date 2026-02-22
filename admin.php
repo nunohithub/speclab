@@ -1732,7 +1732,9 @@ $breadcrumbs = [
                         <?php if ($isSuperAdminUser): ?>
                         <button class="btn btn-ghost btn-sm" onclick="editarTipoAtual()">Editar Tipo</button>
                         <button class="btn btn-ghost btn-sm" onclick="toggleLegendaConfig()">Legenda</button>
-                        <button class="btn btn-primary btn-sm" onclick="abrirRegistoModal()">+ Novo Registo</button>
+                        <button class="btn btn-ghost btn-sm" onclick="adicionarCategoriaInline()">+ Categoria</button>
+                        <button class="btn btn-ghost btn-sm" onclick="adicionarLinhaInline()">+ Linha</button>
+                        <button class="btn btn-primary btn-sm" onclick="guardarBancoTudo()">Guardar Tudo</button>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -1804,32 +1806,6 @@ $breadcrumbs = [
                 </div>
             </div>
 
-            <!-- Modal novo/editar registo do banco -->
-            <div id="registoModal" class="modal-overlay" style="display:none;">
-                <div class="modal-box modal-box-lg">
-                    <div class="modal-header">
-                        <h3 id="registoModalTitle">Novo Registo</h3>
-                        <button class="modal-close" onclick="document.getElementById('registoModal').style.display='none';">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <input type="hidden" id="reg_id" value="0">
-                        <div class="form-group"><label>Categoria (opcional — aparece como linha separadora)</label>
-                            <div style="display:flex; gap:6px; align-items:center;">
-                                <select id="reg_categoria_sel" class="form-control" style="flex:1;" onchange="if(this.value==='__custom__'){document.getElementById('reg_categoria_custom').style.display='block';document.getElementById('reg_categoria_custom').focus();}else{document.getElementById('reg_categoria_custom').style.display='none';}">
-                                    <option value="">— Sem categoria —</option>
-                                </select>
-                                <input type="text" id="reg_categoria_custom" class="form-control" placeholder="Nova categoria..." style="flex:1; display:none;">
-                            </div>
-                        </div>
-                        <div id="reg_campos"></div>
-                        <div class="form-group"><label><input type="checkbox" id="reg_ativo" checked> Ativo</label></div>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn btn-primary" onclick="guardarRegisto()">Guardar</button>
-                        <button class="btn btn-secondary" onclick="document.getElementById('registoModal').style.display='none';">Cancelar</button>
-                    </div>
-                </div>
-            </div>
 
             <script>
             function escE(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -1893,46 +1869,69 @@ $breadcrumbs = [
                 }).catch(function(e) { console.error('Erro banco:', e); });
             }
 
-            function renderBancoTable() {
-                if (!tipoAtual) return;
+            function getBancoCols() {
                 var cols = [];
                 try { cols = typeof tipoAtual.colunas === 'string' ? JSON.parse(tipoAtual.colunas) : tipoAtual.colunas; } catch(e) {}
+                return cols || [];
+            }
+
+            function getTipoCats() {
+                var cats = [];
+                try { cats = typeof tipoAtual.categorias === 'string' ? JSON.parse(tipoAtual.categorias) : (tipoAtual.categorias || []); } catch(e) {}
+                return cats || [];
+            }
+
+            function renderBancoTable() {
+                if (!tipoAtual) return;
+                var cols = getBancoCols();
+                var totalCols = cols.length + (IS_SA ? 1 : 0);
                 // Thead
                 var thHtml = '<tr>';
                 cols.forEach(function(c) { thHtml += '<th>' + escE(c.nome) + '</th>'; });
-                if (IS_SA) thHtml += '<th style="width:60px;">Estado</th><th style="width:120px;">Ações</th>';
+                if (IS_SA) thHtml += '<th style="width:50px;"></th>';
                 thHtml += '</tr>';
                 document.getElementById('paramBancoHead').innerHTML = thHtml;
                 // Tbody
                 var tbody = document.getElementById('paramBancoRows');
-                var totalCols = cols.length + (IS_SA ? 2 : 0);
-                if (bancoRegistos.length === 0) {
+                if (bancoRegistos.length === 0 && !IS_SA) {
                     tbody.innerHTML = '<tr><td colspan="' + totalCols + '" class="muted" style="text-align:center; padding:20px;">Nenhum registo.</td></tr>';
                     return;
                 }
                 var html = '', lastCat = '__NONE__';
-                bancoRegistos.forEach(function(r) {
+                bancoRegistos.forEach(function(r, idx) {
                     var vals = {};
                     try { vals = typeof r.valores === 'string' ? JSON.parse(r.valores) : (r.valores || {}); } catch(e) {}
                     // Linha separadora de categoria
                     if (r.categoria && r.categoria !== lastCat) {
-                        html += '<tr class="param-cat-row"><td colspan="' + totalCols + '" style="padding:6px 10px; font-weight:600; font-size:13px; background:var(--color-primary-lighter, #e6f4f9); color:var(--color-primary, #2596be); border-bottom:1px solid var(--color-primary, #2596be);">' + escE(r.categoria) + '</td></tr>';
+                        html += renderCatRow(r.categoria, totalCols);
                         lastCat = r.categoria;
                     }
-                    var inativo = r.ativo == 0;
-                    html += '<tr' + (inativo ? ' style="opacity:0.45;"' : '') + '>';
+                    html += '<tr data-reg-id="' + (r.id || 0) + '" data-cat="' + escE(r.categoria || '') + '" data-ativo="' + (r.ativo != 0 ? '1' : '0') + '"' + (r.ativo == 0 ? ' style="opacity:0.45;"' : '') + '>';
                     cols.forEach(function(c) {
                         var v = vals[c.chave] || '';
-                        html += '<td style="font-size:12px; white-space:pre-wrap;">' + escE(v) + '</td>';
+                        if (IS_SA) {
+                            html += '<td><textarea class="banco-cell" data-chave="' + escE(c.chave) + '" rows="1" style="width:100%; border:1px solid #e5e7eb; border-radius:4px; padding:4px 6px; font-size:12px; resize:vertical; font-family:inherit;">' + escE(v) + '</textarea></td>';
+                        } else {
+                            html += '<td style="font-size:12px; white-space:pre-wrap;">' + escE(v) + '</td>';
+                        }
                     });
                     if (IS_SA) {
-                        html += '<td>' + (inativo ? '<span class="pill pill-error">Inativo</span>' : '<span class="pill pill-success">Ativo</span>') + '</td>';
-                        html += '<td><button class="btn btn-ghost btn-sm" onclick="editarRegisto(' + r.id + ')">Editar</button> ';
-                        html += '<button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarRegisto(' + r.id + ')">Eliminar</button></td>';
+                        html += '<td style="text-align:center;">';
+                        html += '<button class="btn btn-ghost btn-sm" style="color:#b42318; padding:2px 6px;" onclick="removerLinhaInline(this)" title="Remover">x</button>';
+                        html += '</td>';
                     }
                     html += '</tr>';
                 });
+                if (bancoRegistos.length === 0 && IS_SA) {
+                    html = '<tr><td colspan="' + totalCols + '" class="muted" style="text-align:center; padding:12px;">Tabela vazia. Use "+ Linha" ou "+ Categoria" para começar.</td></tr>';
+                }
                 tbody.innerHTML = html;
+            }
+
+            function renderCatRow(catName, totalCols) {
+                return '<tr class="param-cat-row" data-cat-row="' + escE(catName) + '"><td colspan="' + totalCols + '" style="padding:4px 10px; font-weight:600; font-size:13px; background:var(--color-primary-lighter, #e6f4f9); color:var(--color-primary, #2596be); border-bottom:1px solid var(--color-primary, #2596be);">' +
+                    (IS_SA ? '<div style="display:flex; align-items:center; gap:6px;"><span contenteditable="true" style="flex:1; outline:none; min-width:80px;">' + escE(catName) + '</span><button class="btn btn-ghost btn-sm" style="color:#b42318; padding:0 4px; font-size:11px;" onclick="removerCategoriaInline(this)">x</button></div>' : escE(catName)) +
+                    '</td></tr>';
             }
 
             <?php if ($isSuperAdminUser): ?>
@@ -2085,113 +2084,122 @@ $breadcrumbs = [
                 });
             }
 
-            // === REGISTO CRUD ===
-            function populateRegCatSelect(selected) {
-                var sel = document.getElementById('reg_categoria_sel');
-                var customInput = document.getElementById('reg_categoria_custom');
-                sel.innerHTML = '<option value="">— Sem categoria —</option>';
-                // Merge tipo categorias + banco categorias
-                var cats = new Set();
-                if (tipoAtual) {
-                    var tc = [];
-                    try { tc = typeof tipoAtual.categorias === 'string' ? JSON.parse(tipoAtual.categorias) : (tipoAtual.categorias || []); } catch(e) {}
-                    (tc || []).forEach(function(c){ if (c) cats.add(c); });
-                }
-                bancoRegistos.forEach(function(r){ if (r.categoria) cats.add(r.categoria); });
-                cats.forEach(function(c) {
-                    var o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o);
-                });
-                // Opção "Nova categoria..."
-                var optNew = document.createElement('option'); optNew.value = '__custom__'; optNew.textContent = '+ Nova categoria...'; sel.appendChild(optNew);
-                // Selecionar valor
-                customInput.style.display = 'none';
-                customInput.value = '';
-                if (selected) {
-                    var found = false;
-                    for (var i = 0; i < sel.options.length; i++) {
-                        if (sel.options[i].value === selected) { sel.value = selected; found = true; break; }
-                    }
-                    if (!found) { sel.value = '__custom__'; customInput.style.display = 'block'; customInput.value = selected; }
-                } else { sel.value = ''; }
-            }
-
-            function getRegCategoria() {
-                var sel = document.getElementById('reg_categoria_sel');
-                if (sel.value === '__custom__') return document.getElementById('reg_categoria_custom').value.trim();
-                return sel.value;
-            }
-
-            function abrirRegistoModal() {
+            // === INLINE EDITING ===
+            function adicionarLinhaInline() {
                 if (!tipoAtual) return;
-                document.getElementById('registoModalTitle').textContent = 'Novo Registo — ' + tipoAtual.nome;
-                document.getElementById('reg_id').value = '0';
-                populateRegCatSelect('');
-                document.getElementById('reg_ativo').checked = true;
-                renderRegCampos({});
-                document.getElementById('registoModal').style.display = 'flex';
-            }
-
-            function editarRegisto(id) {
-                var r = bancoRegistos.find(function(x){ return x.id == id; });
-                if (!r) return;
-                document.getElementById('registoModalTitle').textContent = 'Editar Registo — ' + tipoAtual.nome;
-                document.getElementById('reg_id').value = r.id;
-                populateRegCatSelect(r.categoria || '');
-                document.getElementById('reg_ativo').checked = r.ativo != 0;
-                var vals = {};
-                try { vals = typeof r.valores === 'string' ? JSON.parse(r.valores) : (r.valores || {}); } catch(e) {}
-                renderRegCampos(vals);
-                document.getElementById('registoModal').style.display = 'flex';
-            }
-
-            function renderRegCampos(vals) {
-                if (!tipoAtual) return;
-                var cols = [];
-                try { cols = typeof tipoAtual.colunas === 'string' ? JSON.parse(tipoAtual.colunas) : tipoAtual.colunas; } catch(e) {}
+                var cols = getBancoCols();
+                var totalCols = cols.length + 1;
+                var tbody = document.getElementById('paramBancoRows');
+                // Remover mensagem "tabela vazia" se existir
+                var empty = tbody.querySelector('td.muted');
+                if (empty) empty.parentElement.remove();
+                // Descobrir categoria da última linha
+                var rows = tbody.querySelectorAll('tr[data-reg-id]');
+                var lastCat = rows.length > 0 ? (rows[rows.length - 1].getAttribute('data-cat') || '') : '';
+                var tr = document.createElement('tr');
+                tr.setAttribute('data-reg-id', '0');
+                tr.setAttribute('data-cat', lastCat);
+                tr.setAttribute('data-ativo', '1');
                 var html = '';
                 cols.forEach(function(c) {
-                    html += '<div class="form-group"><label>' + escE(c.nome) + '</label>';
-                    html += '<textarea class="form-control reg-campo" data-chave="' + escE(c.chave) + '" rows="2" placeholder="' + escE(c.nome) + '">' + escE(vals[c.chave] || '') + '</textarea>';
-                    html += '</div>';
+                    html += '<td><textarea class="banco-cell" data-chave="' + escE(c.chave) + '" rows="1" style="width:100%; border:1px solid #e5e7eb; border-radius:4px; padding:4px 6px; font-size:12px; resize:vertical; font-family:inherit;"></textarea></td>';
                 });
-                document.getElementById('reg_campos').innerHTML = html;
+                html += '<td style="text-align:center;"><button class="btn btn-ghost btn-sm" style="color:#b42318; padding:2px 6px;" onclick="removerLinhaInline(this)" title="Remover">x</button></td>';
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+                tr.querySelector('textarea').focus();
             }
 
-            function guardarRegisto() {
+            function adicionarCategoriaInline() {
                 if (!tipoAtual) return;
-                var valores = {};
-                document.querySelectorAll('.reg-campo').forEach(function(el) {
-                    valores[el.getAttribute('data-chave')] = el.value;
+                var cats = getTipoCats();
+                var cols = getBancoCols();
+                var totalCols = cols.length + 1;
+                var tbody = document.getElementById('paramBancoRows');
+                var empty = tbody.querySelector('td.muted');
+                if (empty) empty.parentElement.remove();
+                if (cats.length > 0) {
+                    // Mostrar select para escolher ou criar
+                    var catName = prompt('Categoria:\n' + cats.map(function(c,i){ return (i+1) + ') ' + c; }).join('\n') + '\n\nEscreva o nome ou número:');
+                    if (!catName) return;
+                    var idx = parseInt(catName);
+                    if (idx > 0 && idx <= cats.length) catName = cats[idx - 1];
+                } else {
+                    var catName = prompt('Nome da nova categoria:');
+                    if (!catName || !catName.trim()) return;
+                }
+                catName = catName.trim();
+                var catTr = document.createElement('tr');
+                catTr.className = 'param-cat-row';
+                catTr.setAttribute('data-cat-row', catName);
+                catTr.innerHTML = '<td colspan="' + totalCols + '" style="padding:4px 10px; font-weight:600; font-size:13px; background:var(--color-primary-lighter, #e6f4f9); color:var(--color-primary, #2596be); border-bottom:1px solid var(--color-primary, #2596be);"><div style="display:flex; align-items:center; gap:6px;"><span contenteditable="true" style="flex:1; outline:none; min-width:80px;">' + escE(catName) + '</span><button class="btn btn-ghost btn-sm" style="color:#b42318; padding:0 4px; font-size:11px;" onclick="removerCategoriaInline(this)">x</button></div></td>';
+                tbody.appendChild(catTr);
+                // Adicionar linha vazia com esta categoria
+                adicionarLinhaComCat(catName);
+            }
+
+            function adicionarLinhaComCat(cat) {
+                var cols = getBancoCols();
+                var tbody = document.getElementById('paramBancoRows');
+                var tr = document.createElement('tr');
+                tr.setAttribute('data-reg-id', '0');
+                tr.setAttribute('data-cat', cat);
+                tr.setAttribute('data-ativo', '1');
+                var html = '';
+                cols.forEach(function(c) {
+                    html += '<td><textarea class="banco-cell" data-chave="' + escE(c.chave) + '" rows="1" style="width:100%; border:1px solid #e5e7eb; border-radius:4px; padding:4px 6px; font-size:12px; resize:vertical; font-family:inherit;"></textarea></td>';
+                });
+                html += '<td style="text-align:center;"><button class="btn btn-ghost btn-sm" style="color:#b42318; padding:2px 6px;" onclick="removerLinhaInline(this)" title="Remover">x</button></td>';
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+                tr.querySelector('textarea').focus();
+            }
+
+            function removerLinhaInline(btn) {
+                btn.closest('tr').remove();
+            }
+
+            function removerCategoriaInline(btn) {
+                var catRow = btn.closest('tr.param-cat-row');
+                var catName = catRow.getAttribute('data-cat-row');
+                // Remover também as linhas de dados desta categoria
+                var tbody = document.getElementById('paramBancoRows');
+                tbody.querySelectorAll('tr[data-cat="' + catName + '"]').forEach(function(tr) { tr.remove(); });
+                catRow.remove();
+            }
+
+            function guardarBancoTudo() {
+                if (!tipoAtual) return;
+                var cols = getBancoCols();
+                var tbody = document.getElementById('paramBancoRows');
+                var registos = [];
+                var currentCat = '';
+                tbody.querySelectorAll('tr').forEach(function(tr) {
+                    // Linha de categoria — atualizar nome
+                    if (tr.classList.contains('param-cat-row')) {
+                        var span = tr.querySelector('span[contenteditable]');
+                        currentCat = span ? span.textContent.trim() : (tr.getAttribute('data-cat-row') || '');
+                        return;
+                    }
+                    if (!tr.hasAttribute('data-reg-id')) return;
+                    var regId = parseInt(tr.getAttribute('data-reg-id')) || 0;
+                    var ativo = tr.getAttribute('data-ativo') != '0' ? 1 : 0;
+                    var valores = {};
+                    tr.querySelectorAll('.banco-cell').forEach(function(el) {
+                        valores[el.getAttribute('data-chave')] = el.value;
+                    });
+                    // Atualizar categoria com base na última cat row acima
+                    registos.push({ id: regId, categoria: currentCat, valores: valores, ativo: ativo });
                 });
                 fetch(BASE + '/api.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
-                    body: JSON.stringify({
-                        action: 'save_parametro_banco',
-                        id: parseInt(document.getElementById('reg_id').value),
-                        tipo_id: tipoAtual.id,
-                        categoria: getRegCategoria(),
-                        valores: valores,
-                        ativo: document.getElementById('reg_ativo').checked ? 1 : 0
-                    })
+                    body: JSON.stringify({ action: 'save_parametros_banco_bulk', tipo_id: tipoAtual.id, registos: registos })
                 }).then(function(r){return r.json();}).then(function(data) {
                     if (data.success) {
-                        document.getElementById('registoModal').style.display = 'none';
+                        appAlert('Guardado com sucesso! (' + (data.data.count || 0) + ' registos)');
                         carregarBanco();
                     } else appAlert(data.error || 'Erro ao guardar.');
-                });
-            }
-
-            function eliminarRegisto(id) {
-                appConfirmDanger('Eliminar este registo?', function() {
-                    fetch(BASE + '/api.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
-                        body: JSON.stringify({ action: 'delete_parametro_banco', id: id })
-                    }).then(function(r){return r.json();}).then(function(data) {
-                        if (data.success) carregarBanco();
-                        else appAlert(data.error || 'Erro.');
-                    });
                 });
             }
 
