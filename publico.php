@@ -120,13 +120,25 @@ if ($authenticated && $tokenData && $_SERVER['REQUEST_METHOD'] === 'POST' && iss
     }
     if ($nome && registarDecisao($db, $espec['id'], $tokenData['id'], $decisao, $nome, $cargo ?: null, $comentario ?: null, $assinaturaFile)) {
         $aceitacaoMsg = $decisao === 'aceite' ? 'Documento aceite com sucesso!' : 'Documento rejeitado.';
+        // Enviar email de confirmação com link permanente
+        require_once __DIR__ . '/includes/email.php';
+        $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(BASE_PATH, '/');
+        enviarEmailConfirmacaoDecisao($db, $espec['id'], $tokenData['id'], $decisao, $nome, $baseUrl);
     }
 }
 
 // Se autenticado, carregar dados completos
 $data = null;
+$aprovacoes = [];
 if ($authenticated) {
     $data = getEspecificacaoCompleta($db, $espec['id']);
+    $stmtAprov = $db->prepare('SELECT a.tipo_decisao, a.nome_signatario, a.cargo_signatario, a.created_at, t.destinatario_nome, t.tipo_destinatario
+        FROM especificacao_aceitacoes a
+        INNER JOIN especificacao_tokens t ON t.id = a.token_id
+        WHERE a.especificacao_id = ?
+        ORDER BY a.created_at DESC');
+    $stmtAprov->execute([$espec['id']]);
+    $aprovacoes = $stmtAprov->fetchAll();
 }
 
 // Traduções dos rótulos conforme idioma
@@ -268,6 +280,19 @@ $L = $labels[$lang] ?? $labels['pt'];
                 <div><span><?= $L['revisao'] ?>:</span> <strong><?= $data['data_revisao'] ? formatDate($data['data_revisao']) : '-' ?></strong></div>
                 <div><span><?= $L['estado'] ?>:</span> <strong><?= ucfirst($data['estado']) ?></strong></div>
                 <div><span><?= $L['elaborado_por'] ?>:</span> <strong><?= san($data['criado_por_nome'] ?? '-') ?></strong></div>
+                <?php if (!empty($aprovacoes)): ?>
+                <?php foreach ($aprovacoes as $aprov): ?>
+                <div style="width:100%; margin-top:4px;">
+                    <span><?= $aprov['tipo_destinatario'] === 'fornecedor' ? $L['fornecedor'] : ($aprov['tipo_destinatario'] === 'cliente' ? $L['cliente'] : 'Aprovação') ?>:</span>
+                    <strong style="color:<?= $aprov['tipo_decisao'] === 'aceite' ? '#16a34a' : '#dc2626' ?>">
+                        <?= $aprov['tipo_decisao'] === 'aceite' ? 'Aceite' : 'Rejeitado' ?>
+                    </strong>
+                    — <?= san($aprov['nome_signatario']) ?>
+                    <?= $aprov['cargo_signatario'] ? '(' . san($aprov['cargo_signatario']) . ')' : '' ?>
+                    <span style="color:#888; font-size:11px;"><?= date('d/m/Y', strtotime($aprov['created_at'])) ?></span>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
             </div>
 
             <!-- Secções -->

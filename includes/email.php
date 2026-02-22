@@ -324,3 +324,41 @@ function gerarCorpoEmailAceitacao(array $espec, string $link, string $nomeDestin
     $html .= '</body></html>';
     return $html;
 }
+
+/**
+ * Envia email de confirmação após decisão (aceite/rejeitado) com link permanente
+ */
+function enviarEmailConfirmacaoDecisao(PDO $db, int $especId, int $tokenId, string $decisao, string $nomeSig, string $baseUrl): array {
+    $stmt = $db->prepare('SELECT t.*, e.titulo, e.numero, e.versao FROM especificacao_tokens t INNER JOIN especificacoes e ON e.id = t.especificacao_id WHERE t.id = ?');
+    $stmt->execute([$tokenId]);
+    $tk = $stmt->fetch();
+    if (!$tk || empty($tk['destinatario_email'])) {
+        return ['success' => false, 'error' => 'Sem email de destinatário.'];
+    }
+
+    $link = $baseUrl . '/publico.php?token=' . $tk['token'];
+    $aceite = $decisao === 'aceite';
+    $corDecisao = $aceite ? '#16a34a' : '#dc2626';
+    $textoDecisao = $aceite ? 'Aceite' : 'Rejeitado';
+
+    $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">';
+    $html .= '<div style="border-bottom: 3px solid ' . $corDecisao . '; padding-bottom: 12px; margin-bottom: 20px;">';
+    $html .= '<h2 style="color: ' . $corDecisao . '; margin: 0;">Confirmação de Decisão</h2></div>';
+    $html .= '<p>Exmo(a) Sr(a) ' . htmlspecialchars($tk['destinatario_nome']) . ',</p>';
+    $html .= '<p>A sua decisão sobre o seguinte documento foi registada com sucesso:</p>';
+    $html .= '<div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;">';
+    $html .= '<strong>' . htmlspecialchars($tk['titulo']) . '</strong><br>';
+    $html .= '<span style="color: #667085;">Número: ' . htmlspecialchars($tk['numero']) . ' | Versão: ' . htmlspecialchars($tk['versao']) . '</span><br>';
+    $html .= '<span style="font-size: 15px; font-weight: 600; color: ' . $corDecisao . ';">Decisão: ' . $textoDecisao . '</span><br>';
+    $html .= '<span style="color: #667085;">Por: ' . htmlspecialchars($nomeSig) . ' em ' . date('d/m/Y H:i') . '</span>';
+    $html .= '</div>';
+    $html .= '<p>Pode consultar o documento a qualquer momento através do link abaixo:</p>';
+    $html .= '<div style="margin: 24px 0; text-align: center;">';
+    $html .= '<a href="' . htmlspecialchars($link) . '" style="display: inline-block; background: #2596be; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Consultar Documento</a></div>';
+    $html .= '<p style="font-size: 12px; color: #667085;">Guarde este email para consulta futura. Link: <a href="' . htmlspecialchars($link) . '">' . htmlspecialchars($link) . '</a></p>';
+    $html .= '<div style="margin-top: 30px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #999;">Este email foi enviado automaticamente pela plataforma SpecLab.<br>Powered by <strong>SpecLab</strong> &copy;' . date('Y') . '</div>';
+    $html .= '</body></html>';
+
+    $assunto = 'Confirmação: Documento ' . $textoDecisao . ' — ' . $tk['numero'];
+    return enviarEmail($db, $especId, $tk['destinatario_email'], $assunto, $html);
+}

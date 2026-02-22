@@ -53,6 +53,15 @@ $fornecedorDisplay = $data['fornecedor_nome'] ?? '';
 if (strpos($fornecedorDisplay, ',') !== false || empty($fornecedorDisplay)) {
     $fornecedorDisplay = 'Todos';
 }
+// Carregar aprovações (tokens com decisão)
+$stmtAprov = $db->prepare('SELECT a.tipo_decisao, a.nome_signatario, a.cargo_signatario, a.created_at, t.destinatario_nome, t.tipo_destinatario
+    FROM especificacao_aceitacoes a
+    INNER JOIN especificacao_tokens t ON t.id = a.token_id
+    WHERE a.especificacao_id = ?
+    ORDER BY a.created_at DESC');
+$stmtAprov->execute([$id]);
+$aprovacoes = $stmtAprov->fetchAll();
+
 $corPrimaria = $org ? $org['cor_primaria'] : '#2596be';
 $corPrimariaDark = $org ? $org['cor_primaria_dark'] : '#1a7a9e';
 $corPrimariaLight = $org ? $org['cor_primaria_light'] : '#e6f4f9';
@@ -272,6 +281,19 @@ if (!empty($data['seccoes'])) {
                 <div><span><?= $L['revisao'] ?>:</span> <strong><?= $data['data_revisao'] ? formatDate($data['data_revisao']) : '-' ?></strong></div>
                 <div><span><?= $L['estado'] ?>:</span> <strong><?= ucfirst($data['estado']) ?></strong></div>
                 <div><span>Criado por:</span> <strong><?= san($data['criado_por_nome'] ?? '-') ?></strong></div>
+                <?php if (!empty($aprovacoes)): ?>
+                <?php foreach ($aprovacoes as $aprov): ?>
+                <div class="meta-full" style="margin-top:4px;">
+                    <span><?= $aprov['tipo_destinatario'] === 'fornecedor' ? $L['fornecedor'] : ($aprov['tipo_destinatario'] === 'cliente' ? $L['cliente'] : $L['aprovacao']) ?>:</span>
+                    <strong style="color:<?= $aprov['tipo_decisao'] === 'aceite' ? '#16a34a' : '#dc2626' ?>">
+                        <?= $aprov['tipo_decisao'] === 'aceite' ? 'Aceite' : 'Rejeitado' ?>
+                    </strong>
+                    — <?= san($aprov['nome_signatario']) ?>
+                    <?= $aprov['cargo_signatario'] ? '(' . san($aprov['cargo_signatario']) . ')' : '' ?>
+                    <span style="color:#888; font-size:11px;"><?= date('d/m/Y', strtotime($aprov['created_at'])) ?></span>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
             </div>
 
             <?php /* $navItems, $validFilesVer, $ficheirosPos já preparados antes do body */ ?>
