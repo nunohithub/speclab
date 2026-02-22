@@ -3405,6 +3405,8 @@ $breadcrumbs = [
         // Auto-grow textareas
         var tbl = result.block.querySelector('.seccao-ensaios-table');
         if (tbl) {
+            initColResize(tbl);
+            initMergeHandlers(tbl);
             tbl.querySelectorAll('textarea[data-field]').forEach(autoGrowTextarea);
         }
         renumerarSeccoes();
