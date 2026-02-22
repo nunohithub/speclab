@@ -1392,7 +1392,8 @@ $breadcrumbs = [
                                                     <?php else: ?>
                                                     <tr>
                                                         <?php foreach ($pcColunas as $pcCol): ?>
-                                                        <td><textarea rows="1" data-field="<?= sanitize($pcCol['chave']) ?>"><?= sanitize($pcRow[$pcCol['chave']] ?? '') ?></textarea></td>
+                                                        <?php $pcVal = $pcRow[$pcCol['chave']] ?? ''; $pcRowCount = max(1, substr_count($pcVal, "\n") + 1); ?>
+                                                        <td><textarea rows="<?= $pcRowCount ?>" data-field="<?= sanitize($pcCol['chave']) ?>"><?= sanitize($pcVal) ?></textarea></td>
                                                         <?php endforeach; ?>
                                                         <td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>
                                                     </tr>
@@ -3170,8 +3171,11 @@ $breadcrumbs = [
         applyMergesDOM(tbody, merges);
     }
 
-    // Inicializar merge handlers em todas as tabelas existentes
+    // Inicializar merge handlers apenas em tabelas de ensaios (não parametros)
     document.querySelectorAll('.seccao-ensaios-table').forEach(function(table) {
+        var block = table.closest('.seccao-block');
+        var tipo = block ? block.getAttribute('data-tipo') : '';
+        if (tipo === 'parametros' || tipo === 'parametros_custom') return;
         initMergeHandlers(table);
         applyMergesVisual(table);
     });
@@ -3179,7 +3183,7 @@ $breadcrumbs = [
     // Auto-grow textareas nos ensaios
     function autoGrowTextarea(el) {
         el.style.height = 'auto';
-        el.style.height = el.scrollHeight + 'px';
+        el.style.height = (el.scrollHeight + 2) + 'px';
     }
 
     // Event delegation para auto-grow em todas as tabelas de ensaios
@@ -3191,8 +3195,11 @@ $breadcrumbs = [
     });
 
     // Inicializar auto-grow nas textareas existentes (após carregamento)
+    // Só correr auto-grow em textareas com rows=1 (default); rows>1 já têm altura correcta do PHP
     document.querySelectorAll('.seccao-ensaios-table textarea[data-field]').forEach(function(ta) {
-        autoGrowTextarea(ta);
+        if (parseInt(ta.getAttribute('rows') || '1') <= 1) {
+            autoGrowTextarea(ta);
+        }
     });
 
     // Ensaios selector modal
@@ -3265,7 +3272,11 @@ $breadcrumbs = [
     // ============================================================
     // TIPO DE PARÂMETRO SELECTOR
     // ============================================================
-    var _paramTiposCache = null;
+    var _paramTiposCache = <?php
+        $stmtAllPt = $db->prepare('SELECT id, nome, slug, colunas, legenda, legenda_tamanho, categorias FROM parametros_tipos WHERE ativo = 1 ORDER BY ordem, id');
+        $stmtAllPt->execute();
+        echo json_encode($stmtAllPt->fetchAll(PDO::FETCH_ASSOC));
+    ?>;
 
     function abrirSelectorTipoParametro() {
         var modal = document.getElementById('modalSelectorTipo');
@@ -3423,15 +3434,27 @@ $breadcrumbs = [
     }
 
     function adicionarParamCustomLinha(btn, tipoId) {
-        var tipo = _paramTiposCache ? _paramTiposCache.find(function(t) { return t.id == tipoId; }) : null;
-        if (!tipo) return;
-        var cols = [];
-        try { cols = JSON.parse(tipo.colunas); } catch(e) { cols = tipo.colunas || []; }
-        var tbody = btn.closest('.seccao-ensaios-wrap').querySelector('.ensaios-tbody');
+        var wrap = btn.closest('.seccao-ensaios-wrap');
+        var tbody = wrap.querySelector('.ensaios-tbody');
+        // Derivar campos de linha existente (funciona após reload sem cache)
+        var fields = [];
+        var existingTa = tbody.querySelector('tr:not([data-cat]) textarea[data-field]');
+        if (existingTa) {
+            existingTa.closest('tr').querySelectorAll('textarea[data-field]').forEach(function(ta) {
+                fields.push(ta.getAttribute('data-field'));
+            });
+        }
+        // Fallback: usar cache de tipos
+        if (fields.length === 0) {
+            var tipo = _paramTiposCache ? _paramTiposCache.find(function(t) { return t.id == tipoId; }) : null;
+            if (!tipo) return;
+            var cols = [];
+            try { cols = JSON.parse(tipo.colunas); } catch(e) { cols = tipo.colunas || []; }
+            cols.forEach(function(c) { fields.push(c.chave); });
+        }
         var tr = document.createElement('tr');
-        tr.innerHTML = '';
-        cols.forEach(function(c) {
-            tr.innerHTML += '<td><textarea rows="1" data-field="' + escapeHtml(c.chave) + '"></textarea></td>';
+        fields.forEach(function(f) {
+            tr.innerHTML += '<td><textarea rows="1" data-field="' + escapeHtml(f) + '"></textarea></td>';
         });
         tr.innerHTML += '<td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>';
         tbody.appendChild(tr);
@@ -5115,6 +5138,34 @@ $breadcrumbs = [
                     sectionsHtml += '</div>';
                 } else {
                     sectionsHtml += '<div style="font-size:9px; color:#999; margin-bottom:8px;">Sem ficheiros anexados</div>';
+                }
+            } else if (tipo === 'parametros' || tipo === 'parametros_custom') {
+                var tbl = block.querySelector('.seccao-ensaios-table');
+                var tbody2 = tbl ? tbl.querySelector('.ensaios-tbody') : null;
+                if (tbody2 && tbl) {
+                    var ths = tbl.querySelectorAll('thead th');
+                    var nCols = ths.length - 1;
+                    if (nCols > 0) {
+                        sectionsHtml += '<h4 style="color:' + hColor + '; font-size:' + hSize + 'pt; font-weight:' + hWeight + ';' + hMargin + '">' + secNum + ' ' + escapeHtml(titulo) + '</h4>';
+                        sectionsHtml += '<table style="width:100%; font-size:9px; border-collapse:collapse; margin-bottom:8px;' + hMargin + '"><thead><tr>';
+                        for (var ci = 0; ci < nCols; ci++) {
+                            sectionsHtml += '<th style="padding:3px 4px; text-align:left; font-weight:600; background-color:' + configVisual.cor_titulos + '; color:white;">' + escapeHtml(ths[ci].textContent.trim()) + '</th>';
+                        }
+                        sectionsHtml += '</tr></thead><tbody>';
+                        tbody2.querySelectorAll('tr').forEach(function(tr2) {
+                            if (tr2.classList.contains('cat-header-row') || tr2.getAttribute('data-cat') === '1') {
+                                var catInput = tr2.querySelector('.cat-header-input');
+                                sectionsHtml += '<tr><td colspan="' + nCols + '" style="background-color:' + orgCores.light + '; font-weight:600; padding:3px 6px; color:' + orgCores.dark + '; text-align:center;">' + escapeHtml(catInput ? catInput.value : '') + '</td></tr>';
+                            } else {
+                                sectionsHtml += '<tr>';
+                                tr2.querySelectorAll('textarea[data-field]').forEach(function(ta) {
+                                    sectionsHtml += '<td style="padding:2px 4px; border-bottom:1px solid #eee;">' + escapeHtml(ta.value) + '</td>';
+                                });
+                                sectionsHtml += '</tr>';
+                            }
+                        });
+                        sectionsHtml += '</tbody></table>';
+                    }
                 }
             } else {
                 var editorEl = block.querySelector('.seccao-editor');

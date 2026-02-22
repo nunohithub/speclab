@@ -161,12 +161,32 @@ Pedir confirmação apenas quando:
 
 ## Deploy (obrigatório após cada ciclo)
 
-Após cada alteração, os ficheiros devem ficar prontos em DOIS ambientes:
-1. **Local (MAMP):** copiar para `/Applications/MAMP/htdocs/especificacoes/`
-2. **Servidor:** o utilizador copia manualmente via FTP do local para o servidor online
+Após cada alteração, os ficheiros devem ficar prontos em TRÊS locais:
+
+1. **Projeto (fonte):** `/Users/nunonunes/Desktop/projetos/projetos claude/Especificações/especificacoes-app/`
+   - Código fonte principal, onde se edita
+   - `.env` com dados MAMP (local)
+   - `.env-1` com dados do servidor (produção)
+
+2. **Local (MAMP):** `/Applications/MAMP/htdocs/especificacoes/`
+   - Cópia para testes locais
+   - `.env` com dados MAMP (DB_HOST=127.0.0.1, DB_PORT=8889, BASE_PATH=/especificacoes)
+
+3. **Servidor (FTP):** `servidor/` (dentro da pasta do projeto)
+   - Cópia pronta para o utilizador enviar por FTP para speclab.pt
+   - `.env` com dados de produção (copiado do `.env-1`)
+   - NÃO inclui: vendor/, tests/, phpunit.xml, .git/, composer.phar
+
+**Processo obrigatório após cada ciclo:**
+```
+1. Editar ficheiros no projeto (fonte)
+2. Copiar para MAMP: cp -R fonte/* /Applications/MAMP/htdocs/especificacoes/
+3. Copiar para servidor/: rsync (sem vendor/tests/.git) + cp .env-1 → servidor/.env
+4. O utilizador copia de especificacoes-servidor/ para o servidor real via FTP
+```
 
 O utilizador testa no servidor online (speclab.pt), não no MAMP.
-Todas as alterações de código devem ser feitas no projeto local E copiadas para MAMP.
+NUNCA esquecer de atualizar AMBAS as pastas (MAMP + servidor).
 
 ## Servidor de Produção
 

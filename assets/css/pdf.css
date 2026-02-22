@@ -35,6 +35,17 @@ h2 {
     page-break-after: avoid;
 }
 
+h3 {
+    font-size: {{TAM_SUBTITULOS}}pt;
+    font-weight: {{SUB_BOLD}};
+    color: {{COR_SUBTITULOS}};
+    border-bottom: 1px solid {{COR_LINHAS}};
+    padding-bottom: 1mm;
+    margin-top: 4mm;
+    margin-bottom: 2mm;
+    page-break-after: avoid;
+}
+
 /* ============================================================
    META BOX (dados gerais do documento)
    ============================================================ */
@@ -177,9 +188,11 @@ img {
    ASSINATURA / BLOCO FINAL
    ============================================================ */
 .sig-block {
-    margin-top: 15mm;
+    margin-top: 10mm;
+    margin-bottom: 5mm;
     padding-top: 5mm;
     page-break-inside: avoid;
+    border-top: 0.5pt solid #e5e7eb;
 }
 
 .sig-table {
@@ -224,12 +237,13 @@ img {
     margin: 0;
     font-size: 8pt;
     color: #999;
-    padding-top: 15mm;
+    padding-top: 8mm;
     border-top: 1px solid #999;
 }
 
 .sig-img {
-    max-height: 40px;
+    max-height: 12mm;
+    max-width: 40mm;
     margin-bottom: 4px;
 }
 

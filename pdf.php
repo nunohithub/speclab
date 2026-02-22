@@ -470,6 +470,77 @@ if ($useMpdf) {
                         $html .= '<p class="legenda" style="font-size:' . $pdfLegTam . 'pt;">' . san($pdfLegenda) . '</p>';
                     }
                 }
+            } elseif ($secTipo === 'parametros' || $secTipo === 'parametros_custom') {
+                // Parâmetros genéricos (dinâmicos)
+                $html .= '<div class="section"' . $subStyle . '>';
+                $pcRaw = json_decode($sec['conteudo'] ?? '{}', true);
+                $pcRows = $pcRaw['rows'] ?? [];
+                $pcTipoId = $pcRaw['tipo_id'] ?? '';
+                $pcColWidths = $pcRaw['colWidths'] ?? [];
+                $pcColunas = []; $pcLegenda = ''; $pcLegTam = 9;
+                if ($pcTipoId) {
+                    $stmtPt = $db->prepare('SELECT colunas, legenda, legenda_tamanho FROM parametros_tipos WHERE id = ?');
+                    $stmtPt->execute([(int)$pcTipoId]);
+                    $ptRow = $stmtPt->fetch();
+                    if ($ptRow) {
+                        $pcColunas = json_decode($ptRow['colunas'], true) ?: [];
+                        $pcLegenda = $ptRow['legenda'] ?? '';
+                        $pcLegTam = (int)($ptRow['legenda_tamanho'] ?? 9);
+                    }
+                }
+                if (empty($pcColunas) && !empty($pcRows)) {
+                    $firstRow = null;
+                    foreach ($pcRows as $pr) { if (!isset($pr['_cat'])) { $firstRow = $pr; break; } }
+                    if ($firstRow) { foreach (array_keys($firstRow) as $k) { if ($k !== '_cat') $pcColunas[] = ['nome' => ucfirst($k), 'chave' => $k]; } }
+                }
+                $nCols = count($pcColunas);
+                if ($nCols > 0 && count($pcColWidths) === $nCols) {
+                    $cwSum = array_sum($pcColWidths) ?: 1;
+                    $cwPct = array_map(function($v) use ($cwSum) { return round($v / $cwSum * 100, 1); }, $pcColWidths);
+                } else {
+                    $defW = $nCols > 0 ? round(100 / $nCols, 1) : 100;
+                    $cwPct = array_fill(0, max(1, $nCols), $defW);
+                }
+                if (!empty($pcRows) && $nCols > 0) {
+                    $secTitulo = san($sec['titulo']);
+                    $groups = []; $curCat = null; $curRows = [];
+                    foreach ($pcRows as $row) {
+                        if (isset($row['_cat'])) {
+                            if (!empty($curRows)) { $groups[] = ['cat' => $curCat, 'rows' => $curRows]; $curRows = []; }
+                            $curCat = $row['_cat'];
+                        } else { $curRows[] = $row; }
+                    }
+                    if (!empty($curRows)) $groups[] = ['cat' => $curCat, 'rows' => $curRows];
+                    $theadCols = '<tr>';
+                    foreach ($pcColunas as $ci => $pcCol) {
+                        $theadCols .= '<th class="ensaio-th" style="width:' . ($cwPct[$ci] ?? 20) . '%;">' . san($pcCol['nome']) . '</th>';
+                    }
+                    $theadCols .= '</tr>';
+                    $pTitleSize = $secNivel === 2 ? $tamSubtitulos : $tamTitulos;
+                    $pTitleColor = $secNivel === 2 ? san($corSubtitulos) : san($corTitulos);
+                    $pTitleWeight = $secNivel === 2 ? $subBold : 'bold';
+                    $theadTitle = '<tr class="ensaio-titulo-row"><td colspan="' . $nCols . '" style="font-size:' . $pTitleSize . 'pt; color:' . $pTitleColor . '; font-weight:' . $pTitleWeight . ';">' . $secNum . ' ' . $secTitulo . '</td></tr>';
+                    foreach ($groups as $gIdx => $group) {
+                        $mt = $gIdx === 0 ? ' style="margin-top:6px;"' : '';
+                        $html .= '<table class="params" repeat_header="1"' . $mt . '>';
+                        $html .= '<thead>' . ($gIdx === 0 ? $theadTitle : '') . $theadCols;
+                        if ($group['cat']) {
+                            $html .= '<tr class="ensaio-cat-row"><td colspan="' . $nCols . '">' . san($group['cat']) . '</td></tr>';
+                        }
+                        $html .= '</thead><tbody>';
+                        foreach ($group['rows'] as $row) {
+                            $html .= '<tr>';
+                            foreach ($pcColunas as $pcCol) {
+                                $html .= '<td class="ensaio-td">' . nl2br(san($row[$pcCol['chave']] ?? '')) . '</td>';
+                            }
+                            $html .= '</tr>';
+                        }
+                        $html .= '</tbody></table>';
+                    }
+                    if (!empty($pcLegenda)) {
+                        $html .= '<p class="legenda" style="font-size:' . $pcLegTam . 'pt;">' . san($pcLegenda) . '</p>';
+                    }
+                }
             } else {
                 $html .= '<div class="section"' . $subStyle . '><' . $hTag . '>' . $secNum . ' ' . san($sec['titulo']) . '</' . $hTag . '>';
                 $secContent = $sec['conteudo'] ?? '';

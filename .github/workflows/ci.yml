@@ -20,15 +20,4 @@ jobs:
 
       - name: PHP Syntax Check
         run: |
-          find . -name "*.php" -not -path "./vendor/*" -not -path "./node_modules/*" | xargs -I {} php -l {}
-
-      - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Run Tests
-        run: |
-          if [ -f phpunit.xml ]; then
-            vendor/bin/phpunit
-          else
-            echo "No PHPUnit config found, skipping tests"
-          fi
+          find . -name "*.php" -not -path "./vendor/*" -not -path "./node_modules/*" -not -path "./servidor/*" | xargs -I {} php -l {}

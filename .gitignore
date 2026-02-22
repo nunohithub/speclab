@@ -29,3 +29,6 @@ tmp/
 # Backups da base de dados
 backups/*
 !backups/.gitkeep
+
+# Pasta servidor (contém .env de produção)
+servidor/
