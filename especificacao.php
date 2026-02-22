@@ -95,8 +95,6 @@ if ($isNew) {
         'senha_publica' => '',
         'codigo_acesso' => '',
         'parametros' => [],
-        'classes' => [],
-        'defeitos' => [],
         'config_visual' => null,
         'motivo_devolucao' => null,
         'seccoes' => [
@@ -180,8 +178,6 @@ if (!$isNew) {
 
 // Templates de parâmetros
 $categoriasPadrao = getCategoriasPadrao($orgId);
-$classesPadrao = getClassesPadrao();
-$defeitosPadrao = getDefeitosPadrao();
 // Config visual (JSON -> array com defaults, usando cores da org)
 $orgCor = $user['org_cor'] ?? '#2596be';
 $configVisualDefaults = [
@@ -1013,7 +1009,6 @@ $breadcrumbs = [
         <div class="tabs" id="mainTabs">
             <button class="tab active" data-tab="dados-gerais">Dados Gerais</button>
             <button class="tab" data-tab="conteudo">Conteúdo</button>
-            <button class="tab" data-tab="classes-defeitos">Classes e Defeitos</button>
             <?php if (!$saOutraOrg): ?>
             <button class="tab" data-tab="partilha">Partilha</button>
             <button class="tab" data-tab="historico">Histórico<?php if (!empty($nNovasDecisoes)): ?> <span style="background:var(--color-primary); color:#fff; font-size:10px; padding:1px 6px; border-radius:10px; margin-left:4px;"><?= $nNovasDecisoes ?></span><?php endif; ?></button>
@@ -1478,131 +1473,6 @@ $breadcrumbs = [
                     </div>
                 </div>
 
-                <!-- TAB 3: CLASSES E DEFEITOS -->
-                <div class="tab-panel" id="panel-classes-defeitos">
-                    <!-- Classes Visuais -->
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">Classes Visuais</span>
-                            <div class="flex gap-sm">
-                                <button class="btn btn-secondary btn-sm" onclick="carregarClassesPadrao()">Carregar Padrão</button>
-                                <button class="btn btn-primary btn-sm" onclick="adicionarClasse()">+ Adicionar Classe</button>
-                            </div>
-                        </div>
-                        <div class="class-row header">
-                            <span>Classe</span>
-                            <span>Defeitos Máx. (%)</span>
-                            <span>Descrição</span>
-                            <span></span>
-                        </div>
-                        <div id="classRows">
-                            <?php if (!empty($espec['classes'])): ?>
-                                <?php foreach ($espec['classes'] as $classe): ?>
-                                    <div class="class-row" data-class-id="<?= $classe['id'] ?? '' ?>">
-                                        <input type="text" name="class_nome[]" value="<?= sanitize($classe['classe'] ?? '') ?>" placeholder="Nome da classe" class="param-field">
-                                        <input type="number" name="class_defeitos[]" value="<?= sanitize($classe['defeitos_max'] ?? '') ?>" placeholder="%" class="param-field">
-                                        <input type="text" name="class_descricao[]" value="<?= sanitize($classe['descricao'] ?? '') ?>" placeholder="Descrição" class="param-field">
-                                        <button class="remove-btn" onclick="removerLinha(this)" title="Remover">&times;</button>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </div>
-                        <?php if (empty($espec['classes'])): ?>
-                            <div class="empty-state" id="classEmpty" style="padding: var(--spacing-lg);">
-                                <p class="muted">Sem classes definidas. Use o botão "Carregar Padrão" para adicionar as classes standard.</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-
-                    <!-- Defeitos -->
-                    <div class="card">
-                        <div class="card-header">
-                            <span class="card-title">Definição de Defeitos</span>
-                            <div class="flex gap-sm">
-                                <button class="btn btn-secondary btn-sm" onclick="carregarDefeitosPadrao()">Carregar Padrão</button>
-                                <button class="btn btn-primary btn-sm" onclick="adicionarDefeito()">+ Adicionar Defeito</button>
-                            </div>
-                        </div>
-
-                        <!-- Críticos -->
-                        <div class="defect-group">
-                            <div class="defect-group-header critico">Defeitos Críticos</div>
-                            <div class="defect-row header">
-                                <span>Defeito</span>
-                                <span>Descrição</span>
-                                <span></span>
-                            </div>
-                            <div id="defectRowsCritico">
-                                <?php if (!empty($espec['defeitos'])):
-                                    foreach ($espec['defeitos'] as $defeito):
-                                        if (($defeito['severidade'] ?? '') === 'critico'):
-                                ?>
-                                    <div class="defect-row" data-defect-id="<?= $defeito['id'] ?? '' ?>">
-                                        <input type="text" name="defect_nome_critico[]" value="<?= sanitize($defeito['nome'] ?? '') ?>" placeholder="Nome do defeito" class="param-field">
-                                        <input type="text" name="defect_desc_critico[]" value="<?= sanitize($defeito['descricao'] ?? '') ?>" placeholder="Descrição" class="param-field">
-                                        <button class="remove-btn" onclick="removerLinha(this)" title="Remover">&times;</button>
-                                    </div>
-                                <?php
-                                        endif;
-                                    endforeach;
-                                endif; ?>
-                            </div>
-                            <button class="btn btn-ghost btn-sm mt-sm" onclick="adicionarDefeitoSeveridade('critico')">+ Adicionar Crítico</button>
-                        </div>
-
-                        <!-- Maiores -->
-                        <div class="defect-group">
-                            <div class="defect-group-header maior">Defeitos Maiores</div>
-                            <div class="defect-row header">
-                                <span>Defeito</span>
-                                <span>Descrição</span>
-                                <span></span>
-                            </div>
-                            <div id="defectRowsMaior">
-                                <?php if (!empty($espec['defeitos'])):
-                                    foreach ($espec['defeitos'] as $defeito):
-                                        if (($defeito['severidade'] ?? '') === 'maior'):
-                                ?>
-                                    <div class="defect-row" data-defect-id="<?= $defeito['id'] ?? '' ?>">
-                                        <input type="text" name="defect_nome_maior[]" value="<?= sanitize($defeito['nome'] ?? '') ?>" placeholder="Nome do defeito" class="param-field">
-                                        <input type="text" name="defect_desc_maior[]" value="<?= sanitize($defeito['descricao'] ?? '') ?>" placeholder="Descrição" class="param-field">
-                                        <button class="remove-btn" onclick="removerLinha(this)" title="Remover">&times;</button>
-                                    </div>
-                                <?php
-                                        endif;
-                                    endforeach;
-                                endif; ?>
-                            </div>
-                            <button class="btn btn-ghost btn-sm mt-sm" onclick="adicionarDefeitoSeveridade('maior')">+ Adicionar Maior</button>
-                        </div>
-
-                        <!-- Menores -->
-                        <div class="defect-group">
-                            <div class="defect-group-header menor">Defeitos Menores</div>
-                            <div class="defect-row header">
-                                <span>Defeito</span>
-                                <span>Descrição</span>
-                                <span></span>
-                            </div>
-                            <div id="defectRowsMenor">
-                                <?php if (!empty($espec['defeitos'])):
-                                    foreach ($espec['defeitos'] as $defeito):
-                                        if (($defeito['severidade'] ?? '') === 'menor'):
-                                ?>
-                                    <div class="defect-row" data-defect-id="<?= $defeito['id'] ?? '' ?>">
-                                        <input type="text" name="defect_nome_menor[]" value="<?= sanitize($defeito['nome'] ?? '') ?>" placeholder="Nome do defeito" class="param-field">
-                                        <input type="text" name="defect_desc_menor[]" value="<?= sanitize($defeito['descricao'] ?? '') ?>" placeholder="Descrição" class="param-field">
-                                        <button class="remove-btn" onclick="removerLinha(this)" title="Remover">&times;</button>
-                                    </div>
-                                <?php
-                                        endif;
-                                    endforeach;
-                                endif; ?>
-                            </div>
-                            <button class="btn btn-ghost btn-sm mt-sm" onclick="adicionarDefeitoSeveridade('menor')">+ Adicionar Menor</button>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- TAB: PARTILHA -->
                 <div class="tab-panel" id="panel-partilha">
@@ -4260,9 +4130,7 @@ $breadcrumbs = [
             codigo_acesso: (document.getElementById('codigo_acesso') || {}).value || '',
             config_visual: JSON.stringify(recolherConfigVisual()),
             seccoes: [],
-            parametros: [],
-            classes: [],
-            defeitos: []
+            parametros: []
         };
 
         // Secções dinâmicas (texto + ensaios)
@@ -4430,36 +4298,8 @@ $breadcrumbs = [
                     if (btnVer) { btnVer.href = BASE_PATH + '/ver.php?id=' + especId; btnVer.style.display = ''; }
                 }
 
-                // 2. Save parameters, classes, defeitos in parallel
+                // 2. Save sections and parameters
                 var promises = [];
-
-                if (data.classes.length > 0 || document.querySelectorAll('#classRows .class-row').length === 0) {
-                    promises.push(
-                        apiPost({
-                                action: 'save_classes',
-                                especificacao_id: especId,
-                                classes: data.classes
-                            }).then(function(r) { return checkSession(r); })
-                    );
-                }
-
-                if (data.defeitos.length > 0 || true) {
-                    var defeitosForApi = data.defeitos.map(function(d) {
-                        return {
-                            nome: d.nome,
-                            tipo: d.severidade || d.tipo,
-                            descricao: d.descricao,
-                            ordem: d.ordem || 0
-                        };
-                    });
-                    promises.push(
-                        apiPost({
-                                action: 'save_defeitos',
-                                especificacao_id: especId,
-                                defeitos: defeitosForApi
-                            }).then(function(r) { return checkSession(r); })
-                    );
-                }
 
                 // Save sections
                 promises.push(
@@ -4617,113 +4457,6 @@ $breadcrumbs = [
             }
         })
         .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de ligação.', 'error'); });
-    }
-
-    // ============================================================
-    // CLASSES - ADICIONAR / REMOVER
-    // ============================================================
-    function criarLinhaClasse(nome, defeitos, descricao) {
-        nome = nome || '';
-        defeitos = defeitos || '';
-        descricao = descricao || '';
-
-        var row = document.createElement('div');
-        row.className = 'class-row';
-        row.setAttribute('data-class-id', '');
-        row.innerHTML =
-            '<input type="text" name="class_nome[]" value="' + escapeHtml(nome) + '" placeholder="Nome da classe" class="param-field">' +
-            '<input type="number" name="class_defeitos[]" value="' + escapeHtml(String(defeitos)) + '" placeholder="%" class="param-field">' +
-            '<input type="text" name="class_descricao[]" value="' + escapeHtml(descricao) + '" placeholder="Descrição" class="param-field">' +
-            '<button class="remove-btn" onclick="removerLinha(this)" title="Remover">&times;</button>';
-
-        row.querySelectorAll('input').forEach(function(el) {
-            el.addEventListener('input', marcarAlterado);
-        });
-
-        return row;
-    }
-
-    function adicionarClasse() {
-        var container = document.getElementById('classRows');
-        var row = criarLinhaClasse();
-        container.appendChild(row);
-
-        var empty = document.getElementById('classEmpty');
-        if (empty) empty.remove();
-
-        marcarAlterado();
-        row.querySelector('input').focus();
-    }
-
-    function carregarClassesPadrao() {
-        var container = document.getElementById('classRows');
-        var classesPadrao = <?= json_encode($classesPadrao) ?>;
-
-        classesPadrao.forEach(function(c) {
-            var row = criarLinhaClasse(c.classe, c.defeitos_max, c.descricao);
-            container.appendChild(row);
-        });
-
-        var empty = document.getElementById('classEmpty');
-        if (empty) empty.remove();
-
-        marcarAlterado();
-        showToast(classesPadrao.length + ' classes adicionadas.', 'success');
-    }
-
-    // ============================================================
-    // DEFEITOS - ADICIONAR / REMOVER
-    // ============================================================
-    function criarLinhaDefeito(severidade, nome, descricao) {
-        nome = nome || '';
-        descricao = descricao || '';
-
-        var row = document.createElement('div');
-        row.className = 'defect-row';
-        row.setAttribute('data-defect-id', '');
-        row.innerHTML =
-            '<input type="text" name="defect_nome_' + severidade + '[]" value="' + escapeHtml(nome) + '" placeholder="Nome do defeito" class="param-field">' +
-            '<input type="text" name="defect_desc_' + severidade + '[]" value="' + escapeHtml(descricao) + '" placeholder="Descrição" class="param-field">' +
-            '<button class="remove-btn" onclick="removerLinha(this)" title="Remover">&times;</button>';
-
-        row.querySelectorAll('input').forEach(function(el) {
-            el.addEventListener('input', marcarAlterado);
-        });
-
-        return row;
-    }
-
-    function adicionarDefeito() {
-        adicionarDefeitoSeveridade('critico');
-    }
-
-    function adicionarDefeitoSeveridade(severidade) {
-        var containerId = 'defectRows' + severidade.charAt(0).toUpperCase() + severidade.slice(1);
-        var container = document.getElementById(containerId);
-        var row = criarLinhaDefeito(severidade);
-        container.appendChild(row);
-        marcarAlterado();
-        row.querySelector('input').focus();
-    }
-
-    function carregarDefeitosPadrao() {
-        var defeitosPadrao = <?= json_encode($defeitosPadrao) ?>;
-        var total = 0;
-
-        Object.keys(defeitosPadrao).forEach(function(severidade) {
-            var containerId = 'defectRows' + severidade.charAt(0).toUpperCase() + severidade.slice(1);
-            var container = document.getElementById(containerId);
-            var defeitos = defeitosPadrao[severidade];
-
-            Object.keys(defeitos).forEach(function(nome) {
-                var row = criarLinhaDefeito(severidade, nome, defeitos[nome]);
-                container.appendChild(row);
-                total++;
-            });
-        });
-
-        marcarAlterado();
-        showToast(total + ' defeitos adicionados.', 'success');
     }
 
     // ============================================================

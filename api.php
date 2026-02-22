@@ -160,8 +160,6 @@ $handlers = [
     // Especificacoes
     'save_especificacao'      => 'especificacoes',
     'save_parametros'         => 'especificacoes',
-    'save_classes'            => 'especificacoes',
-    'save_defeitos'           => 'especificacoes',
     'save_seccoes'            => 'especificacoes',
     'get_especificacao'       => 'especificacoes',
     'delete_especificacao'    => 'especificacoes',

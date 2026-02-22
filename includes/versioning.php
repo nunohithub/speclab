@@ -82,19 +82,7 @@ function criarNovaVersao(PDO $db, int $especId, int $userId): int|false {
                 ->execute([$novoId, $especId]);
         }
 
-        // 4. Clonar classes
-        $db->prepare('INSERT INTO especificacao_classes (especificacao_id, classe, defeitos_max, descricao, ordem)
-            SELECT ?, classe, defeitos_max, descricao, ordem
-            FROM especificacao_classes WHERE especificacao_id = ?')
-            ->execute([$novoId, $especId]);
-
-        // 5. Clonar defeitos
-        $db->prepare('INSERT INTO especificacao_defeitos (especificacao_id, nome, tipo, descricao, ordem)
-            SELECT ?, nome, tipo, descricao, ordem
-            FROM especificacao_defeitos WHERE especificacao_id = ?')
-            ->execute([$novoId, $especId]);
-
-        // 6. Clonar ficheiros (referência ao mesmo ficheiro físico)
+        // 4. Clonar ficheiros (referência ao mesmo ficheiro físico)
         $db->prepare('INSERT INTO especificacao_ficheiros (especificacao_id, nome_original, nome_servidor, tipo_ficheiro, tamanho, descricao, is_foto, incluir_pdf, pagina_pdf, legenda)
             SELECT ?, nome_original, nome_servidor, tipo_ficheiro, tamanho, descricao, is_foto, incluir_pdf, pagina_pdf, legenda
             FROM especificacao_ficheiros WHERE especificacao_id = ?')

@@ -58,16 +58,6 @@ function getEspecificacaoCompleta(PDO $db, int $id): ?array {
     $stmt->execute([$id]);
     $espec['parametros'] = $stmt->fetchAll();
 
-    // Classes visuais
-    $stmt = $db->prepare('SELECT * FROM especificacao_classes WHERE especificacao_id = ? ORDER BY ordem, id');
-    $stmt->execute([$id]);
-    $espec['classes'] = $stmt->fetchAll();
-
-    // Defeitos
-    $stmt = $db->prepare('SELECT * FROM especificacao_defeitos WHERE especificacao_id = ? ORDER BY ordem, id');
-    $stmt->execute([$id]);
-    $espec['defeitos'] = $stmt->fetchAll();
-
     // Secções personalizadas
     $stmt = $db->prepare('SELECT * FROM especificacao_seccoes WHERE especificacao_id = ? ORDER BY ordem, id');
     $stmt->execute([$id]);
@@ -111,50 +101,6 @@ function getCategoriasPadrao(?int $orgId = null): array {
     }
 }
 
-/**
- * Obter defeitos padrão
- */
-function getDefeitosPadrao(): array {
-    return [
-        'critico' => [
-            'Ano Seco severo' => 'Defeito de madeira seca que compromete vedação',
-            'Bicho' => 'Galerias de inseto que atravessam a rolha',
-            'Fenda total' => 'Fenda que divide completamente a rolha',
-        ],
-        'maior' => [
-            'Ano Seco' => 'Presença de madeira seca',
-            'Costa' => 'Presença de casca exterior',
-            'Caleira' => 'Sulco de sobreposição de broca',
-            'Verde' => 'Células saturadas de água',
-            'Fenda vertical' => 'Fenda na direção axial',
-            'Fenda horizontal' => 'Fenda na direção radial',
-        ],
-        'menor' => [
-            'Rugosidade' => 'Superfície irregular',
-            'Descoloração' => 'Alteração de cor',
-            'Split' => 'Separação no topo da rolha',
-            'Prego' => 'Inclusões de lenhina',
-            'Mal Colmatada' => 'Colmatagem defeituosa',
-        ],
-    ];
-}
-
-/**
- * Classes visuais padrão
- */
-function getClassesPadrao(): array {
-    return [
-        ['classe' => 'Extra', 'defeitos_max' => 6, 'descricao' => 'Qualidade premium'],
-        ['classe' => 'Super', 'defeitos_max' => 8, 'descricao' => 'Qualidade superior'],
-        ['classe' => '1º', 'defeitos_max' => 10, 'descricao' => 'Primeira qualidade'],
-        ['classe' => '2º', 'defeitos_max' => 12, 'descricao' => 'Segunda qualidade'],
-        ['classe' => '3º', 'defeitos_max' => 15, 'descricao' => 'Terceira qualidade'],
-        ['classe' => '4º', 'defeitos_max' => 20, 'descricao' => 'Quarta qualidade'],
-        ['classe' => 'Colmatada A', 'defeitos_max' => 8, 'descricao' => 'Colmatada grau A'],
-        ['classe' => 'Colmatada B', 'defeitos_max' => 10, 'descricao' => 'Colmatada grau B'],
-        ['classe' => 'Colmatada C', 'defeitos_max' => 12, 'descricao' => 'Colmatada grau C'],
-    ];
-}
 
 /**
  * Plano de amostragem NP 2922

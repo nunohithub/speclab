@@ -251,16 +251,12 @@ PROMPT;
                     ->execute([$novoId, sanitize($tituloTrad), $conteudoTrad, $sec['tipo'], (int)($sec['nivel'] ?? 1), $sec['ordem']]);
             }
 
-            // Clonar parametros, classes, defeitos, produtos, fornecedores
+            // Clonar parametros, produtos, fornecedores
             $cols = getColumnList($db, 'especificacao_parametros', ['id', 'especificacao_id']);
             if ($cols) {
                 $db->prepare("INSERT INTO especificacao_parametros (especificacao_id, $cols) SELECT ?, $cols FROM especificacao_parametros WHERE especificacao_id = ?")
                     ->execute([$novoId, $especId]);
             }
-            $db->prepare('INSERT INTO especificacao_classes (especificacao_id, classe, defeitos_max, descricao, ordem) SELECT ?, classe, defeitos_max, descricao, ordem FROM especificacao_classes WHERE especificacao_id = ?')
-                ->execute([$novoId, $especId]);
-            $db->prepare('INSERT INTO especificacao_defeitos (especificacao_id, nome, tipo, descricao, ordem) SELECT ?, nome, tipo, descricao, ordem FROM especificacao_defeitos WHERE especificacao_id = ?')
-                ->execute([$novoId, $especId]);
             $db->prepare('INSERT INTO especificacao_produtos (especificacao_id, produto_id) SELECT ?, produto_id FROM especificacao_produtos WHERE especificacao_id = ?')
                 ->execute([$novoId, $especId]);
             $db->prepare('INSERT INTO especificacao_fornecedores (especificacao_id, fornecedor_id) SELECT ?, fornecedor_id FROM especificacao_fornecedores WHERE especificacao_id = ?')

@@ -441,60 +441,6 @@ $L = $labels[$lang] ?? $labels['pt'];
             <?php endif; ?>
 
 
-            <!-- Visual Classes -->
-            <?php if (!empty($data['classes'])): ?>
-                <div class="doc-section">
-                    <h2>Classes Visuais</h2>
-                    <table class="doc-table">
-                        <thead>
-                            <tr>
-                                <th>Classe</th>
-                                <th>Defeitos Máx. (%)</th>
-                                <th>Descrição</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($data['classes'] as $cl): ?>
-                            <tr>
-                                <td><strong><?= san($cl['classe']) ?></strong></td>
-                                <td><?= $cl['defeitos_max'] ?>%</td>
-                                <td><?= san($cl['descricao'] ?? '') ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php endif; ?>
-
-            <!-- Defects -->
-            <?php if (!empty($data['defeitos'])): ?>
-                <div class="doc-section">
-                    <h2>Classificação de Defeitos</h2>
-                    <table class="doc-table">
-                        <thead>
-                            <tr>
-                                <th>Defeito</th>
-                                <th>Tipo</th>
-                                <th>Descrição</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($data['defeitos'] as $d):
-                                $tipoLabel = ['critico' => 'Crítico', 'maior' => 'Maior', 'menor' => 'Menor'];
-                                $tipoColor = ['critico' => '#b42318', 'maior' => '#b35c00', 'menor' => '#667085'];
-                            ?>
-                            <tr>
-                                <td><strong><?= san($d['nome']) ?></strong></td>
-                                <td style="color:<?= $tipoColor[$d['tipo']] ?? '#666' ?>; font-weight:600;">
-                                    <?= $tipoLabel[$d['tipo']] ?? $d['tipo'] ?>
-                                </td>
-                                <td><?= san($d['descricao'] ?? '') ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php endif; ?>
 
             <!-- Photo Gallery -->
             <?php

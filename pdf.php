@@ -582,31 +582,6 @@ if ($useMpdf) {
     }
 
 
-    // Visual classes
-    if (!empty($data['classes'])) {
-        $html .= '<div class="section"><h2>Classes Visuais</h2>';
-        $html .= '<table class="params"><thead><tr><th>Classe</th><th>Defeitos Máx. (%)</th><th>Descrição</th></tr></thead><tbody>';
-        foreach ($data['classes'] as $cl) {
-            $html .= '<tr><td><strong>' . san($cl['classe']) . '</strong></td>';
-            $html .= '<td>' . $cl['defeitos_max'] . '%</td>';
-            $html .= '<td>' . san($cl['descricao'] ?? '') . '</td></tr>';
-        }
-        $html .= '</tbody></table></div>';
-    }
-
-    // Defects
-    if (!empty($data['defeitos'])) {
-        $html .= '<div class="section"><h2>Classificação de Defeitos</h2>';
-        $html .= '<table class="params"><thead><tr><th>Defeito</th><th>Tipo</th><th>Descrição</th></tr></thead><tbody>';
-        $tipoLabel = ['critico' => 'Crítico', 'maior' => 'Maior', 'menor' => 'Menor'];
-        $tipoClass = ['critico' => 'defeito-critico', 'maior' => 'defeito-maior', 'menor' => 'defeito-menor'];
-        foreach ($data['defeitos'] as $d) {
-            $html .= '<tr><td><strong>' . san($d['nome']) . '</strong></td>';
-            $html .= '<td class="' . ($tipoClass[$d['tipo']] ?? '') . '">' . ($tipoLabel[$d['tipo']] ?? $d['tipo']) . '</td>';
-            $html .= '<td>' . san($d['descricao'] ?? '') . '</td></tr>';
-        }
-        $html .= '</tbody></table></div>';
-    }
 
     // Signature block dinâmico
     $html .= '<div class="sig-block">';
@@ -988,41 +963,6 @@ $tamNome    = (int)$cv['tamanho_nome'];
     <?php endif; ?>
 
 
-    <?php if (!empty($data['classes'])): ?>
-        <div class="section">
-            <h2>Classes Visuais</h2>
-            <table class="params">
-                <thead><tr><th>Classe</th><th>Defeitos Máx. (%)</th><th>Descrição</th></tr></thead>
-                <tbody>
-                <?php foreach ($data['classes'] as $cl): ?>
-                    <tr><td><strong><?= san($cl['classe']) ?></strong></td><td><?= $cl['defeitos_max'] ?>%</td><td><?= san($cl['descricao'] ?? '') ?></td></tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    <?php endif; ?>
-
-    <?php if (!empty($data['defeitos'])): ?>
-        <div class="section">
-            <h2>Classificação de Defeitos</h2>
-            <table class="params">
-                <thead><tr><th>Defeito</th><th>Tipo</th><th>Descrição</th></tr></thead>
-                <tbody>
-                <?php
-                $tipoLabel = ['critico' => 'Crítico', 'maior' => 'Maior', 'menor' => 'Menor'];
-                $tipoColor = ['critico' => '#b42318', 'maior' => '#b35c00', 'menor' => '#667085'];
-                foreach ($data['defeitos'] as $d):
-                ?>
-                    <tr>
-                        <td><strong><?= san($d['nome']) ?></strong></td>
-                        <td style="color:<?= $tipoColor[$d['tipo']] ?? '#666' ?>; font-weight:bold;"><?= $tipoLabel[$d['tipo']] ?? $d['tipo'] ?></td>
-                        <td><?= san($d['descricao'] ?? '') ?></td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    <?php endif; ?>
 
     <?php
     $validFilesFallback = [];

@@ -1,7 +1,7 @@
 <?php
 /**
  * Handler: Especificacoes
- * Actions: save_especificacao, save_parametros, save_classes, save_defeitos,
+ * Actions: save_especificacao, save_parametros,
  *          save_seccoes, get_especificacao, delete_especificacao, duplicate_especificacao,
  *          set_password, save_config_visual
  *
@@ -226,102 +226,6 @@ switch ($action) {
         break;
 
     // ===================================================================
-    // SAVE CLASSES VISUAIS
-    // ===================================================================
-    case 'save_classes':
-        $especificacao_id = (int)($_POST['especificacao_id'] ?? 0);
-        if ($especificacao_id <= 0) {
-            jsonError('ID da especificacao invalido.');
-        }
-
-        verifySpecAccess($db, $especificacao_id, $user);
-
-        $classes = $_POST['classes'] ?? [];
-
-        $db->beginTransaction();
-        try {
-            $stmt = $db->prepare('DELETE FROM especificacao_classes WHERE especificacao_id = ?');
-            $stmt->execute([$especificacao_id]);
-
-            if (!empty($classes) && is_array($classes)) {
-                $stmt = $db->prepare('
-                    INSERT INTO especificacao_classes
-                        (especificacao_id, classe, defeitos_max, descricao, ordem)
-                    VALUES (?, ?, ?, ?, ?)
-                ');
-                foreach ($classes as $i => $c) {
-                    $stmt->execute([
-                        $especificacao_id,
-                        sanitize($c['classe'] ?? ''),
-                        (int)($c['defeitos_max'] ?? 0),
-                        sanitize($c['descricao'] ?? ''),
-                        (int)($c['ordem'] ?? $i),
-                    ]);
-                }
-            }
-
-            $stmt = $db->prepare('UPDATE especificacoes SET updated_at = NOW() WHERE id = ?');
-            $stmt->execute([$especificacao_id]);
-
-            $db->commit();
-            jsonSuccess('Classes visuais guardadas com sucesso.');
-        } catch (Exception $e) {
-            $db->rollBack();
-            throw $e;
-        }
-        break;
-
-    // ===================================================================
-    // SAVE DEFEITOS
-    // ===================================================================
-    case 'save_defeitos':
-        $especificacao_id = (int)($_POST['especificacao_id'] ?? 0);
-        if ($especificacao_id <= 0) {
-            jsonError('ID da especificacao invalido.');
-        }
-
-        verifySpecAccess($db, $especificacao_id, $user);
-
-        $defeitos = $_POST['defeitos'] ?? [];
-
-        $db->beginTransaction();
-        try {
-            $stmt = $db->prepare('DELETE FROM especificacao_defeitos WHERE especificacao_id = ?');
-            $stmt->execute([$especificacao_id]);
-
-            if (!empty($defeitos) && is_array($defeitos)) {
-                $stmt = $db->prepare('
-                    INSERT INTO especificacao_defeitos
-                        (especificacao_id, nome, tipo, descricao, ordem)
-                    VALUES (?, ?, ?, ?, ?)
-                ');
-                foreach ($defeitos as $i => $d) {
-                    $tipo = sanitize($d['tipo'] ?? 'menor');
-                    if (!in_array($tipo, ['critico', 'maior', 'menor'])) {
-                        $tipo = 'menor';
-                    }
-                    $stmt->execute([
-                        $especificacao_id,
-                        sanitize($d['nome'] ?? ''),
-                        $tipo,
-                        sanitize($d['descricao'] ?? ''),
-                        (int)($d['ordem'] ?? $i),
-                    ]);
-                }
-            }
-
-            $stmt = $db->prepare('UPDATE especificacoes SET updated_at = NOW() WHERE id = ?');
-            $stmt->execute([$especificacao_id]);
-
-            $db->commit();
-            jsonSuccess('Defeitos guardados com sucesso.');
-        } catch (Exception $e) {
-            $db->rollBack();
-            throw $e;
-        }
-        break;
-
-    // ===================================================================
     // SAVE SECCOES
     // ===================================================================
     case 'save_seccoes':
@@ -440,8 +344,6 @@ switch ($action) {
             $db->prepare('DELETE FROM especificacao_produtos WHERE especificacao_id = ?')->execute([$id]);
             $db->prepare('DELETE FROM especificacao_fornecedores WHERE especificacao_id = ?')->execute([$id]);
             $db->prepare('DELETE FROM especificacao_parametros WHERE especificacao_id = ?')->execute([$id]);
-            $db->prepare('DELETE FROM especificacao_classes WHERE especificacao_id = ?')->execute([$id]);
-            $db->prepare('DELETE FROM especificacao_defeitos WHERE especificacao_id = ?')->execute([$id]);
             $db->prepare('DELETE FROM especificacao_seccoes WHERE especificacao_id = ?')->execute([$id]);
             $db->prepare('DELETE FROM especificacao_ficheiros WHERE especificacao_id = ?')->execute([$id]);
 
@@ -557,42 +459,6 @@ switch ($action) {
                         $p['metodo'],
                         $p['amostra_nqa'],
                         $p['ordem'],
-                    ]);
-                }
-            }
-
-            // Copiar classes visuais
-            if (!empty($espec['classes'])) {
-                $stmt = $db->prepare('
-                    INSERT INTO especificacao_classes
-                        (especificacao_id, classe, defeitos_max, descricao, ordem)
-                    VALUES (?, ?, ?, ?, ?)
-                ');
-                foreach ($espec['classes'] as $c) {
-                    $stmt->execute([
-                        $novoId,
-                        $c['classe'],
-                        $c['defeitos_max'],
-                        $c['descricao'],
-                        $c['ordem'],
-                    ]);
-                }
-            }
-
-            // Copiar defeitos
-            if (!empty($espec['defeitos'])) {
-                $stmt = $db->prepare('
-                    INSERT INTO especificacao_defeitos
-                        (especificacao_id, nome, tipo, descricao, ordem)
-                    VALUES (?, ?, ?, ?, ?)
-                ');
-                foreach ($espec['defeitos'] as $d) {
-                    $stmt->execute([
-                        $novoId,
-                        $d['nome'],
-                        $d['tipo'],
-                        $d['descricao'],
-                        $d['ordem'],
                     ]);
                 }
             }

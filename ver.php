@@ -216,8 +216,6 @@ if (!empty($data['seccoes'])) {
         if (!empty($data[$lk])) { $navItems[] = ['id' => 'sec-' . $lk, 'label' => $lni . '. ' . $lv]; $lni++; }
     }
 }
-if (!empty($data['classes'])) $navItems[] = ['id' => 'sec-classes', 'label' => 'Classes Visuais'];
-if (!empty($data['defeitos'])) $navItems[] = ['id' => 'sec-defeitos', 'label' => 'Classificação de Defeitos'];
 ?>
 <body style="background: #f3f4f6;">
     <div class="doc-container">
@@ -509,46 +507,6 @@ if (!empty($data['defeitos'])) $navItems[] = ['id' => 'sec-defeitos', 'label' =>
             <?php endif; ?>
 
 
-            <?php if (!empty($data['classes'])): ?>
-                <div class="doc-section" id="sec-classes">
-                    <h2>Classes Visuais</h2>
-                    <table class="doc-table">
-                        <thead><tr><th>Classe</th><th>Defeitos Máx. (%)</th><th>Descrição</th></tr></thead>
-                        <tbody>
-                            <?php foreach ($data['classes'] as $cl): ?>
-                            <tr>
-                                <td><strong><?= san($cl['classe']) ?></strong></td>
-                                <td><?= $cl['defeitos_max'] ?>%</td>
-                                <td><?= san($cl['descricao'] ?? '') ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php endif; ?>
-
-            <?php if (!empty($data['defeitos'])): ?>
-                <div class="doc-section" id="sec-defeitos">
-                    <h2>Classificação de Defeitos</h2>
-                    <table class="doc-table">
-                        <thead><tr><th>Defeito</th><th>Tipo</th><th>Descrição</th></tr></thead>
-                        <tbody>
-                            <?php foreach ($data['defeitos'] as $d):
-                                $tipoLabel = ['critico' => 'Crítico', 'maior' => 'Maior', 'menor' => 'Menor'];
-                                $tipoColor = ['critico' => '#b42318', 'maior' => '#b35c00', 'menor' => '#667085'];
-                            ?>
-                            <tr>
-                                <td><strong><?= san($d['nome']) ?></strong></td>
-                                <td style="color:<?= $tipoColor[$d['tipo']] ?? '#666' ?>; font-weight:600;">
-                                    <?= $tipoLabel[$d['tipo']] ?? $d['tipo'] ?>
-                                </td>
-                                <td><?= san($d['descricao'] ?? '') ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php endif; ?>
 
             <div class="doc-footer">
                 <span>&copy; <?= sanitize($orgNome) ?> <?= date('Y') ?></span>
