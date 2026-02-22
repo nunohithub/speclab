@@ -1,8 +1,9 @@
 <?php
 /**
- * Handler: Parâmetros Custom (tipos e banco)
- * Actions: get_parametros_tipos, save_parametro_tipo, delete_parametro_tipo,
- *          get_parametros_banco, save_parametro_banco, delete_parametro_banco
+ * Handler: Parâmetros (tipos e banco) — sistema genérico
+ * Actions: get_parametros_tipos, get_parametros_tipos_all, save_parametro_tipo,
+ *          delete_parametro_tipo, get_parametros_banco, save_parametro_banco,
+ *          delete_parametro_banco, save_parametro_tipo_config
  *
  * Variables available from parent api.php: $db, $user, $action, $jsonBody
  */
@@ -10,28 +11,39 @@
 switch ($action) {
 
     // ===================================================================
-    // GET PARAMETROS TIPOS (lista tipos de parâmetros da org)
+    // GET PARAMETROS TIPOS (tipos visíveis para a org do user, apenas ativos)
     // ===================================================================
     case 'get_parametros_tipos':
         $orgId = (int)($user['org_id'] ?? 0);
-        $stmt = $db->prepare('SELECT * FROM parametros_tipos WHERE organizacao_id = ? AND ativo = 1 ORDER BY ordem, nome');
+        $stmt = $db->prepare('
+            SELECT t.*, GROUP_CONCAT(DISTINCT po.org_id) as org_ids
+            FROM parametros_tipos t
+            LEFT JOIN parametros_tipos_org po ON po.tipo_id = t.id
+            WHERE t.ativo = 1 AND (t.todas_orgs = 1 OR po.org_id = ?)
+            GROUP BY t.id
+            ORDER BY t.ordem, t.nome
+        ');
         $stmt->execute([$orgId]);
         jsonSuccess('OK', ['tipos' => $stmt->fetchAll()]);
         break;
 
     // ===================================================================
-    // GET ALL PARAMETROS TIPOS (super_admin - inclui inativos)
+    // GET ALL PARAMETROS TIPOS (super_admin — inclui inativos, todos)
     // ===================================================================
     case 'get_parametros_tipos_all':
         if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
-        $orgId = (int)($user['org_id'] ?? 0);
-        $stmt = $db->prepare('SELECT * FROM parametros_tipos WHERE organizacao_id = ? ORDER BY ordem, nome');
-        $stmt->execute([$orgId]);
+        $stmt = $db->query('
+            SELECT t.*, GROUP_CONCAT(DISTINCT po.org_id) as org_ids
+            FROM parametros_tipos t
+            LEFT JOIN parametros_tipos_org po ON po.tipo_id = t.id
+            GROUP BY t.id
+            ORDER BY t.ordem, t.nome
+        ');
         jsonSuccess('OK', ['tipos' => $stmt->fetchAll()]);
         break;
 
     // ===================================================================
-    // SAVE PARAMETRO TIPO
+    // SAVE PARAMETRO TIPO (criar/editar tipo)
     // ===================================================================
     case 'save_parametro_tipo':
         if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
@@ -40,18 +52,19 @@ switch ($action) {
         $slug = trim($jsonBody['slug'] ?? '');
         $colunas = $jsonBody['colunas'] ?? [];
         $legenda = trim($jsonBody['legenda'] ?? '');
+        $legendaTamanho = (int)($jsonBody['legenda_tamanho'] ?? 9);
         $ativo = (int)($jsonBody['ativo'] ?? 1);
-        $orgId = (int)($user['org_id'] ?? 0);
+        $todasOrgs = (int)($jsonBody['todas_orgs'] ?? 1);
+        $orgIds = $jsonBody['org_ids'] ?? [];
 
         if (!$nome) jsonError('Nome é obrigatório.');
         if (!$slug) {
-            // Gerar slug a partir do nome
             $slug = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $nome)));
             $slug = trim($slug, '_');
         }
         if (empty($colunas)) jsonError('Defina pelo menos uma coluna.');
 
-        // Validar colunas: cada uma deve ter nome e chave
+        // Validar colunas
         foreach ($colunas as &$col) {
             $col['nome'] = trim($col['nome'] ?? '');
             $col['chave'] = trim($col['chave'] ?? '');
@@ -63,19 +76,27 @@ switch ($action) {
         }
         unset($col);
         $colunasJson = json_encode($colunas, JSON_UNESCAPED_UNICODE);
+        if ($legendaTamanho < 6) $legendaTamanho = 6;
+        if ($legendaTamanho > 14) $legendaTamanho = 14;
 
         if ($id > 0) {
-            // Verificar que pertence à org e não é o tipo "ensaios" fixo
-            $stmt = $db->prepare('UPDATE parametros_tipos SET nome = ?, slug = ?, colunas = ?, legenda = ?, ativo = ? WHERE id = ? AND organizacao_id = ?');
-            $stmt->execute([$nome, $slug, $colunasJson, $legenda, $ativo, $id, $orgId]);
+            $stmt = $db->prepare('UPDATE parametros_tipos SET nome = ?, slug = ?, colunas = ?, legenda = ?, legenda_tamanho = ?, ativo = ?, todas_orgs = ? WHERE id = ?');
+            $stmt->execute([$nome, $slug, $colunasJson, $legenda, $legendaTamanho, $ativo, $todasOrgs, $id]);
         } else {
-            $stmtMax = $db->prepare('SELECT COALESCE(MAX(ordem),0)+1 FROM parametros_tipos WHERE organizacao_id = ?');
-            $stmtMax->execute([$orgId]);
+            $stmtMax = $db->query('SELECT COALESCE(MAX(ordem),0)+1 FROM parametros_tipos');
             $maxOrdem = $stmtMax->fetchColumn();
-            $stmt = $db->prepare('INSERT INTO parametros_tipos (organizacao_id, nome, slug, colunas, legenda, ativo, ordem) VALUES (?, ?, ?, ?, ?, ?, ?)');
-            $stmt->execute([$orgId, $nome, $slug, $colunasJson, $legenda, $ativo, $maxOrdem]);
+            $stmt = $db->prepare('INSERT INTO parametros_tipos (nome, slug, colunas, legenda, legenda_tamanho, ativo, todas_orgs, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+            $stmt->execute([$nome, $slug, $colunasJson, $legenda, $legendaTamanho, $ativo, $todasOrgs, $maxOrdem]);
             $id = (int)$db->lastInsertId();
         }
+
+        // Gerir orgs associadas
+        $db->prepare('DELETE FROM parametros_tipos_org WHERE tipo_id = ?')->execute([$id]);
+        if (!$todasOrgs && !empty($orgIds)) {
+            $ins = $db->prepare('INSERT INTO parametros_tipos_org (tipo_id, org_id) VALUES (?, ?)');
+            foreach ($orgIds as $oid) $ins->execute([$id, (int)$oid]);
+        }
+
         jsonSuccess('Tipo de parâmetro guardado.', ['id' => $id]);
         break;
 
@@ -85,15 +106,46 @@ switch ($action) {
     case 'delete_parametro_tipo':
         if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
         $id = (int)($jsonBody['id'] ?? 0);
-        $orgId = (int)($user['org_id'] ?? 0);
         if ($id <= 0) jsonError('ID inválido.');
-        // Verificar se é o tipo "ensaios" padrão (slug = ensaios) — não pode eliminar
-        $stmt = $db->prepare('SELECT slug FROM parametros_tipos WHERE id = ? AND organizacao_id = ?');
-        $stmt->execute([$id, $orgId]);
-        $slug = $stmt->fetchColumn();
-        if ($slug === 'ensaios') jsonError('Não é possível eliminar o tipo Ensaios padrão. Pode desativá-lo.');
-        $db->prepare('DELETE FROM parametros_tipos WHERE id = ? AND organizacao_id = ?')->execute([$id, $orgId]);
-        jsonSuccess('Tipo eliminado.');
+        // CASCADE: parametros_tipos_org apagados automaticamente
+        // Apagar também registos do banco
+        $db->prepare('DELETE FROM parametros_banco WHERE tipo_id = ?')->execute([$id]);
+        $db->prepare('DELETE FROM parametros_tipos WHERE id = ?')->execute([$id]);
+        jsonSuccess('Tipo e registos eliminados.');
+        break;
+
+    // ===================================================================
+    // SAVE PARAMETRO TIPO CONFIG (merges, col_widths, legenda)
+    // ===================================================================
+    case 'save_parametro_tipo_config':
+        if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
+        $id = (int)($jsonBody['id'] ?? 0);
+        if ($id <= 0) jsonError('ID inválido.');
+        $updates = [];
+        $params = [];
+        if (array_key_exists('merges', $jsonBody)) {
+            $updates[] = 'merges = ?';
+            $params[] = json_encode($jsonBody['merges']);
+        }
+        if (array_key_exists('col_widths', $jsonBody)) {
+            $updates[] = 'col_widths = ?';
+            $params[] = json_encode($jsonBody['col_widths']);
+        }
+        if (array_key_exists('legenda', $jsonBody)) {
+            $updates[] = 'legenda = ?';
+            $params[] = trim($jsonBody['legenda']);
+        }
+        if (array_key_exists('legenda_tamanho', $jsonBody)) {
+            $tam = (int)$jsonBody['legenda_tamanho'];
+            if ($tam < 6) $tam = 6;
+            if ($tam > 14) $tam = 14;
+            $updates[] = 'legenda_tamanho = ?';
+            $params[] = $tam;
+        }
+        if (empty($updates)) jsonError('Nada para atualizar.');
+        $params[] = $id;
+        $db->prepare('UPDATE parametros_tipos SET ' . implode(', ', $updates) . ' WHERE id = ?')->execute($params);
+        jsonSuccess('Configuração guardada.');
         break;
 
     // ===================================================================
@@ -101,10 +153,14 @@ switch ($action) {
     // ===================================================================
     case 'get_parametros_banco':
         $tipoId = (int)($_GET['tipo_id'] ?? $jsonBody['tipo_id'] ?? 0);
-        $orgId = (int)($user['org_id'] ?? 0);
+        $all = isset($_GET['all']) && isSuperAdmin();
         if (!$tipoId) jsonError('Tipo não especificado.');
-        $stmt = $db->prepare('SELECT * FROM parametros_banco WHERE tipo_id = ? AND organizacao_id = ? ORDER BY ordem, categoria');
-        $stmt->execute([$tipoId, $orgId]);
+        if ($all) {
+            $stmt = $db->prepare('SELECT * FROM parametros_banco WHERE tipo_id = ? ORDER BY ordem, categoria');
+        } else {
+            $stmt = $db->prepare('SELECT * FROM parametros_banco WHERE tipo_id = ? AND ativo = 1 ORDER BY ordem, categoria');
+        }
+        $stmt->execute([$tipoId]);
         jsonSuccess('OK', ['parametros' => $stmt->fetchAll()]);
         break;
 
@@ -115,7 +171,6 @@ switch ($action) {
         if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
         $id = (int)($jsonBody['id'] ?? 0);
         $tipoId = (int)($jsonBody['tipo_id'] ?? 0);
-        $orgId = (int)($user['org_id'] ?? 0);
         $categoria = trim($jsonBody['categoria'] ?? '');
         $valores = $jsonBody['valores'] ?? [];
         $ativo = (int)($jsonBody['ativo'] ?? 1);
@@ -124,17 +179,17 @@ switch ($action) {
         $valoresJson = json_encode($valores, JSON_UNESCAPED_UNICODE);
 
         if ($id > 0) {
-            $stmt = $db->prepare('UPDATE parametros_banco SET categoria = ?, valores = ?, ativo = ? WHERE id = ? AND organizacao_id = ?');
-            $stmt->execute([$categoria, $valoresJson, $ativo, $id, $orgId]);
+            $stmt = $db->prepare('UPDATE parametros_banco SET categoria = ?, valores = ?, ativo = ? WHERE id = ?');
+            $stmt->execute([$categoria, $valoresJson, $ativo, $id]);
         } else {
-            $stmtMax = $db->prepare('SELECT COALESCE(MAX(ordem),0)+1 FROM parametros_banco WHERE tipo_id = ? AND organizacao_id = ?');
-            $stmtMax->execute([$tipoId, $orgId]);
+            $stmtMax = $db->prepare('SELECT COALESCE(MAX(ordem),0)+1 FROM parametros_banco WHERE tipo_id = ?');
+            $stmtMax->execute([$tipoId]);
             $maxOrdem = $stmtMax->fetchColumn();
-            $stmt = $db->prepare('INSERT INTO parametros_banco (tipo_id, organizacao_id, categoria, valores, ativo, ordem) VALUES (?, ?, ?, ?, ?, ?)');
-            $stmt->execute([$tipoId, $orgId, $categoria, $valoresJson, $ativo, $maxOrdem]);
+            $stmt = $db->prepare('INSERT INTO parametros_banco (tipo_id, organizacao_id, categoria, valores, ativo, ordem) VALUES (?, 0, ?, ?, ?, ?)');
+            $stmt->execute([$tipoId, $categoria, $valoresJson, $ativo, $maxOrdem]);
             $id = (int)$db->lastInsertId();
         }
-        jsonSuccess('Parâmetro guardado.', ['id' => $id]);
+        jsonSuccess('Registo guardado.', ['id' => $id]);
         break;
 
     // ===================================================================
@@ -143,10 +198,9 @@ switch ($action) {
     case 'delete_parametro_banco':
         if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
         $id = (int)($jsonBody['id'] ?? 0);
-        $orgId = (int)($user['org_id'] ?? 0);
         if ($id > 0) {
-            $db->prepare('DELETE FROM parametros_banco WHERE id = ? AND organizacao_id = ?')->execute([$id, $orgId]);
+            $db->prepare('DELETE FROM parametros_banco WHERE id = ?')->execute([$id]);
         }
-        jsonSuccess('Parâmetro eliminado.');
+        jsonSuccess('Registo eliminado.');
         break;
 }

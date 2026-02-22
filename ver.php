@@ -428,22 +428,22 @@ if (!empty($data['defeitos'])) $navItems[] = ['id' => 'sec-defeitos', 'label' =>
                             <p style="font-size:<?= $verLegTam ?>px; color:#888; font-style:italic; margin:3px 0 0 0;"><?= san($verLegenda) ?></p>
                             <?php endif; ?>
                             <?php endif; ?>
-                        <?php elseif ($secTipo === 'parametros_custom'): ?>
+                        <?php elseif ($secTipo === 'parametros' || $secTipo === 'parametros_custom'): ?>
                             <?php
                             $pcRaw = json_decode($sec['conteudo'] ?? '{}', true);
                             $pcRows = $pcRaw['rows'] ?? [];
                             $pcTipoId = $pcRaw['tipo_id'] ?? '';
                             $pcColWidths = $pcRaw['colWidths'] ?? [];
-                            $pcColunas = [];
-                            $pcLegenda = '';
+                            $pcColunas = []; $pcLegenda = ''; $pcLegTam = 9;
                             if ($pcTipoId) {
-                                $stmtPt = $db->prepare('SELECT colunas, legenda FROM parametros_tipos WHERE id = ?');
+                                $stmtPt = $db->prepare('SELECT colunas, legenda, legenda_tamanho FROM parametros_tipos WHERE id = ?');
                                 $stmtPt->execute([(int)$pcTipoId]);
                                 $ptRow = $stmtPt->fetch();
-                                if ($ptRow) { $pcColunas = json_decode($ptRow['colunas'], true) ?: []; $pcLegenda = $ptRow['legenda'] ?? ''; }
+                                if ($ptRow) { $pcColunas = json_decode($ptRow['colunas'], true) ?: []; $pcLegenda = $ptRow['legenda'] ?? ''; $pcLegTam = (int)($ptRow['legenda_tamanho'] ?? 9); }
                             }
                             if (empty($pcColunas) && !empty($pcRows)) {
-                                foreach (array_keys(reset($pcRows)) as $k) $pcColunas[] = ['nome' => $k, 'chave' => $k];
+                                $firstDataRow = null; foreach ($pcRows as $pr) { if (!isset($pr['_cat'])) { $firstDataRow = $pr; break; } }
+                                if ($firstDataRow) { foreach (array_keys($firstDataRow) as $k) { if ($k !== '_cat') $pcColunas[] = ['nome' => $k, 'chave' => $k]; } }
                             }
                             $pcCw = count($pcColWidths) ? $pcColWidths : array_fill(0, count($pcColunas), floor(100 / max(1, count($pcColunas))));
                             ?>
@@ -456,16 +456,20 @@ if (!empty($data['defeitos'])) $navItems[] = ['id' => 'sec-defeitos', 'label' =>
                                 </tr></thead>
                                 <tbody>
                                     <?php foreach ($pcRows as $pcRow): ?>
-                                    <tr>
-                                        <?php foreach ($pcColunas as $pcCol): ?>
-                                        <td><?= nl2br(san($pcRow[$pcCol['chave']] ?? '')) ?></td>
-                                        <?php endforeach; ?>
-                                    </tr>
+                                        <?php if (isset($pcRow['_cat'])): ?>
+                                        <tr><td colspan="<?= count($pcColunas) ?>" style="background:<?= sanitizeColor($orgCor ?? '#2596be') ?>15; padding:4px 8px; font-weight:600; font-size:12px; color:<?= sanitizeColor($orgCor ?? '#2596be') ?>;"><?= san($pcRow['_cat']) ?></td></tr>
+                                        <?php else: ?>
+                                        <tr>
+                                            <?php foreach ($pcColunas as $pcCol): ?>
+                                            <td><?= nl2br(san($pcRow[$pcCol['chave']] ?? '')) ?></td>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                        <?php endif; ?>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
                             <?php if (!empty($pcLegenda)): ?>
-                            <p style="font-size:9px; color:#888; font-style:italic; margin:3px 0 0 0;"><?= san($pcLegenda) ?></p>
+                            <p style="font-size:<?= $pcLegTam ?>px; color:#888; font-style:italic; margin:3px 0 0 0;"><?= san($pcLegenda) ?></p>
                             <?php endif; ?>
                             <?php endif; ?>
                         <?php else: ?>

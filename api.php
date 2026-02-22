@@ -50,7 +50,8 @@ if ($action === '') {
 // CSRF validation (exceto acoes de leitura e uploads com FormData)
 // ---------------------------------------------------------------------------
 $csrfExempt = ['get_especificacao', 'get_templates', 'get_legislacao_banco',
-    'get_legislacao_log', 'get_ensaios_banco', 'get_banco_merges', 'get_ensaios_colunas', 'get_ensaios_legenda', 'get_ensaio_valores_custom', 'list_ficheiros'];
+    'get_legislacao_log', 'get_ensaios_banco', 'get_banco_merges', 'get_ensaios_colunas', 'get_ensaios_legenda', 'get_ensaio_valores_custom', 'list_ficheiros',
+    'get_parametros_tipos', 'get_parametros_tipos_all', 'get_parametros_banco'];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !in_array($action, $csrfExempt)) {
     // Para uploads multipart, token vem em $_POST; para JSON, vem no header
     if (!validateCsrf()) {
@@ -210,11 +211,12 @@ $handlers = [
     'get_ensaios_legenda'     => 'ensaios',
     'save_ensaios_legenda_global' => 'ensaios',
 
-    // Parametros (tipos custom)
+    // Parametros (tipos custom + banco)
     'get_parametros_tipos'        => 'parametros',
     'get_parametros_tipos_all'    => 'parametros',
     'save_parametro_tipo'         => 'parametros',
     'delete_parametro_tipo'       => 'parametros',
+    'save_parametro_tipo_config'  => 'parametros',
     'get_parametros_banco'        => 'parametros',
     'save_parametro_banco'        => 'parametros',
     'delete_parametro_banco'      => 'parametros',

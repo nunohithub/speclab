@@ -1710,33 +1710,57 @@ $breadcrumbs = [
             });
             </script>
 
-        <!-- PARÂMETROS (super_admin - editável) -->
-        <?php elseif ($tab === 'parametros' && $isSuperAdminUser): ?>
+        <!-- PARÂMETROS (sistema genérico de tipos + banco) -->
+        <?php elseif ($tab === 'parametros'): ?>
             <div class="flex-between mb-md">
                 <h2>Parâmetros</h2>
-                <div style="display:flex; gap:8px;">
-                    <button class="btn btn-secondary" id="btnTiposGestao" onclick="toggleTiposPanel()">Gerir Tipos</button>
-                </div>
+                <?php if ($isSuperAdminUser): ?>
+                <button class="btn btn-primary" onclick="abrirTipoModal()">+ Novo Tipo</button>
+                <?php endif; ?>
             </div>
 
-            <!-- Painel de gestão de tipos de parâmetros -->
-            <div id="tiposPanel" style="display:none; margin-bottom:16px;">
-                <div class="card" style="padding:16px;">
-                    <div class="flex-between mb-sm">
-                        <h3 style="margin:0; font-size:15px;">Tipos de Parâmetros</h3>
-                        <button class="btn btn-primary btn-sm" onclick="abrirTipoModal()">+ Novo Tipo</button>
+            <!-- Sub-tabs para tipos de parâmetros -->
+            <div id="paramSubTabs" style="display:flex; gap:4px; margin-bottom:16px; flex-wrap:wrap;">
+                <span class="muted" style="font-size:12px; align-self:center;">A carregar...</span>
+            </div>
+
+            <!-- Área de conteúdo do tipo selecionado -->
+            <div id="paramContent" style="display:none;">
+                <div class="flex-between mb-sm">
+                    <h3 style="margin:0; font-size:16px;" id="paramContentTitle">-</h3>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <?php if ($isSuperAdminUser): ?>
+                        <button class="btn btn-ghost btn-sm" onclick="editarTipoAtual()">Editar Tipo</button>
+                        <button class="btn btn-ghost btn-sm" onclick="toggleLegendaConfig()">Legenda</button>
+                        <button class="btn btn-primary btn-sm" onclick="abrirRegistoModal()">+ Novo Registo</button>
+                        <?php endif; ?>
                     </div>
-                    <p class="muted" style="font-size:12px; margin-bottom:10px;">Crie tipos customizados (ex: Garrafas, Embalagem) com colunas à medida. O tipo "Ensaios" vem por defeito.</p>
-                    <table style="width:100%; font-size:13px;">
-                        <thead><tr><th>Nome</th><th>Slug</th><th>Colunas</th><th>Estado</th><th>Ações</th></tr></thead>
-                        <tbody id="tiposRows"><tr><td colspan="5" class="muted" style="text-align:center; padding:12px;">A carregar...</td></tr></tbody>
+                </div>
+                <!-- Legenda config (oculto) -->
+                <div id="legendaConfig" style="display:none; margin-bottom:12px;">
+                    <div class="card" style="padding:12px;">
+                        <div class="form-group"><label>Legenda (aparece debaixo da tabela)</label>
+                            <textarea id="paramLegendaText" class="form-control" rows="2" placeholder="Texto livre..."></textarea>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <label style="margin:0; white-space:nowrap; font-size:13px;">Tamanho (pt):</label>
+                            <input type="number" id="paramLegendaTam" class="form-control" value="9" min="6" max="14" style="width:70px;">
+                            <button class="btn btn-primary btn-sm" onclick="guardarLegendaTipo()">Guardar</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card" style="overflow:auto;">
+                    <table id="paramBancoTable" style="width:100%; font-size:13px;">
+                        <thead id="paramBancoHead"><tr><td class="muted" style="text-align:center; padding:12px;">Selecione um tipo.</td></tr></thead>
+                        <tbody id="paramBancoRows"></tbody>
                     </table>
                 </div>
+                <div id="paramLegendaDisplay" style="display:none; margin-top:6px;"></div>
             </div>
 
             <!-- Modal novo/editar tipo -->
-            <div id="tipoModal" class="modal-overlay" style="display:none; background:rgba(0,0,0,0.6);">
-                <div class="modal-box" style="max-width:600px; background:#fff;">
+            <div id="tipoModal" class="modal-overlay" style="display:none;">
+                <div class="modal-box" style="max-width:650px;">
                     <div class="modal-header">
                         <h3 id="tipoModalTitle">Novo Tipo de Parâmetro</h3>
                         <button class="modal-close" onclick="document.getElementById('tipoModal').style.display='none';">&times;</button>
@@ -1744,17 +1768,22 @@ $breadcrumbs = [
                     <div class="modal-body">
                         <input type="hidden" id="tipo_id" value="0">
                         <div class="form-row">
-                            <div class="form-group"><label>Nome</label><input type="text" id="tipo_nome" class="form-control" placeholder="Ex: Garrafas"></div>
-                            <div class="form-group"><label>Slug (auto)</label><input type="text" id="tipo_slug" class="form-control" placeholder="garrafas" readonly style="background:#f3f4f6;"></div>
+                            <div class="form-group"><label>Nome</label><input type="text" id="tipo_nome" class="form-control" placeholder="Ex: Ensaios, Garrafas"></div>
+                            <div class="form-group"><label>Slug (auto)</label><input type="text" id="tipo_slug" class="form-control" placeholder="auto" readonly style="background:#f3f4f6;"></div>
                         </div>
-                        <div class="form-group">
-                            <label>Legenda</label>
-                            <textarea id="tipo_legenda" class="form-control" rows="2" placeholder="Texto que aparece debaixo da tabela (opcional)"></textarea>
+                        <div class="form-row">
+                            <div class="form-group"><label><input type="checkbox" id="tipo_ativo" checked> Ativo</label></div>
+                            <div class="form-group"><label><input type="checkbox" id="tipo_todas_orgs" checked onchange="document.getElementById('tipoOrgsSelect').style.display=this.checked?'none':'block';"> Todas as organizações</label></div>
                         </div>
-                        <div class="form-group">
-                            <label><input type="checkbox" id="tipo_ativo" checked> Ativo</label>
+                        <div id="tipoOrgsSelect" style="display:none; margin-bottom:12px;">
+                            <label style="font-size:13px;">Organizações com acesso:</label>
+                            <?php
+                            $orgsAll = $db->query('SELECT id, nome FROM organizacoes ORDER BY nome')->fetchAll();
+                            foreach ($orgsAll as $org): ?>
+                            <label style="display:block; font-size:13px; margin:2px 0;"><input type="checkbox" class="tipo_org_chk" value="<?= $org['id'] ?>"> <?= sanitize($org['nome']) ?></label>
+                            <?php endforeach; ?>
                         </div>
-                        <hr style="margin:12px 0;">
+                        <hr style="margin:10px 0;">
                         <div class="flex-between mb-sm">
                             <h4 style="margin:0; font-size:14px;">Colunas</h4>
                             <button class="btn btn-ghost btn-sm" onclick="adicionarColunaTipo()">+ Coluna</button>
@@ -1764,826 +1793,180 @@ $breadcrumbs = [
                     <div class="modal-footer">
                         <button class="btn btn-secondary" onclick="document.getElementById('tipoModal').style.display='none';">Cancelar</button>
                         <button class="btn btn-primary" onclick="guardarTipo()">Guardar</button>
+                        <button class="btn btn-ghost" id="btnEliminarTipo" style="color:#b42318; display:none;" onclick="eliminarTipo()">Eliminar Tipo</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Sub-tabs para escolher tipo de parâmetro -->
-            <div id="paramSubTabs" style="display:flex; gap:4px; margin-bottom:16px; flex-wrap:wrap;">
-                <span class="muted" style="font-size:12px; align-self:center; margin-right:4px;">A carregar tipos...</span>
-            </div>
-
-            <!-- Conteúdo do tipo selecionado: Ensaios ou Custom -->
-            <div id="paramEnsaiosContent" style="display:block;">
-                <!-- O banco de ensaios original fica aqui -->
-                <div class="flex-between mb-sm">
-                    <h3 style="margin:0; font-size:16px;" id="paramSubTitle">Ensaios</h3>
-                    <div style="display:flex; gap:8px;">
-                        <button class="btn btn-secondary btn-sm" onclick="toggleColunasConfig()">Configurar Colunas</button>
-                        <button class="btn btn-primary btn-sm" onclick="document.getElementById('ensaioModal').style.display='flex'; resetEnsaioForm();">+ Novo Ensaio</button>
-                    </div>
-                </div>
-
-            <!-- Painel de configuração de colunas (inicialmente oculto) -->
-            <div id="colunasConfigPanel" style="display:none; margin-bottom:16px;">
-                <div class="card" style="padding:16px;">
-                    <div class="flex-between mb-sm">
-                        <h3 style="margin:0; font-size:15px;">Configurar Colunas</h3>
-                        <button class="btn btn-primary btn-sm" onclick="abrirColunaModal()">+ Nova Coluna</button>
-                    </div>
-                    <p class="muted" style="font-size:12px; margin-bottom:10px;">Ative/desative colunas e defina quais organizações as veem. Colunas fixas não podem ser eliminadas.</p>
-                    <table id="colunasConfigTable" style="width:100%; font-size:13px;">
-                        <thead><tr><th style="width:25%;">Nome</th><th style="width:10%;">Tipo</th><th style="width:10%;">Fixa</th><th style="width:25%;">Organizações</th><th style="width:10%;">Ativa</th><th style="width:20%;">Ações</th></tr></thead>
-                        <tbody id="colunasConfigRows"><tr><td colspan="6" class="muted" style="text-align:center; padding:12px;">A carregar...</td></tr></tbody>
-                    </table>
-                    <hr style="margin:16px 0;">
-                    <h3 style="margin:0 0 8px; font-size:15px;">Legenda da Tabela de Ensaios (por organização)</h3>
-                    <p class="muted" style="font-size:12px; margin-bottom:8px;">Texto livre que aparece por baixo da tabela de ensaios no editor, consulta e PDF.</p>
-                    <div class="form-group">
-                        <label>Organização</label>
-                        <select id="legendaOrgSelect" class="form-control" onchange="carregarLegendaOrg()">
-                            <option value="">-- Selecionar --</option>
-                            <option value="global">Todas (por defeito)</option>
-                            <?php foreach ($organizacoes as $org): ?>
-                            <option value="<?= $org['id'] ?>"><?= htmlspecialchars($org['nome']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div id="legendaOrgFields" style="display:none;">
-                        <div class="form-group">
-                            <textarea id="saLegendaText" class="form-control" rows="3" placeholder="Ex: NEI - Nível Especial de Inspeção conforme NP2922"></textarea>
-                        </div>
-                        <div class="form-group" style="display:flex; align-items:center; gap:12px;">
-                            <label style="margin:0; white-space:nowrap;">Tamanho (pt):</label>
-                            <input type="number" id="saLegendaTamanho" class="form-control" value="9" min="6" max="14" style="width:80px;">
-                            <button class="btn btn-primary btn-sm" onclick="guardarLegendaOrg()">Guardar</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Modal nova/editar coluna -->
-            <div id="colunaModal" class="modal-overlay" style="display:none; background:rgba(0,0,0,0.6);">
-                <div class="modal-box" style="max-width:480px; background:#fff;">
-                    <div class="modal-header">
-                        <h3 id="colunaModalTitle">Nova Coluna</h3>
-                        <button class="modal-close" onclick="document.getElementById('colunaModal').style.display='none';">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <input type="hidden" id="col_id" value="0">
-                        <input type="hidden" id="col_campo_fixo" value="">
-                        <div class="form-group">
-                            <label>Nome da coluna</label>
-                            <input type="text" id="col_nome" class="form-control" placeholder="Ex: Tolerância">
-                        </div>
-                        <div class="form-group" id="col_tipo_group">
-                            <label>Tipo</label>
-                            <select id="col_tipo" class="form-control">
-                                <option value="texto">Texto</option>
-                                <option value="numero">Número</option>
-                                <option value="sim_nao">Sim/Não</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Ordem</label>
-                            <input type="number" id="col_ordem" class="form-control" value="0" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label><input type="checkbox" id="col_todas_orgs" checked onchange="document.getElementById('col_orgs_select').style.display = this.checked ? 'none' : 'block';"> Visível para todas as organizações</label>
-                        </div>
-                        <div id="col_orgs_select" style="display:none;" class="form-group">
-                            <label>Organizações</label>
-                            <div style="max-height:150px; overflow-y:auto; border:1px solid #d1d5db; border-radius:6px; padding:8px;">
-                                <?php foreach ($organizacoes as $org): ?>
-                                <label style="display:block; margin-bottom:4px; font-size:13px;">
-                                    <input type="checkbox" class="col_org_chk" value="<?= $org['id'] ?>"> <?= htmlspecialchars($org['nome']) ?>
-                                </label>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label><input type="checkbox" id="col_ativo" checked> Ativa</label>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn btn-secondary" onclick="document.getElementById('colunaModal').style.display='none';">Cancelar</button>
-                        <button class="btn btn-primary" onclick="guardarColuna()">Guardar</button>
-                    </div>
-                </div>
-            </div>
-
-            <p class="muted" style="font-size:12px; margin-bottom:8px;">Dica: <strong>Cmd+click</strong> (Mac) ou <strong>Ctrl+click</strong> em 2 células da mesma coluna para fundir.</p>
-            <div class="card" style="overflow:visible;">
-                <table id="bancoEnsaiosTable">
-                    <thead><tr><th>Categoria</th><th>Ensaio</th><th>Método/Norma</th><th title="Nível Especial de Inspeção">NEI</th><th title="Nível de Qualidade Aceitável">NQA</th><th>Valor Referência</th><th>Estado</th><th>Ações</th></tr></thead>
-                    <tbody id="ensaioRows"><tr><td colspan="8" class="muted" style="text-align:center; padding:20px;">A carregar...</td></tr></tbody>
-                </table>
-            </div>
-            <div id="bancoMergeFloat" style="display:none; position:fixed; z-index:999; background:#fff; border:1px solid #d1d5db; border-radius:6px; padding:4px 8px; box-shadow:0 2px 8px rgba(0,0,0,.15);">
-                <button class="btn btn-primary btn-sm" onclick="executarBancoMerge()">Fundir</button>
-                <button class="btn btn-ghost btn-sm" onclick="limparBancoSel()">Cancelar</button>
-            </div>
-            <style>
-            #bancoEnsaiosTable td.bm-selected { background:#dbeafe !important; outline:2px solid #3b82f6; }
-            #bancoEnsaiosTable td.bm-master { position:relative; background:#f0f9ff; }
-            #bancoEnsaiosTable td.bm-master .bm-tools { display:none; position:absolute; top:2px; right:2px; gap:2px; }
-            #bancoEnsaiosTable td.bm-master:hover .bm-tools { display:flex; }
-            .bm-tools button { font-size:10px; padding:1px 4px; border:1px solid #d1d5db; border-radius:3px; background:#fff; cursor:pointer; line-height:1.2; }
-            .bm-tools button:hover { background:#f3f4f6; }
-            .bm-tools .bm-unmerge:hover { background:#fee2e2; color:#b42318; }
-            #bancoEnsaiosTable { table-layout:fixed; width:100%; }
-            #bancoEnsaiosTable th { position:relative; overflow:hidden; text-overflow:ellipsis; }
-            #bancoEnsaiosTable td { overflow:hidden; text-overflow:ellipsis; }
-            #bancoEnsaiosTable th .bcr-handle { position:absolute; right:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:2; }
-            #bancoEnsaiosTable th .bcr-handle:hover, #bancoEnsaiosTable th .bcr-handle.active { background:rgba(0,0,0,0.1); }
-            </style>
-
-            <div id="ensaioModal" class="modal-overlay" style="display:none;">
+            <!-- Modal novo/editar registo do banco -->
+            <div id="registoModal" class="modal-overlay" style="display:none;">
                 <div class="modal-box modal-box-lg">
                     <div class="modal-header">
-                        <h3 id="ensaioModalTitle">Novo Ensaio</h3>
-                        <button class="modal-close" onclick="document.getElementById('ensaioModal').style.display='none';">&times;</button>
+                        <h3 id="registoModalTitle">Novo Registo</h3>
+                        <button class="modal-close" onclick="document.getElementById('registoModal').style.display='none';">&times;</button>
                     </div>
                     <div class="modal-body">
-                        <input type="hidden" id="ens_id" value="0">
-                        <div class="form-row">
-                            <div class="form-group"><label>Categoria</label><input type="text" id="ens_categoria" placeholder="Ex: Físico-Mecânico" list="ensCatList"></div>
-                            <div class="form-group"><label>Ensaio</label><input type="text" id="ens_ensaio" placeholder="Ex: Comprimento"></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label>Método / Norma</label><input type="text" id="ens_metodo" placeholder="Ex: ISO 9727-1"></div>
-                            <div class="form-group"><label>NEI <span style="font-weight:normal; color:#667; font-size:12px;">(Nível Especial de Inspeção)</span></label><input type="text" id="ens_nivel_especial" placeholder="Ex: S-2, S-4"></div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label>NQA <span style="font-weight:normal; color:#667; font-size:12px;">(Nível de Qualidade Aceitável)</span></label><input type="text" id="ens_nqa" placeholder="Ex: 2,5"></div>
-                            <div class="form-group"><label>Valor de Referência</label><input type="text" id="ens_exemplo" placeholder="Ex: ±0.7 mm"></div>
-                        </div>
-                        <div id="ens_custom_fields"></div>
-                        <div class="form-group"><label><input type="checkbox" id="ens_ativo" checked> Ativo</label></div>
+                        <input type="hidden" id="reg_id" value="0">
+                        <div class="form-group"><label>Categoria (opcional — aparece como linha separadora)</label><input type="text" id="reg_categoria" class="form-control" placeholder="Ex: Físico-Mecânico" list="regCatList"></div>
+                        <div id="reg_campos"></div>
+                        <div class="form-group"><label><input type="checkbox" id="reg_ativo" checked> Ativo</label></div>
                     </div>
                     <div class="modal-footer">
-                        <button class="btn btn-primary" onclick="guardarEnsaio()">Guardar</button>
-                        <button class="btn btn-secondary" onclick="document.getElementById('ensaioModal').style.display='none';">Cancelar</button>
+                        <button class="btn btn-primary" onclick="guardarRegisto()">Guardar</button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('registoModal').style.display='none';">Cancelar</button>
                     </div>
                 </div>
             </div>
-            <datalist id="ensCatList"></datalist>
+            <datalist id="regCatList"></datalist>
 
             <script>
-            // === CONFIGURAÇÃO DE COLUNAS ===
-            var ensaioColunas = [];
-            function toggleColunasConfig() {
-                var p = document.getElementById('colunasConfigPanel');
-                p.style.display = p.style.display === 'none' ? 'block' : 'none';
-                if (p.style.display === 'block') carregarColunas();
-            }
-            function carregarColunas() {
-                fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_colunas').then(function(r){return r.json();}).then(function(data) {
-                    ensaioColunas = (data.data && data.data.colunas) || [];
-                    renderColunasConfig();
-                });
-            }
-            function renderColunasConfig() {
-                var tbody = document.getElementById('colunasConfigRows');
-                if (ensaioColunas.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center; padding:12px;">Nenhuma coluna.</td></tr>'; return; }
-                var tipos = { texto: 'Texto', numero: 'Número', sim_nao: 'Sim/Não' };
-                var html = '';
-                ensaioColunas.forEach(function(c) {
-                    var fixa = c.campo_fixo ? '<span class="pill pill-info" style="font-size:11px;">Fixa</span>' : '<span class="muted" style="font-size:11px;">Custom</span>';
-                    var orgs = c.todas_orgs == 1 ? '<span class="muted" style="font-size:12px;">Todas</span>' : (c.org_ids || '<span class="muted" style="font-size:12px;">Nenhuma</span>');
-                    var ativa = c.ativo == 1 ? '<span class="pill pill-success">Ativa</span>' : '<span class="pill pill-error">Inativa</span>';
-                    html += '<tr>';
-                    html += '<td><strong>' + escE(c.nome) + '</strong></td>';
-                    html += '<td>' + (tipos[c.tipo] || c.tipo) + '</td>';
-                    html += '<td>' + fixa + '</td>';
-                    html += '<td>' + orgs + '</td>';
-                    html += '<td>' + ativa + '</td>';
-                    html += '<td>';
-                    html += '<button class="btn btn-ghost btn-sm" onclick=\'editarColuna(' + JSON.stringify(c).replace(/\'/g,"&#39;") + ')\'>Editar</button>';
-                    if (!c.campo_fixo) html += ' <button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarColuna(' + c.id + ')">Eliminar</button>';
-                    html += '</td></tr>';
-                });
-                tbody.innerHTML = html;
-            }
-            function abrirColunaModal() {
-                document.getElementById('colunaModalTitle').textContent = 'Nova Coluna';
-                document.getElementById('col_id').value = '0';
-                document.getElementById('col_campo_fixo').value = '';
-                document.getElementById('col_nome').value = '';
-                document.getElementById('col_tipo').value = 'texto';
-                document.getElementById('col_tipo_group').style.display = 'block';
-                document.getElementById('col_ordem').value = ensaioColunas.length + 1;
-                document.getElementById('col_todas_orgs').checked = true;
-                document.getElementById('col_orgs_select').style.display = 'none';
-                document.getElementById('col_ativo').checked = true;
-                document.querySelectorAll('.col_org_chk').forEach(function(cb) { cb.checked = false; });
-                document.getElementById('colunaModal').style.display = 'flex';
-            }
-            function editarColuna(c) {
-                document.getElementById('colunaModalTitle').textContent = 'Editar Coluna';
-                document.getElementById('col_id').value = c.id;
-                document.getElementById('col_campo_fixo').value = c.campo_fixo || '';
-                document.getElementById('col_nome').value = c.nome;
-                document.getElementById('col_tipo').value = c.tipo;
-                document.getElementById('col_tipo_group').style.display = c.campo_fixo ? 'none' : 'block';
-                document.getElementById('col_ordem').value = c.ordem;
-                document.getElementById('col_todas_orgs').checked = c.todas_orgs == 1;
-                document.getElementById('col_orgs_select').style.display = c.todas_orgs == 1 ? 'none' : 'block';
-                document.getElementById('col_ativo').checked = c.ativo == 1;
-                var orgIds = c.org_ids ? c.org_ids.split(',') : [];
-                document.querySelectorAll('.col_org_chk').forEach(function(cb) {
-                    cb.checked = orgIds.indexOf(cb.value) !== -1;
-                });
-                document.getElementById('colunaModal').style.display = 'flex';
-            }
-            function guardarColuna() {
-                var orgIds = [];
-                if (!document.getElementById('col_todas_orgs').checked) {
-                    document.querySelectorAll('.col_org_chk:checked').forEach(function(cb) { orgIds.push(parseInt(cb.value)); });
-                }
-                fetch('<?= BASE_PATH ?>/api.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
-                    body: JSON.stringify({
-                        action: 'save_ensaio_coluna',
-                        id: parseInt(document.getElementById('col_id').value),
-                        nome: document.getElementById('col_nome').value,
-                        tipo: document.getElementById('col_tipo').value,
-                        ordem: parseInt(document.getElementById('col_ordem').value),
-                        todas_orgs: document.getElementById('col_todas_orgs').checked ? 1 : 0,
-                        ativo: document.getElementById('col_ativo').checked ? 1 : 0,
-                        org_ids: orgIds
-                    })
-                }).then(function(r){return r.json();}).then(function(data) {
-                    if (data.success) {
-                        document.getElementById('colunaModal').style.display = 'none';
-                        carregarColunas();
-                        carregarEnsaios(); // refresh table with new columns
-                    } else appAlert(data.error || 'Erro ao guardar coluna.');
-                });
-            }
-            function eliminarColuna(id) {
-                appConfirmDanger('Eliminar esta coluna personalizada? Os valores associados serão perdidos.', function() {
-                    fetch('<?= BASE_PATH ?>/api.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
-                        body: JSON.stringify({ action: 'delete_ensaio_coluna', id: id })
-                    }).then(function(r){return r.json();}).then(function(data) {
-                        if (data.success) { carregarColunas(); carregarEnsaios(); }
-                        else appAlert(data.error || 'Erro.');
-                    });
-                });
-            }
-            function carregarLegendaOrg() {
-                var orgId = document.getElementById('legendaOrgSelect').value;
-                if (!orgId) { document.getElementById('legendaOrgFields').style.display = 'none'; return; }
-                document.getElementById('legendaOrgFields').style.display = 'block';
-                var url = orgId === 'global'
-                    ? '<?= BASE_PATH ?>/api.php?action=get_ensaios_legenda&global=1'
-                    : '<?= BASE_PATH ?>/api.php?action=get_ensaios_legenda&org_id=' + orgId;
-                fetch(url).then(function(r){return r.json();}).then(function(data) {
-                    document.getElementById('saLegendaText').value = (data.data && data.data.legenda) || '';
-                    document.getElementById('saLegendaTamanho').value = (data.data && data.data.tamanho) || 9;
-                });
-            }
-            function guardarLegendaOrg() {
-                var orgId = document.getElementById('legendaOrgSelect').value;
-                if (!orgId) return;
-                var payload = {
-                    action: orgId === 'global' ? 'save_ensaios_legenda_global' : 'save_ensaios_legenda',
-                    legenda: document.getElementById('saLegendaText').value,
-                    tamanho: parseInt(document.getElementById('saLegendaTamanho').value) || 9
-                };
-                if (orgId !== 'global') payload.org_id = parseInt(orgId);
-                fetch('<?= BASE_PATH ?>/api.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
-                    body: JSON.stringify(payload)
-                }).then(function(r){return r.json();}).then(function(data) {
-                    if (data.success) appAlert('Legenda guardada.');
-                    else appAlert(data.error || 'Erro ao guardar.');
-                });
-            }
-
-            // === BANCO DE ENSAIOS ===
             function escE(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-            var bancoRows = [], bancoMerges = [], bancoColWidths = null;
-            var bancoColunas = [], bancoCustomValues = {};
-            var bmSel = { col: null, start: null, end: null }; // merge selection
-            var defaultColWidths = null; // calculado dinamicamente
+            var CSRF = CSRF_TOKEN;
+            var BASE = '<?= BASE_PATH ?>';
+            var IS_SA = <?= $isSuperAdminUser ? 'true' : 'false' ?>;
+            var paramTipos = [], tipoAtual = null, bancoRegistos = [];
 
-            function carregarEnsaios() {
-                Promise.all([
-                    fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_banco&all=1').then(function(r){return r.json();}),
-                    fetch('<?= BASE_PATH ?>/api.php?action=get_banco_merges').then(function(r){return r.json();}),
-                    fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_colunas').then(function(r){return r.json();}),
-                    fetch('<?= BASE_PATH ?>/api.php?action=get_ensaio_valores_custom').then(function(r){return r.json();})
-                ]).then(function(res) {
-                    bancoRows = (res[0].data && res[0].data.ensaios) || [];
-                    var mData = (res[1].data && res[1].data.merges) || [];
-                    if (Array.isArray(mData)) {
-                        bancoMerges = mData;
-                    } else {
-                        bancoMerges = mData.merges || [];
-                        bancoColWidths = mData.colWidths || null;
-                    }
-                    bancoColunas = ((res[2].data && res[2].data.colunas) || []).filter(function(c) { return c.ativo == 1; });
-                    bancoCustomValues = (res[3].data && res[3].data.valores) || {};
-                    renderBancoTable();
-                }).catch(function(e) { console.error('Erro ao carregar ensaios:', e); });
-            }
-
-            function renderBancoTable() {
-                var tbody = document.getElementById('ensaioRows');
-                var totalCols = bancoColunas.length + 2; // +Estado +Ações
-                if (bancoRows.length === 0) { tbody.innerHTML = '<tr><td colspan="' + totalCols + '" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
-
-                // Atualizar thead dinamicamente
-                var theadHtml = '<tr>';
-                bancoColunas.forEach(function(c) {
-                    theadHtml += '<th title="' + escE(c.nome) + '">' + escE(c.nome) + '</th>';
-                });
-                theadHtml += '<th>Estado</th><th>Ações</th></tr>';
-                document.querySelector('#bancoEnsaiosTable thead').innerHTML = theadHtml;
-
-                // Build merge maps
-                var hidden = {}, spans = {}, aligns = {};
-                bancoMerges.forEach(function(m) {
-                    var k = m.row + '_' + m.col;
-                    spans[k] = m.span;
-                    aligns[k] = { h: m.hAlign || 'center', v: m.vAlign || 'middle' };
-                    for (var r = m.row + 1; r < m.row + m.span; r++) hidden[r + '_' + m.col] = true;
-                });
-                var html = '', cats = new Set(), lastCat = '';
-                bancoRows.forEach(function(r, idx) {
-                    cats.add(r.categoria);
-                    var inativo = r.ativo == 0;
-                    html += '<tr data-ridx="' + idx + '"' + (inativo ? ' style="opacity:0.5;"' : '') + '>';
-                    bancoColunas.forEach(function(col, ci) {
-                        var k = idx + '_' + ci;
-                        if (hidden[k]) return;
-                        var rs = spans[k] ? ' rowspan="' + spans[k] + '"' : '';
-                        var isMaster = !!spans[k];
-                        var ms = aligns[k] ? 'vertical-align:' + aligns[k].v + ';text-align:' + aligns[k].h + ';' : '';
-                        var cls = isMaster ? ' class="bm-master"' : '';
-                        var val;
-                        if (col.campo_fixo) {
-                            // Coluna fixa: ler do ensaio
-                            var fval = r[col.campo_fixo] || '';
-                            if (col.campo_fixo === 'categoria') {
-                                val = r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>';
-                                lastCat = r.categoria;
-                            } else {
-                                val = '<span class="muted" style="font-size:12px;">' + escE(fval) + '</span>';
-                            }
-                        } else {
-                            // Coluna custom: ler do mapa de valores
-                            var cv = (bancoCustomValues[r.id] && bancoCustomValues[r.id][col.id]) || '';
-                            if (col.tipo === 'sim_nao') {
-                                val = cv == '1' ? '<span class="pill pill-success" style="font-size:11px;">Sim</span>' : '<span class="muted" style="font-size:12px;">Não</span>';
-                            } else {
-                                val = '<span class="muted" style="font-size:12px;">' + escE(cv) + '</span>';
-                            }
-                        }
-                        var tools = '';
-                        if (isMaster) {
-                            tools = '<div class="bm-tools">' +
-                                '<button onclick="toggleBancoAlign(' + idx + ',' + ci + ',\'h\')" title="Alinhar H">&#9776;</button>' +
-                                '<button onclick="toggleBancoAlign(' + idx + ',' + ci + ',\'v\')" title="Alinhar V">&#8597;</button>' +
-                                '<button class="bm-unmerge" onclick="desfazerBancoMerge(' + idx + ',' + ci + ')" title="Separar">&#10005;</button>' +
-                            '</div>';
-                        }
-                        html += '<td data-col="' + ci + '"' + rs + cls + ' style="' + ms + '">' + val + tools + '</td>';
-                    });
-                    html += '<td>' + (inativo ? '<span class="pill pill-error">Inativo</span>' : '<span class="pill pill-success">Ativo</span>') + '</td>';
-                    html += '<td><button class="btn btn-ghost btn-sm" onclick=\'editEnsaio(' + JSON.stringify(r).replace(/'/g,"&#39;") + ')\'>Editar</button> ';
-                    html += '<button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarEnsaio(' + r.id + ',' + idx + ')">Eliminar</button></td></tr>';
-                });
-                tbody.innerHTML = html;
-                var dl = document.getElementById('ensCatList'); dl.innerHTML = '';
-                cats.forEach(function(c) { var o = document.createElement('option'); o.value = c; dl.appendChild(o); });
-                // Aplicar larguras e inicializar resize
-                var tbl = document.getElementById('bancoEnsaiosTable');
-                var ths = tbl.querySelectorAll('thead th');
-                if (!bancoColWidths) {
-                    // Larguras automáticas proporcionais
-                    var dataColCount = bancoColunas.length;
-                    var pct = Math.floor(80 / (dataColCount || 1));
-                    bancoColWidths = [];
-                    for (var i = 0; i < dataColCount; i++) bancoColWidths.push(pct);
-                    bancoColWidths.push(8); // Estado
-                    bancoColWidths.push(12); // Ações
-                }
-                var cw = bancoColWidths;
-                for (var i = 0; i < ths.length && i < cw.length; i++) ths[i].style.width = cw[i] + '%';
-                initBancoColResize(tbl);
-            }
-
-            // --- Column resize ---
-            var bcrState = null;
-            function initBancoColResize(table) {
-                var ths = table.querySelectorAll('thead th');
-                for (var i = 0; i < ths.length - 1; i++) {
-                    if (ths[i].querySelector('.bcr-handle')) continue;
-                    var h = document.createElement('div');
-                    h.className = 'bcr-handle';
-                    ths[i].appendChild(h);
-                    h.addEventListener('mousedown', bcrStart);
-                }
-            }
-            function bcrStart(e) {
-                e.preventDefault(); e.stopPropagation();
-                var th = e.target.parentElement;
-                var table = th.closest('table');
-                var ths = table.querySelectorAll('thead th');
-                var idx = Array.prototype.indexOf.call(ths, th);
-                var thNext = ths[idx + 1];
-                if (!thNext) return;
-                e.target.classList.add('active');
-                bcrState = { table: table, th: th, thNext: thNext, ths: ths, tableW: table.offsetWidth, startX: e.clientX, startW: th.offsetWidth, startNextW: thNext.offsetWidth, handle: e.target };
-                document.addEventListener('mousemove', bcrMove);
-                document.addEventListener('mouseup', bcrEnd);
-            }
-            function bcrMove(e) {
-                if (!bcrState) return;
-                var s = bcrState, diff = e.clientX - s.startX;
-                var newW = s.startW + diff, newNextW = s.startNextW - diff;
-                var minPx = s.tableW * 0.04;
-                if (newW < minPx || newNextW < minPx) return;
-                s.th.style.width = (newW / s.tableW * 100).toFixed(1) + '%';
-                s.thNext.style.width = (newNextW / s.tableW * 100).toFixed(1) + '%';
-            }
-            function bcrEnd() {
-                if (!bcrState) return;
-                bcrState.handle.classList.remove('active');
-                // Guardar larguras
-                var ths = bcrState.table.querySelectorAll('thead th');
-                var tw = bcrState.table.offsetWidth;
-                bancoColWidths = [];
-                for (var i = 0; i < ths.length; i++) bancoColWidths.push(parseFloat((ths[i].offsetWidth / tw * 100).toFixed(1)));
-                bcrState = null;
-                document.removeEventListener('mousemove', bcrMove);
-                document.removeEventListener('mouseup', bcrEnd);
-                salvarBancoMerges();
-            }
-
-            // --- Merge selection via Ctrl/Cmd+click ---
-            document.getElementById('bancoEnsaiosTable').addEventListener('mousedown', function(e) {
-                if (!e.ctrlKey && !e.metaKey) return;
-                var td = e.target.closest('td[data-col]');
-                if (!td) return;
-                var tr = td.closest('tr[data-ridx]');
-                if (!tr) return;
-                e.preventDefault();
-                var col = parseInt(td.getAttribute('data-col'));
-                var row = parseInt(tr.getAttribute('data-ridx'));
-                if (col >= bancoColunas.length) return;
-                if (bmSel.col === null || bmSel.col !== col) {
-                    limparBancoSel();
-                    bmSel = { col: col, start: row, end: row };
-                } else {
-                    bmSel.start = Math.min(bmSel.start, row);
-                    bmSel.end = Math.max(bmSel.end, row);
-                }
-                highlightBancoSel();
-                updateBancoFloat();
-            });
-            document.addEventListener('mousedown', function(e) {
-                if (e.ctrlKey || e.metaKey) return;
-                if (!e.target.closest('#bancoEnsaiosTable') && !e.target.closest('#bancoMergeFloat')) limparBancoSel();
-            });
-
-            function highlightBancoSel() {
-                document.querySelectorAll('#bancoEnsaiosTable td.bm-selected').forEach(function(el) { el.classList.remove('bm-selected'); });
-                if (bmSel.col === null) return;
-                for (var r = bmSel.start; r <= bmSel.end; r++) {
-                    var td = document.querySelector('#bancoEnsaiosTable tr[data-ridx="' + r + '"] td[data-col="' + bmSel.col + '"]');
-                    if (td) td.classList.add('bm-selected');
-                }
-            }
-            function updateBancoFloat() {
-                var fl = document.getElementById('bancoMergeFloat');
-                if (bmSel.col === null || bmSel.start === bmSel.end) { fl.style.display = 'none'; return; }
-                var lastTd = document.querySelector('#bancoEnsaiosTable tr[data-ridx="' + bmSel.end + '"] td[data-col="' + bmSel.col + '"]');
-                if (!lastTd) lastTd = document.querySelector('#bancoEnsaiosTable tr[data-ridx="' + bmSel.start + '"] td[data-col="' + bmSel.col + '"]');
-                if (!lastTd) { fl.style.display = 'none'; return; }
-                var rect = lastTd.getBoundingClientRect();
-                fl.style.top = (rect.bottom + 4) + 'px';
-                fl.style.left = rect.left + 'px';
-                fl.style.display = 'block';
-            }
-            function limparBancoSel() {
-                bmSel = { col: null, start: null, end: null };
-                highlightBancoSel();
-                document.getElementById('bancoMergeFloat').style.display = 'none';
-            }
-
-            // --- Merge/Unmerge ---
-            function executarBancoMerge() {
-                if (bmSel.col === null || bmSel.start === bmSel.end) return;
-                var col = bmSel.col, s = bmSel.start, e = bmSel.end;
-                // Remove overlapping merges and expand range
-                var newMerges = [];
-                bancoMerges.forEach(function(m) {
-                    if (m.col === col) {
-                        var mEnd = m.row + m.span - 1;
-                        if (!(e < m.row || s > mEnd)) { s = Math.min(s, m.row); e = Math.max(e, mEnd); return; }
-                    }
-                    newMerges.push(m);
-                });
-                newMerges.push({ col: col, row: s, span: e - s + 1, hAlign: 'center', vAlign: 'middle' });
-                bancoMerges = newMerges;
-                limparBancoSel();
-                salvarBancoMerges();
-                renderBancoTable();
-            }
-            function desfazerBancoMerge(row, col) {
-                bancoMerges = bancoMerges.filter(function(m) { return !(m.col === col && m.row === row); });
-                salvarBancoMerges();
-                renderBancoTable();
-            }
-            function toggleBancoAlign(row, col, axis) {
-                var hCycle = ['left','center','right'], vCycle = ['top','middle','bottom'];
-                var cycle = axis === 'h' ? hCycle : vCycle;
-                var key = axis === 'h' ? 'hAlign' : 'vAlign';
-                bancoMerges.forEach(function(m) {
-                    if (m.col === col && m.row === row) {
-                        var cur = m[key] || (axis === 'h' ? 'center' : 'middle');
-                        m[key] = cycle[(cycle.indexOf(cur) + 1) % cycle.length];
-                    }
-                });
-                salvarBancoMerges();
-                renderBancoTable();
-            }
-            function salvarBancoMerges() {
-                fetch('<?= BASE_PATH ?>/api.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
-                    body: JSON.stringify({ action: 'save_banco_merges', merges: { merges: bancoMerges, colWidths: bancoColWidths } })
-                });
-            }
-
-            // --- Ajustar merges ao eliminar linha ---
-            function ajustarMergesDelete(delIdx) {
-                var newMerges = [];
-                bancoMerges.forEach(function(m) {
-                    var mEnd = m.row + m.span - 1;
-                    if (delIdx < m.row) {
-                        newMerges.push({ col: m.col, row: m.row - 1, span: m.span, hAlign: m.hAlign, vAlign: m.vAlign });
-                    } else if (delIdx > mEnd) {
-                        newMerges.push(m);
-                    } else {
-                        // delIdx está dentro do merge
-                        var newSpan = m.span - 1;
-                        if (newSpan > 1) {
-                            var newRow = delIdx === m.row ? m.row : m.row;
-                            newMerges.push({ col: m.col, row: delIdx <= m.row ? m.row : m.row, span: newSpan, hAlign: m.hAlign, vAlign: m.vAlign });
-                        }
-                    }
-                });
-                bancoMerges = newMerges;
-                salvarBancoMerges();
-            }
-
-            // --- CRUD ---
-            function renderCustomFields(ensaioId) {
-                var container = document.getElementById('ens_custom_fields');
-                var customCols = bancoColunas.filter(function(c) { return !c.campo_fixo; });
-                if (customCols.length === 0) { container.innerHTML = ''; return; }
-                var html = '<hr style="margin:12px 0;"><p class="muted" style="font-size:12px; margin-bottom:8px;">Campos personalizados:</p><div class="form-row">';
-                var vals = ensaioId && bancoCustomValues[ensaioId] ? bancoCustomValues[ensaioId] : {};
-                customCols.forEach(function(c) {
-                    var v = vals[c.id] || '';
-                    if (c.tipo === 'sim_nao') {
-                        html += '<div class="form-group"><label><input type="checkbox" class="ens_custom" data-colid="' + c.id + '"' + (v == '1' ? ' checked' : '') + '> ' + escE(c.nome) + '</label></div>';
-                    } else {
-                        var inputType = c.tipo === 'numero' ? 'number' : 'text';
-                        html += '<div class="form-group"><label>' + escE(c.nome) + '</label><input type="' + inputType + '" class="ens_custom" data-colid="' + c.id + '" value="' + escE(v) + '"></div>';
-                    }
-                });
-                html += '</div>';
-                container.innerHTML = html;
-            }
-            function resetEnsaioForm() {
-                document.getElementById('ensaioModalTitle').textContent = 'Novo Ensaio';
-                document.getElementById('ens_id').value = '0';
-                document.getElementById('ens_categoria').value = '';
-                document.getElementById('ens_ensaio').value = '';
-                document.getElementById('ens_metodo').value = '';
-                document.getElementById('ens_nivel_especial').value = '';
-                document.getElementById('ens_nqa').value = '';
-                document.getElementById('ens_exemplo').value = '';
-                document.getElementById('ens_ativo').checked = true;
-                renderCustomFields(null);
-            }
-            function editEnsaio(r) {
-                document.getElementById('ensaioModalTitle').textContent = 'Editar Ensaio';
-                document.getElementById('ens_id').value = r.id;
-                document.getElementById('ens_categoria').value = r.categoria || '';
-                document.getElementById('ens_ensaio').value = r.ensaio || '';
-                document.getElementById('ens_metodo').value = r.metodo || '';
-                document.getElementById('ens_nivel_especial').value = r.nivel_especial || '';
-                document.getElementById('ens_nqa').value = r.nqa || '';
-                document.getElementById('ens_exemplo').value = r.exemplo || '';
-                document.getElementById('ens_ativo').checked = r.ativo != 0;
-                renderCustomFields(r.id);
-                document.getElementById('ensaioModal').style.display = 'flex';
-            }
-            function guardarEnsaio() {
-                var fd = new FormData();
-                fd.append('action', 'save_ensaio_banco');
-                fd.append('id', document.getElementById('ens_id').value);
-                fd.append('categoria', document.getElementById('ens_categoria').value);
-                fd.append('ensaio', document.getElementById('ens_ensaio').value);
-                fd.append('metodo', document.getElementById('ens_metodo').value);
-                fd.append('nivel_especial', document.getElementById('ens_nivel_especial').value);
-                fd.append('nqa', document.getElementById('ens_nqa').value);
-                fd.append('exemplo', document.getElementById('ens_exemplo').value);
-                fd.append('ativo', document.getElementById('ens_ativo').checked ? '1' : '0');
-                fd.append('csrf_token', CSRF_TOKEN);
-                fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
-                .then(function(r){return r.json();})
-                .then(function(data) {
-                    if (data.success) {
-                        // Guardar valores custom
-                        var ensaioId = data.data && data.data.id ? data.data.id : document.getElementById('ens_id').value;
-                        var customEls = document.querySelectorAll('.ens_custom');
-                        var promises = [];
-                        customEls.forEach(function(el) {
-                            var colId = el.getAttribute('data-colid');
-                            var val = el.type === 'checkbox' ? (el.checked ? '1' : '0') : el.value;
-                            promises.push(fetch('<?= BASE_PATH ?>/api.php', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
-                                body: JSON.stringify({ action: 'save_ensaio_valor_custom', ensaio_id: parseInt(ensaioId), coluna_id: parseInt(colId), valor: val })
-                            }));
-                        });
-                        Promise.all(promises).then(function() {
-                            document.getElementById('ensaioModal').style.display = 'none';
-                            carregarEnsaios();
-                        });
-                    }
-                    else appAlert(data.error || 'Erro ao guardar.');
-                });
-            }
-            function eliminarEnsaio(id, rowIdx) {
-                appConfirmDanger('Eliminar este ensaio?', function() {
-                var fd = new FormData();
-                fd.append('action', 'delete_ensaio_banco');
-                fd.append('id', id);
-                fd.append('csrf_token', CSRF_TOKEN);
-                fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
-                .then(function(r){return r.json();})
-                .then(function(data) {
-                    if (data.success) { ajustarMergesDelete(rowIdx); carregarEnsaios(); }
-                    else appAlert(data.error || 'Erro.');
-                });
-                });
-            }
-            // Carregar ensaios automaticamente (conteúdo visível por defeito)
-            carregarEnsaios();
-            </script>
-            </div><!-- /paramEnsaiosContent -->
-
-            <!-- Conteúdo de tipo custom (não-ensaios) -->
-            <div id="paramCustomContent" style="display:none;">
-                <div class="flex-between mb-sm">
-                    <h3 style="margin:0; font-size:16px;" id="customSubTitle">-</h3>
-                    <button class="btn btn-primary btn-sm" onclick="abrirCustomParamModal()">+ Novo Registo</button>
-                </div>
-                <div class="card" style="overflow:auto;">
-                    <table id="customParamTable" style="width:100%; font-size:13px;">
-                        <thead id="customParamHead"><tr><td class="muted" style="text-align:center; padding:12px;">Selecione um tipo.</td></tr></thead>
-                        <tbody id="customParamRows"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Modal novo/editar registo custom -->
-            <div id="customParamModal" class="modal-overlay" style="display:none;">
-                <div class="modal-box modal-box-lg">
-                    <div class="modal-header">
-                        <h3 id="customParamModalTitle">Novo Registo</h3>
-                        <button class="modal-close" onclick="document.getElementById('customParamModal').style.display='none';">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <input type="hidden" id="cp_id" value="0">
-                        <div class="form-group"><label>Categoria</label><input type="text" id="cp_categoria" class="form-control" placeholder="Ex: Grupo A" list="cpCatList"></div>
-                        <div id="cp_campos"></div>
-                        <div class="form-group"><label><input type="checkbox" id="cp_ativo" checked> Ativo</label></div>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn btn-primary" onclick="guardarCustomParam()">Guardar</button>
-                        <button class="btn btn-secondary" onclick="document.getElementById('customParamModal').style.display='none';">Cancelar</button>
-                    </div>
-                </div>
-            </div>
-            <datalist id="cpCatList"></datalist>
-
-            <script>
-            // === GESTÃO DE TIPOS DE PARÂMETROS ===
-            var paramTipos = [];
-            var tipoAtual = null;
-
-            function toggleTiposPanel() {
-                var p = document.getElementById('tiposPanel');
-                p.style.display = p.style.display === 'none' ? 'block' : 'none';
-                if (p.style.display === 'block') carregarTipos();
-            }
-
+            // === CARREGAR TIPOS ===
             function carregarTipos() {
-                fetch('<?= BASE_PATH ?>/api.php?action=get_parametros_tipos_all').then(function(r){return r.json();}).then(function(data) {
+                var url = IS_SA ? BASE + '/api.php?action=get_parametros_tipos_all' : BASE + '/api.php?action=get_parametros_tipos';
+                fetch(url).then(function(r){return r.json();}).then(function(data) {
                     paramTipos = (data.data && data.data.tipos) || [];
-                    renderTiposTable();
                     renderSubTabs();
-                }).catch(function(e) { console.error('Erro ao carregar tipos:', e); });
-            }
-
-            function renderTiposTable() {
-                var tbody = document.getElementById('tiposRows');
-                if (paramTipos.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center; padding:12px;">Nenhum tipo.</td></tr>'; return; }
-                var html = '';
-                paramTipos.forEach(function(t) {
-                    var cols = [];
-                    try { cols = JSON.parse(t.colunas); } catch(e) {}
-                    var colNames = cols.map(function(c) { return c.nome; }).join(', ');
-                    var estado = t.ativo == 1 ? '<span class="pill pill-success">Ativo</span>' : '<span class="pill pill-error">Inativo</span>';
-                    html += '<tr>';
-                    html += '<td><strong>' + escE(t.nome) + '</strong></td>';
-                    html += '<td class="muted" style="font-size:12px;">' + escE(t.slug) + '</td>';
-                    html += '<td class="muted" style="font-size:12px;">' + escE(colNames) + '</td>';
-                    html += '<td>' + estado + '</td>';
-                    html += '<td>';
-                    html += '<button class="btn btn-ghost btn-sm" onclick=\'editarTipo(' + t.id + ')\'>Editar</button>';
-                    if (t.slug !== 'ensaios') html += ' <button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarTipo(' + t.id + ')">Eliminar</button>';
-                    html += '</td></tr>';
-                });
-                tbody.innerHTML = html;
+                }).catch(function(e) { console.error('Erro tipos:', e); });
             }
 
             function renderSubTabs() {
-                var container = document.getElementById('paramSubTabs');
+                var c = document.getElementById('paramSubTabs');
+                if (paramTipos.length === 0) { c.innerHTML = '<span class="muted" style="font-size:13px;">Nenhum tipo de parâmetro criado.' + (IS_SA ? ' Clique em "+ Novo Tipo" para começar.' : '') + '</span>'; return; }
                 var html = '';
-                paramTipos.filter(function(t) { return t.ativo == 1; }).forEach(function(t) {
+                paramTipos.filter(function(t){ return IS_SA || t.ativo == 1; }).forEach(function(t) {
                     var sel = tipoAtual && tipoAtual.id == t.id ? ' btn-primary' : ' btn-secondary';
-                    html += '<button class="btn btn-sm' + sel + '" onclick="selecionarTipo(' + t.id + ')">' + escE(t.nome) + '</button>';
+                    var lbl = escE(t.nome) + (t.ativo != 1 ? ' (inativo)' : '');
+                    html += '<button class="btn btn-sm' + sel + '" onclick="selecionarTipo(' + t.id + ')">' + lbl + '</button>';
                 });
-                container.innerHTML = html;
-                // Se não há tipo selecionado, selecionar o primeiro
+                c.innerHTML = html;
                 if (!tipoAtual && paramTipos.length > 0) {
-                    var first = paramTipos.find(function(t) { return t.ativo == 1; });
-                    if (first) selecionarTipo(first.id);
+                    var first = paramTipos.find(function(t){ return t.ativo == 1; }) || paramTipos[0];
+                    selecionarTipo(first.id);
                 }
             }
 
             function selecionarTipo(id) {
-                tipoAtual = paramTipos.find(function(t) { return t.id == id; });
+                tipoAtual = paramTipos.find(function(t){ return t.id == id; });
                 if (!tipoAtual) return;
                 renderSubTabs();
-                if (tipoAtual.slug === 'ensaios') {
-                    document.getElementById('paramEnsaiosContent').style.display = 'block';
-                    document.getElementById('paramCustomContent').style.display = 'none';
-                    document.getElementById('paramSubTitle').textContent = tipoAtual.nome;
-                    carregarEnsaios();
+                document.getElementById('paramContent').style.display = 'block';
+                document.getElementById('paramContentTitle').textContent = tipoAtual.nome;
+                document.getElementById('legendaConfig').style.display = 'none';
+                // Legenda display
+                if (tipoAtual.legenda) {
+                    var ld = document.getElementById('paramLegendaDisplay');
+                    ld.style.display = 'block';
+                    ld.style.fontSize = (tipoAtual.legenda_tamanho || 9) + 'px';
+                    ld.style.color = '#667';
+                    ld.innerHTML = escE(tipoAtual.legenda).replace(/\n/g, '<br>');
                 } else {
-                    document.getElementById('paramEnsaiosContent').style.display = 'none';
-                    document.getElementById('paramCustomContent').style.display = 'block';
-                    document.getElementById('customSubTitle').textContent = tipoAtual.nome;
-                    carregarCustomParams();
+                    document.getElementById('paramLegendaDisplay').style.display = 'none';
                 }
+                carregarBanco();
             }
 
-            // === MODAL TIPO ===
+            // === BANCO (registos do tipo) ===
+            function carregarBanco() {
+                if (!tipoAtual) return;
+                var url = BASE + '/api.php?action=get_parametros_banco&tipo_id=' + tipoAtual.id + (IS_SA ? '&all=1' : '');
+                fetch(url).then(function(r){return r.json();}).then(function(data) {
+                    bancoRegistos = (data.data && data.data.parametros) || [];
+                    renderBancoTable();
+                }).catch(function(e) { console.error('Erro banco:', e); });
+            }
+
+            function renderBancoTable() {
+                if (!tipoAtual) return;
+                var cols = [];
+                try { cols = typeof tipoAtual.colunas === 'string' ? JSON.parse(tipoAtual.colunas) : tipoAtual.colunas; } catch(e) {}
+                // Thead
+                var thHtml = '<tr>';
+                cols.forEach(function(c) { thHtml += '<th>' + escE(c.nome) + '</th>'; });
+                if (IS_SA) thHtml += '<th style="width:60px;">Estado</th><th style="width:120px;">Ações</th>';
+                thHtml += '</tr>';
+                document.getElementById('paramBancoHead').innerHTML = thHtml;
+                // Tbody
+                var tbody = document.getElementById('paramBancoRows');
+                var totalCols = cols.length + (IS_SA ? 2 : 0);
+                if (bancoRegistos.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="' + totalCols + '" class="muted" style="text-align:center; padding:20px;">Nenhum registo.</td></tr>';
+                    return;
+                }
+                var html = '', lastCat = '__NONE__';
+                bancoRegistos.forEach(function(r) {
+                    var vals = {};
+                    try { vals = typeof r.valores === 'string' ? JSON.parse(r.valores) : (r.valores || {}); } catch(e) {}
+                    // Linha separadora de categoria
+                    if (r.categoria && r.categoria !== lastCat) {
+                        html += '<tr class="param-cat-row"><td colspan="' + totalCols + '" style="padding:6px 10px; font-weight:600; font-size:13px; background:var(--color-primary-lighter, #e6f4f9); color:var(--color-primary, #2596be); border-bottom:1px solid var(--color-primary, #2596be);">' + escE(r.categoria) + '</td></tr>';
+                        lastCat = r.categoria;
+                    }
+                    var inativo = r.ativo == 0;
+                    html += '<tr' + (inativo ? ' style="opacity:0.45;"' : '') + '>';
+                    cols.forEach(function(c) {
+                        var v = vals[c.chave] || '';
+                        html += '<td style="font-size:12px; white-space:pre-wrap;">' + escE(v) + '</td>';
+                    });
+                    if (IS_SA) {
+                        html += '<td>' + (inativo ? '<span class="pill pill-error">Inativo</span>' : '<span class="pill pill-success">Ativo</span>') + '</td>';
+                        html += '<td><button class="btn btn-ghost btn-sm" onclick="editarRegisto(' + r.id + ')">Editar</button> ';
+                        html += '<button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarRegisto(' + r.id + ')">Eliminar</button></td>';
+                    }
+                    html += '</tr>';
+                });
+                tbody.innerHTML = html;
+                // Autocomplete categorias
+                var cats = new Set();
+                bancoRegistos.forEach(function(r){ if (r.categoria) cats.add(r.categoria); });
+                var dl = document.getElementById('regCatList'); dl.innerHTML = '';
+                cats.forEach(function(c){ var o = document.createElement('option'); o.value = c; dl.appendChild(o); });
+            }
+
+            <?php if ($isSuperAdminUser): ?>
+            // === TIPO CRUD ===
             function abrirTipoModal() {
                 document.getElementById('tipoModalTitle').textContent = 'Novo Tipo de Parâmetro';
                 document.getElementById('tipo_id').value = '0';
                 document.getElementById('tipo_nome').value = '';
                 document.getElementById('tipo_slug').value = '';
-                document.getElementById('tipo_legenda').value = '';
                 document.getElementById('tipo_ativo').checked = true;
+                document.getElementById('tipo_todas_orgs').checked = true;
+                document.getElementById('tipoOrgsSelect').style.display = 'none';
+                document.querySelectorAll('.tipo_org_chk').forEach(function(cb){ cb.checked = false; });
                 renderTipoColunas([{ nome: '', chave: '' }]);
+                document.getElementById('btnEliminarTipo').style.display = 'none';
                 document.getElementById('tipoModal').style.display = 'flex';
             }
 
-            function editarTipo(id) {
-                var t = paramTipos.find(function(x) { return x.id == id; });
-                if (!t) return;
-                document.getElementById('tipoModalTitle').textContent = 'Editar Tipo';
+            function editarTipoAtual() {
+                if (!tipoAtual) return;
+                var t = tipoAtual;
+                document.getElementById('tipoModalTitle').textContent = 'Editar Tipo — ' + t.nome;
                 document.getElementById('tipo_id').value = t.id;
                 document.getElementById('tipo_nome').value = t.nome;
                 document.getElementById('tipo_slug').value = t.slug;
-                document.getElementById('tipo_legenda').value = t.legenda || '';
                 document.getElementById('tipo_ativo').checked = t.ativo == 1;
+                document.getElementById('tipo_todas_orgs').checked = t.todas_orgs == 1;
+                document.getElementById('tipoOrgsSelect').style.display = t.todas_orgs == 1 ? 'none' : 'block';
+                var orgIds = t.org_ids ? t.org_ids.split(',') : [];
+                document.querySelectorAll('.tipo_org_chk').forEach(function(cb){ cb.checked = orgIds.indexOf(cb.value) !== -1; });
                 var cols = [];
-                try { cols = JSON.parse(t.colunas); } catch(e) {}
-                if (cols.length === 0) cols = [{ nome: '', chave: '' }];
+                try { cols = typeof t.colunas === 'string' ? JSON.parse(t.colunas) : t.colunas; } catch(e) {}
+                if (!cols || cols.length === 0) cols = [{ nome: '', chave: '' }];
                 renderTipoColunas(cols);
+                document.getElementById('btnEliminarTipo').style.display = 'inline-block';
                 document.getElementById('tipoModal').style.display = 'flex';
             }
 
             function renderTipoColunas(cols) {
                 var html = '';
-                cols.forEach(function(c, i) {
+                cols.forEach(function(c) {
                     html += '<div class="form-row" style="align-items:flex-end; margin-bottom:4px;">';
                     html += '<div class="form-group" style="flex:2;"><input type="text" class="form-control tipo-col-nome" value="' + escE(c.nome) + '" placeholder="Nome da coluna"></div>';
                     html += '<div class="form-group" style="flex:1;"><input type="text" class="form-control tipo-col-chave" value="' + escE(c.chave || '') + '" placeholder="chave (auto)" style="font-size:12px; color:#667;"></div>';
@@ -2601,7 +1984,6 @@ $breadcrumbs = [
                 document.getElementById('tipoColunas').appendChild(div);
             }
 
-            // Auto-gerar slug a partir do nome
             document.getElementById('tipo_nome').addEventListener('input', function() {
                 if (document.getElementById('tipo_id').value === '0') {
                     document.getElementById('tipo_slug').value = this.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
@@ -2618,292 +2000,164 @@ $breadcrumbs = [
                     colunas.push({ nome: nome, chave: chaves[i] ? chaves[i].value.trim() : '' });
                 }
                 if (colunas.length === 0) { appAlert('Defina pelo menos uma coluna.'); return; }
-                fetch('<?= BASE_PATH ?>/api.php', {
+                var orgIds = [];
+                if (!document.getElementById('tipo_todas_orgs').checked) {
+                    document.querySelectorAll('.tipo_org_chk:checked').forEach(function(cb){ orgIds.push(parseInt(cb.value)); });
+                }
+                fetch(BASE + '/api.php', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
                     body: JSON.stringify({
                         action: 'save_parametro_tipo',
                         id: parseInt(document.getElementById('tipo_id').value),
                         nome: document.getElementById('tipo_nome').value,
                         slug: document.getElementById('tipo_slug').value,
                         colunas: colunas,
-                        legenda: document.getElementById('tipo_legenda').value,
-                        ativo: document.getElementById('tipo_ativo').checked ? 1 : 0
+                        ativo: document.getElementById('tipo_ativo').checked ? 1 : 0,
+                        todas_orgs: document.getElementById('tipo_todas_orgs').checked ? 1 : 0,
+                        org_ids: orgIds
                     })
                 }).then(function(r){return r.json();}).then(function(data) {
                     if (data.success) {
                         document.getElementById('tipoModal').style.display = 'none';
+                        var editId = parseInt(document.getElementById('tipo_id').value);
+                        tipoAtual = null;
                         carregarTipos();
+                        // Re-selecionar após reload
+                        setTimeout(function() {
+                            var id = editId || (data.data && data.data.id) || 0;
+                            if (id) selecionarTipo(id);
+                        }, 300);
                     } else appAlert(data.error || 'Erro ao guardar tipo.');
                 });
             }
 
-            function eliminarTipo(id) {
-                appConfirmDanger('Eliminar este tipo de parâmetro e todos os seus registos?', function() {
-                    fetch('<?= BASE_PATH ?>/api.php', {
+            function eliminarTipo() {
+                if (!tipoAtual) return;
+                appConfirmDanger('Eliminar o tipo "' + tipoAtual.nome + '" e TODOS os seus registos?', function() {
+                    fetch(BASE + '/api.php', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
-                        body: JSON.stringify({ action: 'delete_parametro_tipo', id: id })
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
+                        body: JSON.stringify({ action: 'delete_parametro_tipo', id: tipoAtual.id })
                     }).then(function(r){return r.json();}).then(function(data) {
-                        if (data.success) { tipoAtual = null; carregarTipos(); }
-                        else appAlert(data.error || 'Erro.');
+                        if (data.success) {
+                            document.getElementById('tipoModal').style.display = 'none';
+                            tipoAtual = null;
+                            carregarTipos();
+                        } else appAlert(data.error || 'Erro.');
                     });
                 });
             }
 
-            // === PARAMETROS CUSTOM (banco) ===
-            var customParams = [];
-
-            function carregarCustomParams() {
+            // === REGISTO CRUD ===
+            function abrirRegistoModal() {
                 if (!tipoAtual) return;
-                fetch('<?= BASE_PATH ?>/api.php?action=get_parametros_banco&tipo_id=' + tipoAtual.id).then(function(r){return r.json();}).then(function(data) {
-                    customParams = (data.data && data.data.parametros) || [];
-                    renderCustomParamTable();
-                });
+                document.getElementById('registoModalTitle').textContent = 'Novo Registo — ' + tipoAtual.nome;
+                document.getElementById('reg_id').value = '0';
+                document.getElementById('reg_categoria').value = '';
+                document.getElementById('reg_ativo').checked = true;
+                renderRegCampos({});
+                document.getElementById('registoModal').style.display = 'flex';
             }
 
-            function renderCustomParamTable() {
-                if (!tipoAtual) return;
-                var cols = [];
-                try { cols = JSON.parse(tipoAtual.colunas); } catch(e) {}
-                // Thead
-                var theadHtml = '<tr><th>Categoria</th>';
-                cols.forEach(function(c) { theadHtml += '<th>' + escE(c.nome) + '</th>'; });
-                theadHtml += '<th>Estado</th><th>Ações</th></tr>';
-                document.getElementById('customParamHead').innerHTML = theadHtml;
-                // Tbody
-                var tbody = document.getElementById('customParamRows');
-                if (customParams.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="' + (cols.length + 3) + '" class="muted" style="text-align:center; padding:20px;">Nenhum registo.</td></tr>';
-                    return;
-                }
-                var html = '', cats = new Set(), lastCat = '';
-                customParams.forEach(function(r) {
-                    if (r.categoria) cats.add(r.categoria);
-                    var vals = {};
-                    try { vals = typeof r.valores === 'string' ? JSON.parse(r.valores) : (r.valores || {}); } catch(e) {}
-                    var inativo = r.ativo == 0;
-                    html += '<tr' + (inativo ? ' style="opacity:0.5;"' : '') + '>';
-                    html += '<td>' + (r.categoria && r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>') + '</td>';
-                    lastCat = r.categoria;
-                    cols.forEach(function(c) {
-                        html += '<td><span class="muted" style="font-size:12px;">' + escE(vals[c.chave] || '') + '</span></td>';
-                    });
-                    html += '<td>' + (inativo ? '<span class="pill pill-error">Inativo</span>' : '<span class="pill pill-success">Ativo</span>') + '</td>';
-                    html += '<td><button class="btn btn-ghost btn-sm" onclick=\'editCustomParam(' + r.id + ')\'>Editar</button> ';
-                    html += '<button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarCustomParam(' + r.id + ')">Eliminar</button></td></tr>';
-                });
-                tbody.innerHTML = html;
-                var dl = document.getElementById('cpCatList'); dl.innerHTML = '';
-                cats.forEach(function(c) { var o = document.createElement('option'); o.value = c; dl.appendChild(o); });
-            }
-
-            function abrirCustomParamModal() {
-                if (!tipoAtual) return;
-                document.getElementById('customParamModalTitle').textContent = 'Novo Registo — ' + tipoAtual.nome;
-                document.getElementById('cp_id').value = '0';
-                document.getElementById('cp_categoria').value = '';
-                document.getElementById('cp_ativo').checked = true;
-                renderCpCampos({});
-                document.getElementById('customParamModal').style.display = 'flex';
-            }
-
-            function editCustomParam(id) {
-                var r = customParams.find(function(x) { return x.id == id; });
+            function editarRegisto(id) {
+                var r = bancoRegistos.find(function(x){ return x.id == id; });
                 if (!r) return;
-                document.getElementById('customParamModalTitle').textContent = 'Editar Registo — ' + tipoAtual.nome;
-                document.getElementById('cp_id').value = r.id;
-                document.getElementById('cp_categoria').value = r.categoria || '';
-                document.getElementById('cp_ativo').checked = r.ativo != 0;
+                document.getElementById('registoModalTitle').textContent = 'Editar Registo — ' + tipoAtual.nome;
+                document.getElementById('reg_id').value = r.id;
+                document.getElementById('reg_categoria').value = r.categoria || '';
+                document.getElementById('reg_ativo').checked = r.ativo != 0;
                 var vals = {};
                 try { vals = typeof r.valores === 'string' ? JSON.parse(r.valores) : (r.valores || {}); } catch(e) {}
-                renderCpCampos(vals);
-                document.getElementById('customParamModal').style.display = 'flex';
+                renderRegCampos(vals);
+                document.getElementById('registoModal').style.display = 'flex';
             }
 
-            function renderCpCampos(vals) {
+            function renderRegCampos(vals) {
                 if (!tipoAtual) return;
                 var cols = [];
-                try { cols = JSON.parse(tipoAtual.colunas); } catch(e) {}
-                var html = '<div class="form-row">';
+                try { cols = typeof tipoAtual.colunas === 'string' ? JSON.parse(tipoAtual.colunas) : tipoAtual.colunas; } catch(e) {}
+                var html = '';
                 cols.forEach(function(c) {
-                    html += '<div class="form-group"><label>' + escE(c.nome) + '</label><input type="text" class="form-control cp-chave" data-chave="' + escE(c.chave) + '" value="' + escE(vals[c.chave] || '') + '"></div>';
+                    html += '<div class="form-group"><label>' + escE(c.nome) + '</label>';
+                    html += '<textarea class="form-control reg-campo" data-chave="' + escE(c.chave) + '" rows="2" placeholder="' + escE(c.nome) + '">' + escE(vals[c.chave] || '') + '</textarea>';
+                    html += '</div>';
                 });
-                html += '</div>';
-                document.getElementById('cp_campos').innerHTML = html;
+                document.getElementById('reg_campos').innerHTML = html;
             }
 
-            function guardarCustomParam() {
+            function guardarRegisto() {
                 if (!tipoAtual) return;
                 var valores = {};
-                document.querySelectorAll('.cp-chave').forEach(function(el) {
+                document.querySelectorAll('.reg-campo').forEach(function(el) {
                     valores[el.getAttribute('data-chave')] = el.value;
                 });
-                fetch('<?= BASE_PATH ?>/api.php', {
+                fetch(BASE + '/api.php', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
                     body: JSON.stringify({
                         action: 'save_parametro_banco',
-                        id: parseInt(document.getElementById('cp_id').value),
+                        id: parseInt(document.getElementById('reg_id').value),
                         tipo_id: tipoAtual.id,
-                        categoria: document.getElementById('cp_categoria').value,
+                        categoria: document.getElementById('reg_categoria').value,
                         valores: valores,
-                        ativo: document.getElementById('cp_ativo').checked ? 1 : 0
+                        ativo: document.getElementById('reg_ativo').checked ? 1 : 0
                     })
                 }).then(function(r){return r.json();}).then(function(data) {
                     if (data.success) {
-                        document.getElementById('customParamModal').style.display = 'none';
-                        carregarCustomParams();
+                        document.getElementById('registoModal').style.display = 'none';
+                        carregarBanco();
                     } else appAlert(data.error || 'Erro ao guardar.');
                 });
             }
 
-            function eliminarCustomParam(id) {
+            function eliminarRegisto(id) {
                 appConfirmDanger('Eliminar este registo?', function() {
-                    fetch('<?= BASE_PATH ?>/api.php', {
+                    fetch(BASE + '/api.php', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
                         body: JSON.stringify({ action: 'delete_parametro_banco', id: id })
                     }).then(function(r){return r.json();}).then(function(data) {
-                        if (data.success) carregarCustomParams();
+                        if (data.success) carregarBanco();
                         else appAlert(data.error || 'Erro.');
                     });
                 });
             }
 
-            // Iniciar: carregar tipos
-            carregarTipos();
-            </script>
-
-        <!-- PARÂMETROS (org_admin / user - read-only) -->
-        <?php elseif ($tab === 'parametros' && !$isSuperAdminUser): ?>
-            <div class="flex-between mb-md">
-                <h2>Parâmetros</h2>
-                <?php if ($user['role'] === 'org_admin'): ?>
-                <button class="btn btn-secondary btn-sm" onclick="toggleLegendaPanel()">Legenda da Tabela</button>
-                <?php endif; ?>
-            </div>
-
-            <?php if ($user['role'] === 'org_admin'): ?>
-            <div id="legendaPanel" style="display:none; margin-bottom:16px;">
-                <div class="card" style="padding:16px;">
-                    <h3 style="margin:0 0 8px; font-size:15px;">Legenda da Tabela de Ensaios</h3>
-                    <p class="muted" style="font-size:12px; margin-bottom:8px;">Texto livre que aparece por baixo da tabela de ensaios (editor, consulta e PDF).</p>
-                    <div class="form-group">
-                        <textarea id="ensaiosLegendaText" class="form-control" rows="3" placeholder="Ex: NEI - Nível Especial de Inspeção conforme NP2922; NQA - Nível de Qualidade Aceitável conforme ISO 2859-1"></textarea>
-                    </div>
-                    <div class="form-group" style="display:flex; align-items:center; gap:12px;">
-                        <label style="margin:0; white-space:nowrap;">Tamanho (pt):</label>
-                        <input type="number" id="ensaiosLegendaTamanho" class="form-control" value="9" min="6" max="14" style="width:80px;">
-                        <button class="btn btn-primary btn-sm" onclick="guardarEnsaiosLegenda()">Guardar</button>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
-            <div class="card">
-                <style>#bancoEnsaiosRO { table-layout:fixed; width:100%; } #bancoEnsaiosRO td { overflow:hidden; text-overflow:ellipsis; }</style>
-                <table id="bancoEnsaiosRO">
-                    <thead id="ensaioHeadRO"><tr><td class="muted" style="text-align:center; padding:12px;">A carregar...</td></tr></thead>
-                    <tbody id="ensaioRowsRO"></tbody>
-                </table>
-            </div>
-            <script>
-            function escE(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-            var roColunasData = [];
-            <?php if ($user['role'] === 'org_admin'): ?>
-            function toggleLegendaPanel() {
-                var p = document.getElementById('legendaPanel');
+            // === LEGENDA ===
+            function toggleLegendaConfig() {
+                var p = document.getElementById('legendaConfig');
                 p.style.display = p.style.display === 'none' ? 'block' : 'none';
+                if (p.style.display === 'block' && tipoAtual) {
+                    document.getElementById('paramLegendaText').value = tipoAtual.legenda || '';
+                    document.getElementById('paramLegendaTam').value = tipoAtual.legenda_tamanho || 9;
+                }
             }
-            function guardarEnsaiosLegenda() {
-                fetch('<?= BASE_PATH ?>/api.php', {
+
+            function guardarLegendaTipo() {
+                if (!tipoAtual) return;
+                fetch(BASE + '/api.php', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '<?= getCsrfToken() ?>' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
                     body: JSON.stringify({
-                        action: 'save_ensaios_legenda',
-                        legenda: document.getElementById('ensaiosLegendaText').value,
-                        tamanho: parseInt(document.getElementById('ensaiosLegendaTamanho').value) || 9
+                        action: 'save_parametro_tipo_config',
+                        id: tipoAtual.id,
+                        legenda: document.getElementById('paramLegendaText').value,
+                        legenda_tamanho: parseInt(document.getElementById('paramLegendaTam').value) || 9
                     })
                 }).then(function(r){return r.json();}).then(function(data) {
-                    if (data.success) appAlert('Legenda guardada.');
-                    else appAlert(data.error || 'Erro ao guardar.');
+                    if (data.success) {
+                        appAlert('Legenda guardada.');
+                        tipoAtual.legenda = document.getElementById('paramLegendaText').value;
+                        tipoAtual.legenda_tamanho = parseInt(document.getElementById('paramLegendaTam').value) || 9;
+                        selecionarTipo(tipoAtual.id);
+                    } else appAlert(data.error || 'Erro.');
                 });
             }
-            // Carregar legenda existente
-            fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_legenda').then(function(r){return r.json();}).then(function(data) {
-                if (data.data) {
-                    document.getElementById('ensaiosLegendaText').value = data.data.legenda || '';
-                    document.getElementById('ensaiosLegendaTamanho').value = data.data.tamanho || 9;
-                }
-            });
             <?php endif; ?>
-            Promise.all([
-                fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_banco').then(function(r){return r.json();}),
-                fetch('<?= BASE_PATH ?>/api.php?action=get_banco_merges').then(function(r){return r.json();}),
-                fetch('<?= BASE_PATH ?>/api.php?action=get_ensaios_colunas').then(function(r){return r.json();}),
-                fetch('<?= BASE_PATH ?>/api.php?action=get_ensaio_valores_custom').then(function(r){return r.json();})
-            ]).then(function(res) {
-                var rows = (res[0].data && res[0].data.ensaios) || [];
-                var mData = (res[1].data && res[1].data.merges) || [];
-                var merges, colWidths;
-                if (Array.isArray(mData)) { merges = mData; colWidths = null; }
-                else { merges = mData.merges || []; colWidths = mData.colWidths || null; }
-                var colunas = ((res[2].data && res[2].data.colunas) || []).filter(function(c) { return c.ativo == 1; });
-                var customVals = (res[3].data && res[3].data.valores) || {};
-                roColunasData = colunas;
 
-                // Thead dinâmico (usa nome_display que inclui legendas custom)
-                var theadHtml = '<tr>';
-                colunas.forEach(function(c) { var dn = c.nome_display || c.nome; theadHtml += '<th title="' + escE(dn) + '">' + escE(dn) + '</th>'; });
-                theadHtml += '</tr>';
-                document.getElementById('ensaioHeadRO').innerHTML = theadHtml;
-
-                var tbody = document.getElementById('ensaioRowsRO');
-                var totalCols = colunas.length;
-                if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="' + totalCols + '" class="muted" style="text-align:center; padding:20px;">Nenhum ensaio registado.</td></tr>'; return; }
-                var hidden = {}, spans = {}, aligns = {};
-                merges.forEach(function(m) {
-                    var k = m.row + '_' + m.col;
-                    spans[k] = m.span;
-                    aligns[k] = { h: m.hAlign || 'center', v: m.vAlign || 'middle' };
-                    for (var r = m.row + 1; r < m.row + m.span; r++) hidden[r + '_' + m.col] = true;
-                });
-                var html = '', lastCat = '';
-                rows.forEach(function(r, idx) {
-                    html += '<tr>';
-                    colunas.forEach(function(col, ci) {
-                        var k = idx + '_' + ci;
-                        if (hidden[k]) return;
-                        var rs = spans[k] ? ' rowspan="' + spans[k] + '"' : '';
-                        var ms = aligns[k] ? ' style="vertical-align:' + aligns[k].v + ';text-align:' + aligns[k].h + ';"' : '';
-                        var val;
-                        if (col.campo_fixo) {
-                            if (col.campo_fixo === 'categoria') {
-                                val = r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>';
-                                lastCat = r.categoria;
-                            } else {
-                                val = '<span class="muted" style="font-size:12px;">' + escE(r[col.campo_fixo] || '') + '</span>';
-                            }
-                        } else {
-                            var cv = (customVals[r.id] && customVals[r.id][col.id]) || '';
-                            if (col.tipo === 'sim_nao') {
-                                val = cv == '1' ? '<span class="pill pill-success" style="font-size:11px;">Sim</span>' : '<span class="muted" style="font-size:12px;">Não</span>';
-                            } else {
-                                val = '<span class="muted" style="font-size:12px;">' + escE(cv) + '</span>';
-                            }
-                        }
-                        html += '<td' + rs + ms + '>' + val + '</td>';
-                    });
-                    html += '</tr>';
-                });
-                tbody.innerHTML = html;
-                // Larguras automáticas
-                var tbl = document.getElementById('bancoEnsaiosRO');
-                var ths = tbl.querySelectorAll('thead th');
-                var pct = Math.floor(100 / (colunas.length || 1));
-                var cw = colWidths ? colWidths.slice(0, colunas.length) : null;
-                for (var i = 0; i < ths.length; i++) ths[i].style.width = (cw && cw[i] ? cw[i] : pct) + '%';
-            });
+            // Iniciar
+            carregarTipos();
             </script>
 
         <!-- CONFIGURAÇÕES -->

@@ -1319,35 +1319,40 @@ $breadcrumbs = [
                                         </div>
                                     </div>
                                 </div>
-                                <?php elseif ($secTipo === 'parametros_custom'): ?>
+                                <?php elseif ($secTipo === 'parametros' || $secTipo === 'parametros_custom'): ?>
                                 <?php
                                     $pcRaw = json_decode($sec['conteudo'] ?? '{}', true);
                                     $pcRows = $pcRaw['rows'] ?? [];
                                     $pcTipoId = $pcRaw['tipo_id'] ?? '';
                                     $pcTipoSlug = $pcRaw['tipo_slug'] ?? '';
                                     $pcColWidths = $pcRaw['colWidths'] ?? [];
-                                    // Buscar definição do tipo para obter colunas
                                     $pcColunas = [];
                                     $pcTipoNome = $sec['titulo'] ?? 'Parâmetros';
+                                    $pcLegenda = '';
+                                    $pcLegTam = 9;
                                     if ($pcTipoId) {
-                                        $stmtPt = $db->prepare('SELECT nome, colunas, legenda FROM parametros_tipos WHERE id = ?');
+                                        $stmtPt = $db->prepare('SELECT nome, colunas, legenda, legenda_tamanho FROM parametros_tipos WHERE id = ?');
                                         $stmtPt->execute([(int)$pcTipoId]);
                                         $ptRow = $stmtPt->fetch();
                                         if ($ptRow) {
                                             $pcColunas = json_decode($ptRow['colunas'], true) ?: [];
                                             $pcTipoNome = $ptRow['nome'];
+                                            $pcLegenda = $ptRow['legenda'] ?? '';
+                                            $pcLegTam = (int)($ptRow['legenda_tamanho'] ?? 9);
                                         }
                                     }
                                     if (empty($pcColunas) && !empty($pcRows)) {
-                                        // Fallback: inferir colunas das keys da primeira row
-                                        $firstRow = reset($pcRows);
-                                        foreach (array_keys($firstRow) as $k) {
-                                            $pcColunas[] = ['nome' => $k, 'chave' => $k];
+                                        $firstDataRow = null;
+                                        foreach ($pcRows as $pr) { if (!isset($pr['_cat'])) { $firstDataRow = $pr; break; } }
+                                        if ($firstDataRow) {
+                                            foreach (array_keys($firstDataRow) as $k) {
+                                                if ($k !== '_cat') $pcColunas[] = ['nome' => $k, 'chave' => $k];
+                                            }
                                         }
                                     }
                                     $pcColW = count($pcColWidths) ? $pcColWidths : array_fill(0, count($pcColunas), floor(90 / max(1, count($pcColunas))));
                                 ?>
-                                <div class="seccao-block" data-seccao-idx="<?= $i ?>" data-tipo="parametros_custom" data-tipo-id="<?= (int)$pcTipoId ?>" data-tipo-slug="<?= sanitize($pcTipoSlug) ?>" data-nivel="<?= (int)($sec['nivel'] ?? 1) ?>">
+                                <div class="seccao-block" data-seccao-idx="<?= $i ?>" data-tipo="parametros" data-tipo-id="<?= (int)$pcTipoId ?>" data-tipo-slug="<?= sanitize($pcTipoSlug) ?>" data-nivel="<?= (int)($sec['nivel'] ?? 1) ?>">
                                     <div class="seccao-header">
                                         <span class="seccao-numero"><?= $hierNumbers[$i] ?? ($i + 1) . '.' ?></span>
                                         <input type="text" class="seccao-titulo" value="<?= sanitize($sec['titulo'] ?? $pcTipoNome) ?>" placeholder="Título da secção">
@@ -1368,16 +1373,29 @@ $breadcrumbs = [
                                             </tr></thead>
                                             <tbody class="ensaios-tbody">
                                                 <?php foreach ($pcRows as $pcRow): ?>
-                                                <tr>
-                                                    <?php foreach ($pcColunas as $pcCol): ?>
-                                                    <td><textarea rows="1" data-field="<?= sanitize($pcCol['chave']) ?>"><?= sanitize($pcRow[$pcCol['chave']] ?? '') ?></textarea></td>
-                                                    <?php endforeach; ?>
-                                                    <td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>
-                                                </tr>
+                                                    <?php if (isset($pcRow['_cat'])): ?>
+                                                    <tr class="cat-header-row" data-cat="1">
+                                                        <td colspan="<?= count($pcColunas) + 1 ?>" style="background:var(--color-primary-lighter, #e6f4f9); padding:4px 8px; font-weight:600; font-size:12px; color:var(--color-primary, #2596be);">
+                                                            <input type="text" class="cat-header-input" value="<?= sanitize($pcRow['_cat']) ?>" style="border:none; background:transparent; font-weight:600; color:var(--color-primary, #2596be); width:calc(100% - 30px); font-size:12px;">
+                                                            <button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover" style="float:right;">&times;</button>
+                                                        </td>
+                                                    </tr>
+                                                    <?php else: ?>
+                                                    <tr>
+                                                        <?php foreach ($pcColunas as $pcCol): ?>
+                                                        <td><textarea rows="1" data-field="<?= sanitize($pcCol['chave']) ?>"><?= sanitize($pcRow[$pcCol['chave']] ?? '') ?></textarea></td>
+                                                        <?php endforeach; ?>
+                                                        <td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>
+                                                    </tr>
+                                                    <?php endif; ?>
                                                 <?php endforeach; ?>
                                             </tbody>
                                         </table>
+                                        <?php if ($pcLegenda): ?>
+                                        <div class="ensaios-legenda" style="font-size:<?= $pcLegTam ?>px; color:#666; font-style:italic; margin-top:4px; padding:2px 4px;"><?= sanitize($pcLegenda) ?></div>
+                                        <?php endif; ?>
                                         <div class="seccao-ensaios-actions">
+                                            <button class="btn btn-secondary btn-sm" onclick="adicionarParamCatLinha(this, <?= (int)$pcTipoId ?>)">+ Categoria</button>
                                             <button class="btn btn-secondary btn-sm" onclick="adicionarParamCustomLinha(this, <?= (int)$pcTipoId ?>)">+ Linha</button>
                                             <button class="btn btn-secondary btn-sm" onclick="abrirBancoParamCustom(this, <?= (int)$pcTipoId ?>)">+ Do Banco</button>
                                         </div>
@@ -3273,14 +3291,8 @@ $breadcrumbs = [
         document.getElementById('modalSelectorTipo').classList.add('hidden');
         var tipo = _paramTiposCache.find(function(t) { return t.id == tipoId; });
         if (!tipo) return;
-
-        if (tipo.slug === 'ensaios') {
-            // Fluxo existente de ensaios
-            abrirSelectorEnsaios();
-        } else {
-            // Criar secção de parâmetros custom com tabela dinâmica
-            adicionarSeccaoParametrosCustom(tipo);
-        }
+        // Todos os tipos usam o mesmo fluxo dinâmico
+        adicionarSeccaoParametrosCustom(tipo);
     }
 
     function criarSeccaoParametrosCustom(tipo, dados, idx, nivel) {
@@ -3288,13 +3300,13 @@ $breadcrumbs = [
         var block = document.createElement('div');
         block.className = 'seccao-block';
         block.setAttribute('data-seccao-idx', idx);
-        block.setAttribute('data-tipo', 'parametros_custom');
+        block.setAttribute('data-tipo', 'parametros');
         block.setAttribute('data-tipo-id', tipo.id);
         block.setAttribute('data-tipo-slug', tipo.slug);
         block.setAttribute('data-nivel', nivel);
 
         var cols = [];
-        try { cols = JSON.parse(tipo.colunas); } catch(e) { cols = tipo.colunas || []; }
+        try { cols = typeof tipo.colunas === 'string' ? JSON.parse(tipo.colunas) : (tipo.colunas || []); } catch(e) {}
 
         var headerHtml =
             '<div class="seccao-header">' +
@@ -3308,7 +3320,6 @@ $breadcrumbs = [
                 '</div>' +
             '</div>';
 
-        // Calcular larguras proporcionais
         var colWidth = Math.floor(90 / (cols.length || 1));
         var tableHtml =
             '<div class="seccao-ensaios-wrap">' +
@@ -3319,16 +3330,20 @@ $breadcrumbs = [
         });
         tableHtml += '<th style="width:4%"></th></tr></thead><tbody class="ensaios-tbody">';
 
-        // Adicionar dados existentes
         if (dados && dados.length) {
             dados.forEach(function(row) {
-                tableHtml += criarParamCustomRowHtml(cols, row);
+                if (row._cat) {
+                    tableHtml += criarParamCatRowHtml(row._cat, cols.length);
+                } else {
+                    tableHtml += criarParamCustomRowHtml(cols, row);
+                }
             });
         }
 
         var legendaHtml = '';
         if (tipo.legenda) {
-            legendaHtml = '<div class="ensaios-legenda" style="font-size:9px; color:#666; font-style:italic; margin-top:4px; padding:2px 4px;">' + escapeHtml(tipo.legenda) + '</div>';
+            var legTam = tipo.legenda_tamanho || 9;
+            legendaHtml = '<div class="ensaios-legenda" style="font-size:' + legTam + 'px; color:#666; font-style:italic; margin-top:4px; padding:2px 4px;">' + escapeHtml(tipo.legenda) + '</div>';
         }
 
         tableHtml +=
@@ -3336,6 +3351,7 @@ $breadcrumbs = [
                 '</table>' +
                 legendaHtml +
                 '<div class="seccao-ensaios-actions">' +
+                    '<button class="btn btn-secondary btn-sm" onclick="adicionarParamCatLinha(this, ' + tipo.id + ')">+ Categoria</button>' +
                     '<button class="btn btn-secondary btn-sm" onclick="adicionarParamCustomLinha(this, ' + tipo.id + ')">+ Linha</button>' +
                     '<button class="btn btn-secondary btn-sm" onclick="abrirBancoParamCustom(this, ' + tipo.id + ')">+ Do Banco</button>' +
                 '</div>' +
@@ -3344,6 +3360,13 @@ $breadcrumbs = [
         block.innerHTML = headerHtml + tableHtml;
         block.querySelector('.seccao-titulo').addEventListener('input', marcarAlterado);
         return { block: block };
+    }
+
+    function criarParamCatRowHtml(cat, numCols) {
+        return '<tr class="cat-header-row" data-cat="1"><td colspan="' + (numCols + 1) + '" style="background:var(--color-primary-lighter, #e6f4f9); padding:4px 8px; font-weight:600; font-size:12px; color:var(--color-primary, #2596be);">' +
+            '<input type="text" class="cat-header-input" value="' + escapeHtml(cat) + '" placeholder="Nome da categoria" style="border:none; background:transparent; font-weight:600; color:var(--color-primary, #2596be); width:calc(100% - 30px); font-size:12px;">' +
+            '<button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover" style="float:right;">&times;</button>' +
+            '</td></tr>';
     }
 
     function criarParamCustomRowHtml(cols, valores) {
@@ -3355,6 +3378,21 @@ $breadcrumbs = [
         });
         html += '<td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td></tr>';
         return html;
+    }
+
+    function adicionarParamCatLinha(btn, tipoId) {
+        var tipo = _paramTiposCache ? _paramTiposCache.find(function(t) { return t.id == tipoId; }) : null;
+        if (!tipo) return;
+        var cols = [];
+        try { cols = typeof tipo.colunas === 'string' ? JSON.parse(tipo.colunas) : (tipo.colunas || []); } catch(e) {}
+        var tbody = btn.closest('.seccao-ensaios-wrap').querySelector('.ensaios-tbody');
+        var tr = document.createElement('tr');
+        tr.className = 'cat-header-row';
+        tr.setAttribute('data-cat', '1');
+        tr.innerHTML = '<td colspan="' + (cols.length + 1) + '" style="background:var(--color-primary-lighter, #e6f4f9); padding:4px 8px; font-weight:600; font-size:12px; color:var(--color-primary, #2596be);"><input type="text" class="cat-header-input" value="" placeholder="Nome da categoria" style="border:none; background:transparent; font-weight:600; color:var(--color-primary, #2596be); width:calc(100% - 30px); font-size:12px;"><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover" style="float:right;">&times;</button></td>';
+        tbody.appendChild(tr);
+        tr.querySelector('.cat-header-input').focus();
+        marcarAlterado();
     }
 
     function adicionarSeccaoParametrosCustom(tipo, dados) {
@@ -3392,7 +3430,6 @@ $breadcrumbs = [
 
     function abrirBancoParamCustom(btn, tipoId) {
         var wrap = btn.closest('.seccao-ensaios-wrap');
-        // Fetch items from parametros_banco for this tipo
         fetch('<?= BASE_PATH ?>/api.php?action=get_parametros_banco&tipo_id=' + tipoId).then(function(r){return r.json();}).then(function(data) {
             var params = (data.data && data.data.parametros) || [];
             if (params.length === 0) {
@@ -3402,9 +3439,19 @@ $breadcrumbs = [
             var tipo = _paramTiposCache ? _paramTiposCache.find(function(t) { return t.id == tipoId; }) : null;
             if (!tipo) return;
             var cols = [];
-            try { cols = JSON.parse(tipo.colunas); } catch(e) { cols = tipo.colunas || []; }
+            try { cols = typeof tipo.colunas === 'string' ? JSON.parse(tipo.colunas) : (tipo.colunas || []); } catch(e) {}
             var tbody = wrap.querySelector('.ensaios-tbody');
+            var lastCat = '__NONE__';
             params.forEach(function(p) {
+                // Adicionar linha de categoria se mudou
+                if (p.categoria && p.categoria !== lastCat) {
+                    var catTr = document.createElement('tr');
+                    catTr.className = 'cat-header-row';
+                    catTr.setAttribute('data-cat', '1');
+                    catTr.innerHTML = '<td colspan="' + (cols.length + 1) + '" style="background:var(--color-primary-lighter, #e6f4f9); padding:4px 8px; font-weight:600; font-size:12px; color:var(--color-primary, #2596be);"><input type="text" class="cat-header-input" value="' + escapeHtml(p.categoria) + '" style="border:none; background:transparent; font-weight:600; color:var(--color-primary, #2596be); width:calc(100% - 30px); font-size:12px;"><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover" style="float:right;">&times;</button></td>';
+                    tbody.appendChild(catTr);
+                    lastCat = p.categoria;
+                }
                 var vals = {};
                 try { vals = typeof p.valores === 'string' ? JSON.parse(p.valores) : (p.valores || {}); } catch(e) {}
                 var tr = document.createElement('tr');
@@ -4052,8 +4099,8 @@ $breadcrumbs = [
                     colWidths.push(parseFloat(ths[ci].style.width) || 0);
                 }
                 conteudo = JSON.stringify({ colWidths: colWidths, rows: ensaiosArr, merges: merges });
-            } else if (tipo === 'parametros_custom') {
-                // Recolher dados de parâmetros custom
+            } else if (tipo === 'parametros' || tipo === 'parametros_custom') {
+                // Recolher dados de parâmetros (genérico)
                 var pcTbl = block.querySelector('.seccao-ensaios-table');
                 var pcTbody = pcTbl ? pcTbl.querySelector('.ensaios-tbody') : null;
                 var pcRows = [];
@@ -4061,11 +4108,17 @@ $breadcrumbs = [
                 var pcTipoSlug = block.getAttribute('data-tipo-slug') || '';
                 if (pcTbody) {
                     pcTbody.querySelectorAll('tr').forEach(function(tr) {
-                        var row = {};
-                        tr.querySelectorAll('textarea[data-field], input[data-field]').forEach(function(inp) {
-                            row[inp.getAttribute('data-field')] = inp.value;
-                        });
-                        pcRows.push(row);
+                        if (tr.getAttribute('data-cat') === '1') {
+                            // Linha de categoria
+                            var catInput = tr.querySelector('.cat-header-input');
+                            pcRows.push({ _cat: catInput ? catInput.value : '' });
+                        } else {
+                            var row = {};
+                            tr.querySelectorAll('textarea[data-field], input[data-field]').forEach(function(inp) {
+                                row[inp.getAttribute('data-field')] = inp.value;
+                            });
+                            pcRows.push(row);
+                        }
                     });
                 }
                 var pcColWidths = [];

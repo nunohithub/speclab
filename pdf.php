@@ -832,21 +832,22 @@ $tamNome    = (int)$cv['tamanho_nome'];
                     <p style="font-size:<?= $prvLegTam ?>px; color:#888; font-style:italic; margin:2px 0 0 0;"><?= san($prvLegenda) ?></p>
                     <?php endif; ?>
                     <?php endif; ?>
-                <?php elseif ($secTipo === 'parametros_custom'): ?>
+                <?php elseif ($secTipo === 'parametros' || $secTipo === 'parametros_custom'): ?>
                     <?php
                     $pcRaw = json_decode($sec['conteudo'] ?? '{}', true);
                     $pcRows = $pcRaw['rows'] ?? [];
                     $pcTipoId = $pcRaw['tipo_id'] ?? '';
-                    $pcColunas = []; $pcLegenda = '';
+                    $pcColunas = []; $pcLegenda = ''; $pcLegTam = 9;
                     $pcColWidths = $pcRaw['colWidths'] ?? [];
                     if ($pcTipoId) {
-                        $stmtPt = $db->prepare('SELECT colunas, legenda FROM parametros_tipos WHERE id = ?');
+                        $stmtPt = $db->prepare('SELECT colunas, legenda, legenda_tamanho FROM parametros_tipos WHERE id = ?');
                         $stmtPt->execute([(int)$pcTipoId]);
                         $ptRow = $stmtPt->fetch();
-                        if ($ptRow) { $pcColunas = json_decode($ptRow['colunas'], true) ?: []; $pcLegenda = $ptRow['legenda'] ?? ''; }
+                        if ($ptRow) { $pcColunas = json_decode($ptRow['colunas'], true) ?: []; $pcLegenda = $ptRow['legenda'] ?? ''; $pcLegTam = (int)($ptRow['legenda_tamanho'] ?? 9); }
                     }
                     if (empty($pcColunas) && !empty($pcRows)) {
-                        foreach (array_keys(reset($pcRows)) as $k) $pcColunas[] = ['nome' => $k, 'chave' => $k];
+                        $firstDataRow = null; foreach ($pcRows as $pr) { if (!isset($pr['_cat'])) { $firstDataRow = $pr; break; } }
+                        if ($firstDataRow) { foreach (array_keys($firstDataRow) as $k) { if ($k !== '_cat') $pcColunas[] = ['nome' => $k, 'chave' => $k]; } }
                     }
                     $pcCw = count($pcColWidths) ? $pcColWidths : array_fill(0, count($pcColunas), floor(100 / max(1, count($pcColunas))));
                     ?>
@@ -859,16 +860,20 @@ $tamNome    = (int)$cv['tamanho_nome'];
                         </tr></thead>
                         <tbody>
                             <?php foreach ($pcRows as $pcRow): ?>
-                            <tr>
-                                <?php foreach ($pcColunas as $pcCol): ?>
-                                <td><?= nl2br(san($pcRow[$pcCol['chave']] ?? '')) ?></td>
-                                <?php endforeach; ?>
-                            </tr>
+                                <?php if (isset($pcRow['_cat'])): ?>
+                                <tr><td colspan="<?= count($pcColunas) ?>" style="background:<?= $corPrimaria ?>20; padding:5px 10px; font-weight:600; font-size:11px; color:<?= $corPrimaria ?>;"><?= san($pcRow['_cat']) ?></td></tr>
+                                <?php else: ?>
+                                <tr>
+                                    <?php foreach ($pcColunas as $pcCol): ?>
+                                    <td style="white-space:pre-wrap;"><?= nl2br(san($pcRow[$pcCol['chave']] ?? '')) ?></td>
+                                    <?php endforeach; ?>
+                                </tr>
+                                <?php endif; ?>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                     <?php if (!empty($pcLegenda)): ?>
-                    <p style="font-size:8px; color:#888; font-style:italic; margin:2px 0 0 0;"><?= san($pcLegenda) ?></p>
+                    <p style="font-size:<?= max(7, $pcLegTam - 1) ?>px; color:#888; font-style:italic; margin:2px 0 0 0;"><?= san($pcLegenda) ?></p>
                     <?php endif; ?>
                     <?php endif; ?>
                 <?php else: ?>
