@@ -660,22 +660,22 @@ $breadcrumbs = [
                             <div class="form-group">
                                 <label>Cor Primária</label>
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <input type="color" name="cor_primaria" id="org_cor_primaria" value="#2596be" style="width: 50px; height: 36px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer;">
-                                    <input type="text" id="org_cor_primaria_text" value="#2596be" style="width: 100px; font-size: 13px;" onchange="document.getElementById('org_cor_primaria').value = this.value;">
+                                    <input type="color" name="cor_primaria" id="org_cor_primaria" value="#2596be" style="width: 40px; height: 32px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;" oninput="document.getElementById('org_cor_primaria_text').value = this.value;">
+                                    <input type="text" id="org_cor_primaria_text" value="#2596be" style="width: 80px; font-family: monospace; font-size: 12px;" maxlength="7" onchange="document.getElementById('org_cor_primaria').value = this.value;">
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label>Cor Primária Dark</label>
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <input type="color" name="cor_primaria_dark" id="org_cor_primaria_dark" value="#1a7a9e" style="width: 50px; height: 36px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer;">
-                                    <input type="text" id="org_cor_primaria_dark_text" value="#1a7a9e" style="width: 100px; font-size: 13px;" onchange="document.getElementById('org_cor_primaria_dark').value = this.value;">
+                                    <input type="color" name="cor_primaria_dark" id="org_cor_primaria_dark" value="#1a7a9e" style="width: 40px; height: 32px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;" oninput="document.getElementById('org_cor_primaria_dark_text').value = this.value;">
+                                    <input type="text" id="org_cor_primaria_dark_text" value="#1a7a9e" style="width: 80px; font-family: monospace; font-size: 12px;" maxlength="7" onchange="document.getElementById('org_cor_primaria_dark').value = this.value;">
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label>Cor Primária Light</label>
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <input type="color" name="cor_primaria_light" id="org_cor_primaria_light" value="#e6f4f9" style="width: 50px; height: 36px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer;">
-                                    <input type="text" id="org_cor_primaria_light_text" value="#e6f4f9" style="width: 100px; font-size: 13px;" onchange="document.getElementById('org_cor_primaria_light').value = this.value;">
+                                    <input type="color" name="cor_primaria_light" id="org_cor_primaria_light" value="#e6f4f9" style="width: 40px; height: 32px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;" oninput="document.getElementById('org_cor_primaria_light_text').value = this.value;">
+                                    <input type="text" id="org_cor_primaria_light_text" value="#e6f4f9" style="width: 80px; font-family: monospace; font-size: 12px;" maxlength="7" onchange="document.getElementById('org_cor_primaria_light').value = this.value;">
                                 </div>
                             </div>
                         </div>
@@ -2323,19 +2323,22 @@ $breadcrumbs = [
                         <div class="form-group">
                             <label>Cor Primária</label>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <input type="color" name="cor_primaria" value="<?= sanitize($orgInfo['cor_primaria'] ?? '#2596be') ?>" style="width: 50px; height: 36px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer;">
+                                <input type="color" name="cor_primaria" id="oa_cor_primaria" value="<?= sanitize($orgInfo['cor_primaria'] ?? '#2596be') ?>" style="width: 40px; height: 32px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;" oninput="document.getElementById('oa_cor_primaria_hex').value = this.value;">
+                                <input type="text" id="oa_cor_primaria_hex" value="<?= sanitize($orgInfo['cor_primaria'] ?? '#2596be') ?>" style="width: 80px; font-family: monospace; font-size: 12px;" maxlength="7" onchange="document.getElementById('oa_cor_primaria').value = this.value;">
                             </div>
                         </div>
                         <div class="form-group">
                             <label>Cor Primária Dark</label>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <input type="color" name="cor_primaria_dark" value="<?= sanitize($orgInfo['cor_primaria_dark'] ?? '#1a7a9e') ?>" style="width: 50px; height: 36px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer;">
+                                <input type="color" name="cor_primaria_dark" id="oa_cor_dark" value="<?= sanitize($orgInfo['cor_primaria_dark'] ?? '#1a7a9e') ?>" style="width: 40px; height: 32px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;" oninput="document.getElementById('oa_cor_dark_hex').value = this.value;">
+                                <input type="text" id="oa_cor_dark_hex" value="<?= sanitize($orgInfo['cor_primaria_dark'] ?? '#1a7a9e') ?>" style="width: 80px; font-family: monospace; font-size: 12px;" maxlength="7" onchange="document.getElementById('oa_cor_dark').value = this.value;">
                             </div>
                         </div>
                         <div class="form-group">
                             <label>Cor Primária Light</label>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <input type="color" name="cor_primaria_light" value="<?= sanitize($orgInfo['cor_primaria_light'] ?? '#e6f4f9') ?>" style="width: 50px; height: 36px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer;">
+                                <input type="color" name="cor_primaria_light" id="oa_cor_light" value="<?= sanitize($orgInfo['cor_primaria_light'] ?? '#e6f4f9') ?>" style="width: 40px; height: 32px; padding: 2px; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer;" oninput="document.getElementById('oa_cor_light_hex').value = this.value;">
+                                <input type="text" id="oa_cor_light_hex" value="<?= sanitize($orgInfo['cor_primaria_light'] ?? '#e6f4f9') ?>" style="width: 80px; font-family: monospace; font-size: 12px;" maxlength="7" onchange="document.getElementById('oa_cor_light').value = this.value;">
                             </div>
                         </div>
                     </div>
