@@ -56,6 +56,7 @@ switch ($action) {
         $ativo = (int)($jsonBody['ativo'] ?? 1);
         $todasOrgs = (int)($jsonBody['todas_orgs'] ?? 1);
         $orgIds = $jsonBody['org_ids'] ?? [];
+        $categorias = $jsonBody['categorias'] ?? [];
 
         if (!$nome) jsonError('Nome é obrigatório.');
         if (!$slug) {
@@ -76,17 +77,24 @@ switch ($action) {
         }
         unset($col);
         $colunasJson = json_encode($colunas, JSON_UNESCAPED_UNICODE);
+        // Sanitizar categorias — array de strings
+        $catsFinal = [];
+        foreach ($categorias as $cat) {
+            $cat = trim($cat);
+            if ($cat !== '') $catsFinal[] = $cat;
+        }
+        $categoriasJson = !empty($catsFinal) ? json_encode($catsFinal, JSON_UNESCAPED_UNICODE) : null;
         if ($legendaTamanho < 6) $legendaTamanho = 6;
         if ($legendaTamanho > 14) $legendaTamanho = 14;
 
         if ($id > 0) {
-            $stmt = $db->prepare('UPDATE parametros_tipos SET nome = ?, slug = ?, colunas = ?, legenda = ?, legenda_tamanho = ?, ativo = ?, todas_orgs = ? WHERE id = ?');
-            $stmt->execute([$nome, $slug, $colunasJson, $legenda, $legendaTamanho, $ativo, $todasOrgs, $id]);
+            $stmt = $db->prepare('UPDATE parametros_tipos SET nome = ?, slug = ?, colunas = ?, legenda = ?, legenda_tamanho = ?, ativo = ?, todas_orgs = ?, categorias = ? WHERE id = ?');
+            $stmt->execute([$nome, $slug, $colunasJson, $legenda, $legendaTamanho, $ativo, $todasOrgs, $categoriasJson, $id]);
         } else {
             $stmtMax = $db->query('SELECT COALESCE(MAX(ordem),0)+1 FROM parametros_tipos');
             $maxOrdem = $stmtMax->fetchColumn();
-            $stmt = $db->prepare('INSERT INTO parametros_tipos (nome, slug, colunas, legenda, legenda_tamanho, ativo, todas_orgs, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-            $stmt->execute([$nome, $slug, $colunasJson, $legenda, $legendaTamanho, $ativo, $todasOrgs, $maxOrdem]);
+            $stmt = $db->prepare('INSERT INTO parametros_tipos (nome, slug, colunas, legenda, legenda_tamanho, ativo, todas_orgs, categorias, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+            $stmt->execute([$nome, $slug, $colunasJson, $legenda, $legendaTamanho, $ativo, $todasOrgs, $categoriasJson, $maxOrdem]);
             $id = (int)$db->lastInsertId();
         }
 
