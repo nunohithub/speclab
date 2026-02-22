@@ -3440,31 +3440,75 @@ $breadcrumbs = [
             if (!tipo) return;
             var cols = [];
             try { cols = typeof tipo.colunas === 'string' ? JSON.parse(tipo.colunas) : (tipo.colunas || []); } catch(e) {}
-            var tbody = wrap.querySelector('.ensaios-tbody');
+
+            // Construir modal com checkboxes
+            var old = document.getElementById('bancoPicker');
+            if (old) old.remove();
+            var overlay = document.createElement('div');
+            overlay.id = 'bancoPicker';
+            overlay.className = 'modal-overlay';
+            overlay.style.cssText = 'display:flex; z-index:9999;';
+            var html = '<div class="modal-box" style="max-width:700px; max-height:80vh; display:flex; flex-direction:column;">';
+            html += '<div class="modal-header"><h3 style="margin:0;">Selecionar do Banco</h3><button class="modal-close" onclick="document.getElementById(\'bancoPicker\').remove();">&times;</button></div>';
+            html += '<div style="padding:8px 16px; border-bottom:1px solid #e5e7eb;"><label style="font-size:13px; cursor:pointer;"><input type="checkbox" id="bancoPickAll" onchange="document.querySelectorAll(\'.banco-pick-item\').forEach(function(c){c.checked=this.checked;}.bind(this));"> <strong>Selecionar todos</strong></label></div>';
+            html += '<div class="modal-body" style="overflow-y:auto; flex:1; padding:8px 16px;">';
+            html += '<table style="width:100%; font-size:12px; border-collapse:collapse;">';
+            // Header
+            html += '<thead><tr><th style="width:30px;"></th>';
+            cols.forEach(function(c) { html += '<th style="padding:4px 6px; text-align:left; border-bottom:2px solid #e5e7eb;">' + escapeHtml(c.nome) + '</th>'; });
+            html += '</tr></thead><tbody>';
             var lastCat = '__NONE__';
-            params.forEach(function(p) {
-                // Adicionar linha de categoria se mudou
+            params.forEach(function(p, idx) {
                 if (p.categoria && p.categoria !== lastCat) {
-                    var catTr = document.createElement('tr');
-                    catTr.className = 'cat-header-row';
-                    catTr.setAttribute('data-cat', '1');
-                    catTr.innerHTML = '<td colspan="' + (cols.length + 1) + '" style="background:var(--color-primary-lighter, #e6f4f9); padding:4px 8px; font-weight:600; font-size:12px; color:var(--color-primary, #2596be);"><input type="text" class="cat-header-input" value="' + escapeHtml(p.categoria) + '" style="border:none; background:transparent; font-weight:600; color:var(--color-primary, #2596be); width:calc(100% - 30px); font-size:12px;"><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover" style="float:right;">&times;</button></td>';
-                    tbody.appendChild(catTr);
+                    html += '<tr><td colspan="' + (cols.length + 1) + '" style="padding:4px 8px; font-weight:600; font-size:12px; background:var(--color-primary-lighter, #e6f4f9); color:var(--color-primary, #2596be);">' + escapeHtml(p.categoria) + '</td></tr>';
                     lastCat = p.categoria;
                 }
                 var vals = {};
                 try { vals = typeof p.valores === 'string' ? JSON.parse(p.valores) : (p.valores || {}); } catch(e) {}
-                var tr = document.createElement('tr');
-                var html = '';
+                html += '<tr><td style="text-align:center;"><input type="checkbox" class="banco-pick-item" data-idx="' + idx + '" checked></td>';
                 cols.forEach(function(c) {
-                    html += '<td><textarea rows="1" data-field="' + escapeHtml(c.chave) + '">' + escapeHtml(vals[c.chave] || '') + '</textarea></td>';
+                    html += '<td style="padding:3px 6px; border-bottom:1px solid #f0f0f0; white-space:pre-wrap;">' + escapeHtml(vals[c.chave] || '') + '</td>';
                 });
-                html += '<td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>';
-                tr.innerHTML = html;
-                tbody.appendChild(tr);
-                tr.querySelectorAll('textarea[data-field]').forEach(autoGrowTextarea);
+                html += '</tr>';
             });
-            marcarAlterado();
+            html += '</tbody></table></div>';
+            html += '<div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById(\'bancoPicker\').remove();">Cancelar</button> <button class="btn btn-primary" id="bancoPickConfirm">Inserir selecionados</button></div>';
+            html += '</div>';
+            overlay.innerHTML = html;
+            document.body.appendChild(overlay);
+
+            // Handler do botão Inserir
+            document.getElementById('bancoPickConfirm').addEventListener('click', function() {
+                var checks = document.querySelectorAll('.banco-pick-item:checked');
+                if (checks.length === 0) { appAlert('Selecione pelo menos um registo.'); return; }
+                var tbody = wrap.querySelector('.ensaios-tbody');
+                var lastCat2 = '__NONE__';
+                checks.forEach(function(cb) {
+                    var p = params[parseInt(cb.getAttribute('data-idx'))];
+                    if (!p) return;
+                    if (p.categoria && p.categoria !== lastCat2) {
+                        var catTr = document.createElement('tr');
+                        catTr.className = 'cat-header-row';
+                        catTr.setAttribute('data-cat', '1');
+                        catTr.innerHTML = '<td colspan="' + (cols.length + 1) + '" style="background:var(--color-primary-lighter, #e6f4f9); padding:4px 8px; font-weight:600; font-size:12px; color:var(--color-primary, #2596be);"><input type="text" class="cat-header-input" value="' + escapeHtml(p.categoria) + '" style="border:none; background:transparent; font-weight:600; color:var(--color-primary, #2596be); width:calc(100% - 30px); font-size:12px;"><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover" style="float:right;">&times;</button></td>';
+                        tbody.appendChild(catTr);
+                        lastCat2 = p.categoria;
+                    }
+                    var vals = {};
+                    try { vals = typeof p.valores === 'string' ? JSON.parse(p.valores) : (p.valores || {}); } catch(e) {}
+                    var tr = document.createElement('tr');
+                    var rowHtml = '';
+                    cols.forEach(function(c) {
+                        rowHtml += '<td><textarea rows="1" data-field="' + escapeHtml(c.chave) + '">' + escapeHtml(vals[c.chave] || '') + '</textarea></td>';
+                    });
+                    rowHtml += '<td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>';
+                    tr.innerHTML = rowHtml;
+                    tbody.appendChild(tr);
+                    tr.querySelectorAll('textarea[data-field]').forEach(autoGrowTextarea);
+                });
+                marcarAlterado();
+                document.getElementById('bancoPicker').remove();
+            });
         });
     }
 
