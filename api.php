@@ -210,6 +210,15 @@ $handlers = [
     'get_ensaios_legenda'     => 'ensaios',
     'save_ensaios_legenda_global' => 'ensaios',
 
+    // Parametros (tipos custom)
+    'get_parametros_tipos'        => 'parametros',
+    'get_parametros_tipos_all'    => 'parametros',
+    'save_parametro_tipo'         => 'parametros',
+    'delete_parametro_tipo'       => 'parametros',
+    'get_parametros_banco'        => 'parametros',
+    'save_parametro_banco'        => 'parametros',
+    'delete_parametro_banco'      => 'parametros',
+
     // Admin (clientes, produtos, orgs, fornecedores)
     'save_cliente'            => 'admin',
     'save_produto'            => 'admin',

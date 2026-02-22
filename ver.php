@@ -428,6 +428,46 @@ if (!empty($data['defeitos'])) $navItems[] = ['id' => 'sec-defeitos', 'label' =>
                             <p style="font-size:<?= $verLegTam ?>px; color:#888; font-style:italic; margin:3px 0 0 0;"><?= san($verLegenda) ?></p>
                             <?php endif; ?>
                             <?php endif; ?>
+                        <?php elseif ($secTipo === 'parametros_custom'): ?>
+                            <?php
+                            $pcRaw = json_decode($sec['conteudo'] ?? '{}', true);
+                            $pcRows = $pcRaw['rows'] ?? [];
+                            $pcTipoId = $pcRaw['tipo_id'] ?? '';
+                            $pcColWidths = $pcRaw['colWidths'] ?? [];
+                            $pcColunas = [];
+                            $pcLegenda = '';
+                            if ($pcTipoId) {
+                                $stmtPt = $db->prepare('SELECT colunas, legenda FROM parametros_tipos WHERE id = ?');
+                                $stmtPt->execute([(int)$pcTipoId]);
+                                $ptRow = $stmtPt->fetch();
+                                if ($ptRow) { $pcColunas = json_decode($ptRow['colunas'], true) ?: []; $pcLegenda = $ptRow['legenda'] ?? ''; }
+                            }
+                            if (empty($pcColunas) && !empty($pcRows)) {
+                                foreach (array_keys(reset($pcRows)) as $k) $pcColunas[] = ['nome' => $k, 'chave' => $k];
+                            }
+                            $pcCw = count($pcColWidths) ? $pcColWidths : array_fill(0, count($pcColunas), floor(100 / max(1, count($pcColunas))));
+                            ?>
+                            <?php if (!empty($pcRows)): ?>
+                            <table class="doc-table">
+                                <thead><tr>
+                                    <?php foreach ($pcColunas as $ci => $pcCol): ?>
+                                    <th style="width:<?= isset($pcCw[$ci]) ? $pcCw[$ci] : 15 ?>%"><?= san($pcCol['nome']) ?></th>
+                                    <?php endforeach; ?>
+                                </tr></thead>
+                                <tbody>
+                                    <?php foreach ($pcRows as $pcRow): ?>
+                                    <tr>
+                                        <?php foreach ($pcColunas as $pcCol): ?>
+                                        <td><?= nl2br(san($pcRow[$pcCol['chave']] ?? '')) ?></td>
+                                        <?php endforeach; ?>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                            <?php if (!empty($pcLegenda)): ?>
+                            <p style="font-size:9px; color:#888; font-style:italic; margin:3px 0 0 0;"><?= san($pcLegenda) ?></p>
+                            <?php endif; ?>
+                            <?php endif; ?>
                         <?php else: ?>
                             <div class="content"><?php
                                 $secContent = $sec['conteudo'] ?? '';

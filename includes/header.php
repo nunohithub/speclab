@@ -80,12 +80,12 @@ $activeNav = $activeNav ?? '';
     <?php if ($user['role'] === 'super_admin'): ?>
         <a href="<?= BASE_PATH ?>/admin.php?tab=organizacoes" class="nav-item <?= $activeNav === 'organizacoes' ? 'active' : '' ?>">Organizações</a>
         <a href="<?= BASE_PATH ?>/admin.php?tab=legislacao" class="nav-item <?= $activeNav === 'legislacao' ? 'active' : '' ?>">Legislação</a>
-        <a href="<?= BASE_PATH ?>/admin.php?tab=ensaios" class="nav-item <?= $activeNav === 'ensaios' ? 'active' : '' ?>">Ensaios</a>
+        <a href="<?= BASE_PATH ?>/admin.php?tab=parametros" class="nav-item <?= $activeNav === 'parametros' ? 'active' : '' ?>">Parâmetros</a>
         <a href="<?= BASE_PATH ?>/admin.php?tab=configuracoes" class="nav-item <?= $activeNav === 'configuracoes' ? 'active' : '' ?>">Configurações</a>
         <a href="<?= BASE_PATH ?>/admin.php?tab=planos" class="nav-item <?= $activeNav === 'planos' ? 'active' : '' ?>">Planos</a>
     <?php elseif (in_array($user['role'], ['org_admin', 'user'])): ?>
         <a href="<?= BASE_PATH ?>/admin.php?tab=legislacao" class="nav-item <?= $activeNav === 'legislacao' ? 'active' : '' ?>">Legislação</a>
-        <a href="<?= BASE_PATH ?>/admin.php?tab=ensaios" class="nav-item <?= $activeNav === 'ensaios' ? 'active' : '' ?>">Ensaios</a>
+        <a href="<?= BASE_PATH ?>/admin.php?tab=parametros" class="nav-item <?= $activeNav === 'parametros' ? 'active' : '' ?>">Parâmetros</a>
         <?php if ($user['role'] === 'org_admin'): ?>
             <a href="<?= BASE_PATH ?>/admin.php?tab=configuracoes" class="nav-item <?= $activeNav === 'configuracoes' ? 'active' : '' ?>">Configurações</a>
         <?php endif; ?>

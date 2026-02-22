@@ -5,9 +5,10 @@
  */
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
-// Legislacao e Ensaios tabs são acessíveis a todos os utilizadores autenticados
+// Legislacao e Parametros/Ensaios tabs são acessíveis a todos os utilizadores autenticados
 $tab = $_GET['tab'] ?? 'utilizadores';
-if (in_array($tab, ['legislacao', 'ensaios'])) {
+if ($tab === 'ensaios') $tab = 'parametros'; // backward compat
+if (in_array($tab, ['legislacao', 'parametros'])) {
     requireLogin();
 } else {
     requireAdmin();
@@ -516,7 +517,7 @@ $pageTitle = 'Cadernos de Encargos';
 $pageSubtitle = 'Sistema de Especificações Técnicas';
 $showNav = true;
 $activeNav = $tab;
-$tabLabels = ['produtos' => 'Produtos', 'clientes' => 'Clientes', 'fornecedores' => 'Fornecedores', 'utilizadores' => 'Utilizadores', 'organizacoes' => 'Organizações', 'legislacao' => 'Legislação', 'ensaios' => 'Ensaios', 'configuracoes' => 'Configurações', 'planos' => 'Planos'];
+$tabLabels = ['produtos' => 'Produtos', 'clientes' => 'Clientes', 'fornecedores' => 'Fornecedores', 'utilizadores' => 'Utilizadores', 'organizacoes' => 'Organizações', 'legislacao' => 'Legislação', 'parametros' => 'Parâmetros', 'configuracoes' => 'Configurações', 'planos' => 'Planos'];
 $breadcrumbs = [
     ['label' => 'Dashboard', 'url' => BASE_PATH . '/dashboard.php'],
     ['label' => $tabLabels[$tab] ?? ucfirst($tab)]
@@ -1709,15 +1710,79 @@ $breadcrumbs = [
             });
             </script>
 
-        <!-- ENSAIOS (super_admin - editável) -->
-        <?php elseif ($tab === 'ensaios' && $isSuperAdminUser): ?>
+        <!-- PARÂMETROS (super_admin - editável) -->
+        <?php elseif ($tab === 'parametros' && $isSuperAdminUser): ?>
             <div class="flex-between mb-md">
-                <h2>Banco de Ensaios</h2>
+                <h2>Parâmetros</h2>
                 <div style="display:flex; gap:8px;">
-                    <button class="btn btn-secondary" onclick="toggleColunasConfig()">⚙ Configurar Colunas</button>
-                    <button class="btn btn-primary" onclick="document.getElementById('ensaioModal').style.display='flex'; resetEnsaioForm();">+ Novo Ensaio</button>
+                    <button class="btn btn-secondary" id="btnTiposGestao" onclick="toggleTiposPanel()">Gerir Tipos</button>
                 </div>
             </div>
+
+            <!-- Painel de gestão de tipos de parâmetros -->
+            <div id="tiposPanel" style="display:none; margin-bottom:16px;">
+                <div class="card" style="padding:16px;">
+                    <div class="flex-between mb-sm">
+                        <h3 style="margin:0; font-size:15px;">Tipos de Parâmetros</h3>
+                        <button class="btn btn-primary btn-sm" onclick="abrirTipoModal()">+ Novo Tipo</button>
+                    </div>
+                    <p class="muted" style="font-size:12px; margin-bottom:10px;">Crie tipos customizados (ex: Garrafas, Embalagem) com colunas à medida. O tipo "Ensaios" vem por defeito.</p>
+                    <table style="width:100%; font-size:13px;">
+                        <thead><tr><th>Nome</th><th>Slug</th><th>Colunas</th><th>Estado</th><th>Ações</th></tr></thead>
+                        <tbody id="tiposRows"><tr><td colspan="5" class="muted" style="text-align:center; padding:12px;">A carregar...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modal novo/editar tipo -->
+            <div id="tipoModal" class="modal-overlay" style="display:none; background:rgba(0,0,0,0.6);">
+                <div class="modal-box" style="max-width:600px; background:#fff;">
+                    <div class="modal-header">
+                        <h3 id="tipoModalTitle">Novo Tipo de Parâmetro</h3>
+                        <button class="modal-close" onclick="document.getElementById('tipoModal').style.display='none';">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="tipo_id" value="0">
+                        <div class="form-row">
+                            <div class="form-group"><label>Nome</label><input type="text" id="tipo_nome" class="form-control" placeholder="Ex: Garrafas"></div>
+                            <div class="form-group"><label>Slug (auto)</label><input type="text" id="tipo_slug" class="form-control" placeholder="garrafas" readonly style="background:#f3f4f6;"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Legenda</label>
+                            <textarea id="tipo_legenda" class="form-control" rows="2" placeholder="Texto que aparece debaixo da tabela (opcional)"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label><input type="checkbox" id="tipo_ativo" checked> Ativo</label>
+                        </div>
+                        <hr style="margin:12px 0;">
+                        <div class="flex-between mb-sm">
+                            <h4 style="margin:0; font-size:14px;">Colunas</h4>
+                            <button class="btn btn-ghost btn-sm" onclick="adicionarColunaTipo()">+ Coluna</button>
+                        </div>
+                        <div id="tipoColunas"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="document.getElementById('tipoModal').style.display='none';">Cancelar</button>
+                        <button class="btn btn-primary" onclick="guardarTipo()">Guardar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sub-tabs para escolher tipo de parâmetro -->
+            <div id="paramSubTabs" style="display:flex; gap:4px; margin-bottom:16px; flex-wrap:wrap;">
+                <span class="muted" style="font-size:12px; align-self:center; margin-right:4px;">A carregar tipos...</span>
+            </div>
+
+            <!-- Conteúdo do tipo selecionado: Ensaios ou Custom -->
+            <div id="paramEnsaiosContent" style="display:none;">
+                <!-- O banco de ensaios original fica aqui -->
+                <div class="flex-between mb-sm">
+                    <h3 style="margin:0; font-size:16px;" id="paramSubTitle">Ensaios</h3>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-secondary btn-sm" onclick="toggleColunasConfig()">Configurar Colunas</button>
+                        <button class="btn btn-primary btn-sm" onclick="document.getElementById('ensaioModal').style.display='flex'; resetEnsaioForm();">+ Novo Ensaio</button>
+                    </div>
+                </div>
 
             <!-- Painel de configuração de colunas (inicialmente oculto) -->
             <div id="colunasConfigPanel" style="display:none; margin-bottom:16px;">
@@ -2375,13 +2440,344 @@ $breadcrumbs = [
                 });
                 });
             }
-            carregarEnsaios();
+            // Não carregar ensaios automaticamente — esperar seleção de sub-tab
+            </script>
+            </div><!-- /paramEnsaiosContent -->
+
+            <!-- Conteúdo de tipo custom (não-ensaios) -->
+            <div id="paramCustomContent" style="display:none;">
+                <div class="flex-between mb-sm">
+                    <h3 style="margin:0; font-size:16px;" id="customSubTitle">-</h3>
+                    <button class="btn btn-primary btn-sm" onclick="abrirCustomParamModal()">+ Novo Registo</button>
+                </div>
+                <div class="card" style="overflow:auto;">
+                    <table id="customParamTable" style="width:100%; font-size:13px;">
+                        <thead id="customParamHead"><tr><td class="muted" style="text-align:center; padding:12px;">Selecione um tipo.</td></tr></thead>
+                        <tbody id="customParamRows"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Modal novo/editar registo custom -->
+            <div id="customParamModal" class="modal-overlay" style="display:none;">
+                <div class="modal-box modal-box-lg">
+                    <div class="modal-header">
+                        <h3 id="customParamModalTitle">Novo Registo</h3>
+                        <button class="modal-close" onclick="document.getElementById('customParamModal').style.display='none';">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="cp_id" value="0">
+                        <div class="form-group"><label>Categoria</label><input type="text" id="cp_categoria" class="form-control" placeholder="Ex: Grupo A" list="cpCatList"></div>
+                        <div id="cp_campos"></div>
+                        <div class="form-group"><label><input type="checkbox" id="cp_ativo" checked> Ativo</label></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" onclick="guardarCustomParam()">Guardar</button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('customParamModal').style.display='none';">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+            <datalist id="cpCatList"></datalist>
+
+            <script>
+            // === GESTÃO DE TIPOS DE PARÂMETROS ===
+            var paramTipos = [];
+            var tipoAtual = null;
+
+            function toggleTiposPanel() {
+                var p = document.getElementById('tiposPanel');
+                p.style.display = p.style.display === 'none' ? 'block' : 'none';
+                if (p.style.display === 'block') carregarTipos();
+            }
+
+            function carregarTipos() {
+                fetch('<?= BASE_PATH ?>/api.php?action=get_parametros_tipos_all').then(function(r){return r.json();}).then(function(data) {
+                    paramTipos = (data.data && data.data.tipos) || [];
+                    renderTiposTable();
+                    renderSubTabs();
+                });
+            }
+
+            function renderTiposTable() {
+                var tbody = document.getElementById('tiposRows');
+                if (paramTipos.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center; padding:12px;">Nenhum tipo.</td></tr>'; return; }
+                var html = '';
+                paramTipos.forEach(function(t) {
+                    var cols = [];
+                    try { cols = JSON.parse(t.colunas); } catch(e) {}
+                    var colNames = cols.map(function(c) { return c.nome; }).join(', ');
+                    var estado = t.ativo == 1 ? '<span class="pill pill-success">Ativo</span>' : '<span class="pill pill-error">Inativo</span>';
+                    html += '<tr>';
+                    html += '<td><strong>' + escE(t.nome) + '</strong></td>';
+                    html += '<td class="muted" style="font-size:12px;">' + escE(t.slug) + '</td>';
+                    html += '<td class="muted" style="font-size:12px;">' + escE(colNames) + '</td>';
+                    html += '<td>' + estado + '</td>';
+                    html += '<td>';
+                    html += '<button class="btn btn-ghost btn-sm" onclick=\'editarTipo(' + t.id + ')\'>Editar</button>';
+                    if (t.slug !== 'ensaios') html += ' <button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarTipo(' + t.id + ')">Eliminar</button>';
+                    html += '</td></tr>';
+                });
+                tbody.innerHTML = html;
+            }
+
+            function renderSubTabs() {
+                var container = document.getElementById('paramSubTabs');
+                var html = '';
+                paramTipos.filter(function(t) { return t.ativo == 1; }).forEach(function(t) {
+                    var sel = tipoAtual && tipoAtual.id == t.id ? ' btn-primary' : ' btn-secondary';
+                    html += '<button class="btn btn-sm' + sel + '" onclick="selecionarTipo(' + t.id + ')">' + escE(t.nome) + '</button>';
+                });
+                container.innerHTML = html;
+                // Se não há tipo selecionado, selecionar o primeiro
+                if (!tipoAtual && paramTipos.length > 0) {
+                    var first = paramTipos.find(function(t) { return t.ativo == 1; });
+                    if (first) selecionarTipo(first.id);
+                }
+            }
+
+            function selecionarTipo(id) {
+                tipoAtual = paramTipos.find(function(t) { return t.id == id; });
+                if (!tipoAtual) return;
+                renderSubTabs();
+                if (tipoAtual.slug === 'ensaios') {
+                    document.getElementById('paramEnsaiosContent').style.display = 'block';
+                    document.getElementById('paramCustomContent').style.display = 'none';
+                    document.getElementById('paramSubTitle').textContent = tipoAtual.nome;
+                    carregarEnsaios();
+                } else {
+                    document.getElementById('paramEnsaiosContent').style.display = 'none';
+                    document.getElementById('paramCustomContent').style.display = 'block';
+                    document.getElementById('customSubTitle').textContent = tipoAtual.nome;
+                    carregarCustomParams();
+                }
+            }
+
+            // === MODAL TIPO ===
+            function abrirTipoModal() {
+                document.getElementById('tipoModalTitle').textContent = 'Novo Tipo de Parâmetro';
+                document.getElementById('tipo_id').value = '0';
+                document.getElementById('tipo_nome').value = '';
+                document.getElementById('tipo_slug').value = '';
+                document.getElementById('tipo_legenda').value = '';
+                document.getElementById('tipo_ativo').checked = true;
+                renderTipoColunas([{ nome: '', campo: '' }]);
+                document.getElementById('tipoModal').style.display = 'flex';
+            }
+
+            function editarTipo(id) {
+                var t = paramTipos.find(function(x) { return x.id == id; });
+                if (!t) return;
+                document.getElementById('tipoModalTitle').textContent = 'Editar Tipo';
+                document.getElementById('tipo_id').value = t.id;
+                document.getElementById('tipo_nome').value = t.nome;
+                document.getElementById('tipo_slug').value = t.slug;
+                document.getElementById('tipo_legenda').value = t.legenda || '';
+                document.getElementById('tipo_ativo').checked = t.ativo == 1;
+                var cols = [];
+                try { cols = JSON.parse(t.colunas); } catch(e) {}
+                if (cols.length === 0) cols = [{ nome: '', campo: '' }];
+                renderTipoColunas(cols);
+                document.getElementById('tipoModal').style.display = 'flex';
+            }
+
+            function renderTipoColunas(cols) {
+                var html = '';
+                cols.forEach(function(c, i) {
+                    html += '<div class="form-row" style="align-items:flex-end; margin-bottom:4px;">';
+                    html += '<div class="form-group" style="flex:2;"><input type="text" class="form-control tipo-col-nome" value="' + escE(c.nome) + '" placeholder="Nome da coluna"></div>';
+                    html += '<div class="form-group" style="flex:1;"><input type="text" class="form-control tipo-col-chave" value="' + escE(c.chave || '') + '" placeholder="chave (auto)" style="font-size:12px; color:#667;"></div>';
+                    html += '<button class="btn btn-ghost btn-sm" style="color:#b42318; margin-bottom:12px;" onclick="this.parentElement.remove();">x</button>';
+                    html += '</div>';
+                });
+                document.getElementById('tipoColunas').innerHTML = html;
+            }
+
+            function adicionarColunaTipo() {
+                var div = document.createElement('div');
+                div.className = 'form-row';
+                div.style.cssText = 'align-items:flex-end; margin-bottom:4px;';
+                div.innerHTML = '<div class="form-group" style="flex:2;"><input type="text" class="form-control tipo-col-nome" value="" placeholder="Nome da coluna"></div><div class="form-group" style="flex:1;"><input type="text" class="form-control tipo-col-chave" value="" placeholder="chave (auto)" style="font-size:12px; color:#667;"></div><button class="btn btn-ghost btn-sm" style="color:#b42318; margin-bottom:12px;" onclick="this.parentElement.remove();">x</button>';
+                document.getElementById('tipoColunas').appendChild(div);
+            }
+
+            // Auto-gerar slug a partir do nome
+            document.getElementById('tipo_nome').addEventListener('input', function() {
+                if (document.getElementById('tipo_id').value === '0') {
+                    document.getElementById('tipo_slug').value = this.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+                }
+            });
+
+            function guardarTipo() {
+                var colunas = [];
+                var nomes = document.querySelectorAll('.tipo-col-nome');
+                var chaves = document.querySelectorAll('.tipo-col-chave');
+                for (var i = 0; i < nomes.length; i++) {
+                    var nome = nomes[i].value.trim();
+                    if (!nome) continue;
+                    colunas.push({ nome: nome, chave: chaves[i] ? chaves[i].value.trim() : '' });
+                }
+                if (colunas.length === 0) { appAlert('Defina pelo menos uma coluna.'); return; }
+                fetch('<?= BASE_PATH ?>/api.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                    body: JSON.stringify({
+                        action: 'save_parametro_tipo',
+                        id: parseInt(document.getElementById('tipo_id').value),
+                        nome: document.getElementById('tipo_nome').value,
+                        slug: document.getElementById('tipo_slug').value,
+                        colunas: colunas,
+                        legenda: document.getElementById('tipo_legenda').value,
+                        ativo: document.getElementById('tipo_ativo').checked ? 1 : 0
+                    })
+                }).then(function(r){return r.json();}).then(function(data) {
+                    if (data.success) {
+                        document.getElementById('tipoModal').style.display = 'none';
+                        carregarTipos();
+                    } else appAlert(data.error || 'Erro ao guardar tipo.');
+                });
+            }
+
+            function eliminarTipo(id) {
+                appConfirmDanger('Eliminar este tipo de parâmetro e todos os seus registos?', function() {
+                    fetch('<?= BASE_PATH ?>/api.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                        body: JSON.stringify({ action: 'delete_parametro_tipo', id: id })
+                    }).then(function(r){return r.json();}).then(function(data) {
+                        if (data.success) { tipoAtual = null; carregarTipos(); }
+                        else appAlert(data.error || 'Erro.');
+                    });
+                });
+            }
+
+            // === PARAMETROS CUSTOM (banco) ===
+            var customParams = [];
+
+            function carregarCustomParams() {
+                if (!tipoAtual) return;
+                fetch('<?= BASE_PATH ?>/api.php?action=get_parametros_banco&tipo_id=' + tipoAtual.id).then(function(r){return r.json();}).then(function(data) {
+                    customParams = (data.data && data.data.parametros) || [];
+                    renderCustomParamTable();
+                });
+            }
+
+            function renderCustomParamTable() {
+                if (!tipoAtual) return;
+                var cols = [];
+                try { cols = JSON.parse(tipoAtual.colunas); } catch(e) {}
+                // Thead
+                var theadHtml = '<tr><th>Categoria</th>';
+                cols.forEach(function(c) { theadHtml += '<th>' + escE(c.nome) + '</th>'; });
+                theadHtml += '<th>Estado</th><th>Ações</th></tr>';
+                document.getElementById('customParamHead').innerHTML = theadHtml;
+                // Tbody
+                var tbody = document.getElementById('customParamRows');
+                if (customParams.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="' + (cols.length + 3) + '" class="muted" style="text-align:center; padding:20px;">Nenhum registo.</td></tr>';
+                    return;
+                }
+                var html = '', cats = new Set(), lastCat = '';
+                customParams.forEach(function(r) {
+                    if (r.categoria) cats.add(r.categoria);
+                    var vals = {};
+                    try { vals = typeof r.valores === 'string' ? JSON.parse(r.valores) : (r.valores || {}); } catch(e) {}
+                    var inativo = r.ativo == 0;
+                    html += '<tr' + (inativo ? ' style="opacity:0.5;"' : '') + '>';
+                    html += '<td>' + (r.categoria && r.categoria !== lastCat ? '<strong>' + escE(r.categoria) + '</strong>' : '<span class="muted" style="font-size:12px;">〃</span>') + '</td>';
+                    lastCat = r.categoria;
+                    cols.forEach(function(c) {
+                        html += '<td><span class="muted" style="font-size:12px;">' + escE(vals[c.chave] || '') + '</span></td>';
+                    });
+                    html += '<td>' + (inativo ? '<span class="pill pill-error">Inativo</span>' : '<span class="pill pill-success">Ativo</span>') + '</td>';
+                    html += '<td><button class="btn btn-ghost btn-sm" onclick=\'editCustomParam(' + r.id + ')\'>Editar</button> ';
+                    html += '<button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarCustomParam(' + r.id + ')">Eliminar</button></td></tr>';
+                });
+                tbody.innerHTML = html;
+                var dl = document.getElementById('cpCatList'); dl.innerHTML = '';
+                cats.forEach(function(c) { var o = document.createElement('option'); o.value = c; dl.appendChild(o); });
+            }
+
+            function abrirCustomParamModal() {
+                if (!tipoAtual) return;
+                document.getElementById('customParamModalTitle').textContent = 'Novo Registo — ' + tipoAtual.nome;
+                document.getElementById('cp_id').value = '0';
+                document.getElementById('cp_categoria').value = '';
+                document.getElementById('cp_ativo').checked = true;
+                renderCpCampos({});
+                document.getElementById('customParamModal').style.display = 'flex';
+            }
+
+            function editCustomParam(id) {
+                var r = customParams.find(function(x) { return x.id == id; });
+                if (!r) return;
+                document.getElementById('customParamModalTitle').textContent = 'Editar Registo — ' + tipoAtual.nome;
+                document.getElementById('cp_id').value = r.id;
+                document.getElementById('cp_categoria').value = r.categoria || '';
+                document.getElementById('cp_ativo').checked = r.ativo != 0;
+                var vals = {};
+                try { vals = typeof r.valores === 'string' ? JSON.parse(r.valores) : (r.valores || {}); } catch(e) {}
+                renderCpCampos(vals);
+                document.getElementById('customParamModal').style.display = 'flex';
+            }
+
+            function renderCpCampos(vals) {
+                if (!tipoAtual) return;
+                var cols = [];
+                try { cols = JSON.parse(tipoAtual.colunas); } catch(e) {}
+                var html = '<div class="form-row">';
+                cols.forEach(function(c) {
+                    html += '<div class="form-group"><label>' + escE(c.nome) + '</label><input type="text" class="form-control cp-chave" data-chave="' + escE(c.chave) + '" value="' + escE(vals[c.chave] || '') + '"></div>';
+                });
+                html += '</div>';
+                document.getElementById('cp_campos').innerHTML = html;
+            }
+
+            function guardarCustomParam() {
+                if (!tipoAtual) return;
+                var valores = {};
+                document.querySelectorAll('.cp-chave').forEach(function(el) {
+                    valores[el.getAttribute('data-chave')] = el.value;
+                });
+                fetch('<?= BASE_PATH ?>/api.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                    body: JSON.stringify({
+                        action: 'save_parametro_banco',
+                        id: parseInt(document.getElementById('cp_id').value),
+                        tipo_id: tipoAtual.id,
+                        categoria: document.getElementById('cp_categoria').value,
+                        valores: valores,
+                        ativo: document.getElementById('cp_ativo').checked ? 1 : 0
+                    })
+                }).then(function(r){return r.json();}).then(function(data) {
+                    if (data.success) {
+                        document.getElementById('customParamModal').style.display = 'none';
+                        carregarCustomParams();
+                    } else appAlert(data.error || 'Erro ao guardar.');
+                });
+            }
+
+            function eliminarCustomParam(id) {
+                appConfirmDanger('Eliminar este registo?', function() {
+                    fetch('<?= BASE_PATH ?>/api.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                        body: JSON.stringify({ action: 'delete_parametro_banco', id: id })
+                    }).then(function(r){return r.json();}).then(function(data) {
+                        if (data.success) carregarCustomParams();
+                        else appAlert(data.error || 'Erro.');
+                    });
+                });
+            }
+
+            // Iniciar: carregar tipos
+            carregarTipos();
             </script>
 
-        <!-- ENSAIOS (org_admin / user - read-only) -->
-        <?php elseif ($tab === 'ensaios' && !$isSuperAdminUser): ?>
+        <!-- PARÂMETROS (org_admin / user - read-only) -->
+        <?php elseif ($tab === 'parametros' && !$isSuperAdminUser): ?>
             <div class="flex-between mb-md">
-                <h2>Banco de Ensaios</h2>
+                <h2>Parâmetros</h2>
                 <?php if ($user['role'] === 'org_admin'): ?>
                 <button class="btn btn-secondary btn-sm" onclick="toggleLegendaPanel()">Legenda da Tabela</button>
                 <?php endif; ?>
