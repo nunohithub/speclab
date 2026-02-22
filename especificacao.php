@@ -1017,7 +1017,7 @@ $breadcrumbs = [
             <?php if (!$saOutraOrg): ?>
             <button class="tab" data-tab="partilha">Partilha</button>
             <button class="tab" data-tab="historico">Histórico<?php if (!empty($nNovasDecisoes)): ?> <span style="background:var(--color-primary); color:#fff; font-size:10px; padding:1px 6px; border-radius:10px; margin-left:4px;"><?= $nNovasDecisoes ?></span><?php endif; ?></button>
-            <button class="tab" data-tab="configuracoes">Configurações</button>
+            <button class="tab" data-tab="configuracoes">Aspeto PDF / Online</button>
             <?php endif; ?>
         </div>
         </div><!-- /.sticky-header -->
