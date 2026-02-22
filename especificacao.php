@@ -1350,7 +1350,16 @@ $breadcrumbs = [
                                             }
                                         }
                                     }
-                                    $pcColW = count($pcColWidths) ? $pcColWidths : array_fill(0, count($pcColunas), floor(90 / max(1, count($pcColunas))));
+                                    // Se colWidths não corresponde ao nº de colunas, usar largura do tipo ou recalcular
+                                    if (count($pcColWidths) === count($pcColunas)) {
+                                        $pcColW = $pcColWidths;
+                                    } else {
+                                        $pcColW = [];
+                                        $defW = floor(90 / max(1, count($pcColunas)));
+                                        foreach ($pcColunas as $pc) {
+                                            $pcColW[] = $pc['largura'] ?? $defW;
+                                        }
+                                    }
                                 ?>
                                 <div class="seccao-block" data-seccao-idx="<?= $i ?>" data-tipo="parametros" data-tipo-id="<?= (int)$pcTipoId ?>" data-tipo-slug="<?= sanitize($pcTipoSlug) ?>" data-nivel="<?= (int)($sec['nivel'] ?? 1) ?>">
                                     <div class="seccao-header">
@@ -4168,9 +4177,13 @@ $breadcrumbs = [
                     });
                 }
                 var pcColWidths = [];
-                var pcThs = block.querySelectorAll('.seccao-ensaios-table thead th');
+                var pcTbl = block.querySelector('.seccao-ensaios-table');
+                var pcThs = pcTbl ? pcTbl.querySelectorAll('thead th') : [];
+                var pcTblW = pcTbl ? pcTbl.offsetWidth : 1;
                 for (var pi = 0; pi < pcThs.length - 1; pi++) {
-                    pcColWidths.push(parseFloat(pcThs[pi].style.width) || 0);
+                    var w = parseFloat(pcThs[pi].style.width);
+                    if (!w || isNaN(w)) w = (pcThs[pi].offsetWidth / pcTblW * 100);
+                    pcColWidths.push(Math.round(w * 10) / 10);
                 }
                 conteudo = JSON.stringify({ tipo_id: pcTipoId, tipo_slug: pcTipoSlug, colWidths: pcColWidths, rows: pcRows });
             } else if (tipo === 'ficheiros') {
