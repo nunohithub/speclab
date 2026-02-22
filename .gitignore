@@ -20,6 +20,12 @@ Thumbs.db
 
 # Logs
 *.log
+logs/*
+!logs/.gitkeep
 
 # Debug temporário
 tmp/
+
+# Backups da base de dados
+backups/*
+!backups/.gitkeep

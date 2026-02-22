@@ -159,5 +159,28 @@ Pedir confirmação apenas quando:
 - for mexer em uploads
 - for alterar credenciais ou config sensível
 
+## Deploy (obrigatório após cada ciclo)
+
+Após cada alteração, os ficheiros devem ficar prontos em DOIS ambientes:
+1. **Local (MAMP):** copiar para `/Applications/MAMP/htdocs/especificacoes/`
+2. **Servidor:** o utilizador copia manualmente via FTP do local para o servidor online
+
+O utilizador testa no servidor online (speclab.pt), não no MAMP.
+Todas as alterações de código devem ser feitas no projeto local E copiadas para MAMP.
+
+## Servidor de Produção
+
+- **URL:** https://speclab.pt/
+- **Hosting:** WebTuga (cPanel, shared hosting)
+- **PHP:** 8.2
+- **BD:** MySQL (localhost, sem porta)
+- **BD nome:** exipt_speclab
+- **BD user:** exipt_speclab
+- **BASE_PATH:** vazio (site na raiz do domínio, não em /especificacoes/)
+- **Config:** usa `.env` na raiz com variáveis de ambiente
+- **Deploy:** manual via FTP (utilizador copia ficheiros)
+- **SSL:** ativo
+- **Diferenças do local:** DB_PORT vazio (local usa 8889), BASE_PATH vazio (local usa /especificacoes)
+
 
 

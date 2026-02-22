@@ -248,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $updateParams = [$nome, $slug, $nif, $morada, $telefone, $email, $website, $cor_primaria, $cor_primaria_dark, $cor_primaria_light, $numeracao_prefixo, $tem_clientes, $tem_fornecedores, $plano, $max_utilizadores, $max_especificacoes, $ativo, $email_speclab, $email_permitido_users];
             if ($email_speclab_pass !== '') {
                 $updateSql .= ', email_speclab_pass=?';
-                $updateParams[] = $email_speclab_pass;
+                $updateParams[] = encryptValue($email_speclab_pass);
             }
             $updateSql .= ' WHERE id=?';
             $updateParams[] = $oid;
@@ -261,7 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $slug .= '-' . time();
             }
             $db->prepare('INSERT INTO organizacoes (nome, slug, nif, morada, telefone, email, website, cor_primaria, cor_primaria_dark, cor_primaria_light, numeracao_prefixo, tem_clientes, tem_fornecedores, plano, max_utilizadores, max_especificacoes, ativo, email_speclab, email_speclab_pass, email_permitido_users) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-                ->execute([$nome, $slug, $nif, $morada, $telefone, $email, $website, $cor_primaria, $cor_primaria_dark, $cor_primaria_light, $numeracao_prefixo, $tem_clientes, $tem_fornecedores, $plano, $max_utilizadores, $max_especificacoes, $ativo, $email_speclab, $email_speclab_pass, $email_permitido_users]);
+                ->execute([$nome, $slug, $nif, $morada, $telefone, $email, $website, $cor_primaria, $cor_primaria_dark, $cor_primaria_light, $numeracao_prefixo, $tem_clientes, $tem_fornecedores, $plano, $max_utilizadores, $max_especificacoes, $ativo, $email_speclab, encryptValue($email_speclab_pass), $email_permitido_users]);
             $oid = (int)$db->lastInsertId();
         }
 
@@ -376,11 +376,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'save_config' && $isSuperAdminUser) {
         // Campos sensíveis: não gravar se vazio (manter valor atual)
         $sensitiveKeys = ['smtp_pass', 'openai_api_key'];
+        // Campos que devem ser encriptados antes de guardar
+        $encryptKeys = ['smtp_pass'];
         foreach ($_POST as $key => $value) {
             if (strpos($key, 'cfg_') === 0) {
                 $chave = substr($key, 4);
                 if (in_array($chave, $sensitiveKeys) && trim($value) === '') continue;
-                setConfiguracao($chave, trim($value));
+                $val = trim($value);
+                if (in_array($chave, $encryptKeys) && $val !== '') {
+                    $val = encryptValue($val);
+                }
+                setConfiguracao($chave, $val);
             }
         }
         header('Location: ' . BASE_PATH . '/admin.php?tab=configuracoes&msg=Configura%C3%A7%C3%B5es+guardadas');
@@ -449,7 +455,7 @@ if ($action === 'save_org_email' && $user['role'] === 'org_admin' && $orgId) {
         $params = [$orgEmailSpeclab];
         if ($orgEmailPass !== '') {
             $sql .= ', email_speclab_pass = ?';
-            $params[] = $orgEmailPass;
+            $params[] = encryptValue($orgEmailPass);
         }
         $sql .= ' WHERE id = ?';
         $params[] = $orgId;

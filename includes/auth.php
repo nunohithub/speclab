@@ -14,6 +14,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/logger.php';
+require_once __DIR__ . '/crypto.php';
 
 // =============================================
 // RATE LIMITING (sessão)
@@ -25,7 +27,10 @@ function checkRateLimit(string $key, int $maxPerHour = 20): bool {
     if (!isset($_SESSION[$sessionKey])) $_SESSION[$sessionKey] = [];
     // Limpar entradas com mais de 1h
     $_SESSION[$sessionKey] = array_filter($_SESSION[$sessionKey], function($t) use ($now) { return ($now - $t) < 3600; });
-    if (count($_SESSION[$sessionKey]) >= $maxPerHour) return false;
+    if (count($_SESSION[$sessionKey]) >= $maxPerHour) {
+        AppLogger::security('Rate limit exceeded', ['key' => $key]);
+        return false;
+    }
     $_SESSION[$sessionKey][] = $now;
     return true;
 }
@@ -43,7 +48,11 @@ function getCsrfToken(): string {
 
 function validateCsrf(): bool {
     $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['csrf_token'] ?? '';
-    return $token !== '' && hash_equals(getCsrfToken(), $token);
+    $valid = $token !== '' && hash_equals(getCsrfToken(), $token);
+    if (!$valid) {
+        AppLogger::security('CSRF validation failed', ['uri' => $_SERVER['REQUEST_URI'] ?? '']);
+    }
+    return $valid;
 }
 
 // =============================================
@@ -195,9 +204,41 @@ function sanitizeRichText(string $html): string {
     $html = str_ireplace('</div>', '', $html);
     $html = preg_replace('/<\/p>\s*/i', '<br>', $html);
     $html = preg_replace('/<p[^>]*>/i', '', $html);
-    $html = strip_tags($html, '<b><strong><u><span><br><em><i><ul><ol><li>');
-    // Remover TODOS os atributos das tags (previne XSS via onmouseover, onclick, style, etc.)
-    $html = preg_replace('/<(\w+)\s+[^>]*>/i', '<$1>', $html);
+    $html = strip_tags($html, '<b><strong><u><span><br><em><i><ul><ol><li><table><thead><tbody><tfoot><tr><th><td><colgroup><col>');
+    // Sanitizar atributos: permitir style seguro em tags de tabela, colspan/rowspan em td/th
+    $html = preg_replace_callback('/<(\w+)(\s+[^>]*)>/i', function($m) {
+        $tag = strtolower($m[1]);
+        $attrs = $m[2];
+        $tableTags = ['table','thead','tbody','tfoot','tr','th','td','col','colgroup'];
+        if (!in_array($tag, $tableTags)) {
+            return '<' . $m[1] . '>';
+        }
+        $safe = [];
+        // Permitir style com propriedades CSS seguras
+        if (preg_match('/style\s*=\s*"([^"]*)"/i', $attrs, $sm)) {
+            $cssProps = [];
+            $allowed = ['width','min-width','max-width','height','text-align','vertical-align','border','border-collapse','border-spacing','padding','background-color','color'];
+            foreach (explode(';', $sm[1]) as $decl) {
+                $decl = trim($decl);
+                if (!$decl) continue;
+                $parts = explode(':', $decl, 2);
+                if (count($parts) === 2 && in_array(trim(strtolower($parts[0])), $allowed)) {
+                    $val = trim($parts[1]);
+                    // Bloquear expression(), url(), javascript:
+                    if (!preg_match('/expression|url\s*\(|javascript/i', $val)) {
+                        $cssProps[] = trim($parts[0]) . ':' . $val;
+                    }
+                }
+            }
+            if ($cssProps) $safe[] = 'style="' . implode('; ', $cssProps) . '"';
+        }
+        // Permitir colspan e rowspan em td/th
+        if (in_array($tag, ['td','th'])) {
+            if (preg_match('/colspan\s*=\s*"(\d+)"/i', $attrs, $cm)) $safe[] = 'colspan="' . $cm[1] . '"';
+            if (preg_match('/rowspan\s*=\s*"(\d+)"/i', $attrs, $rm)) $safe[] = 'rowspan="' . $rm[1] . '"';
+        }
+        return '<' . $m[1] . ($safe ? ' ' . implode(' ', $safe) : '') . '>';
+    }, $html);
     $html = preg_replace('/^(<br\s*\/?>)+/i', '', $html);
     $html = preg_replace('/(<br\s*\/?>){3,}/i', '<br><br>', $html);
     return trim($html);

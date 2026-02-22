@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $db->prepare('SELECT COUNT(*) FROM login_attempts WHERE ip = ? AND attempted_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)');
             $stmt->execute([$ip]);
             if ((int)$stmt->fetchColumn() >= 5) {
+                AppLogger::security('Rate limit exceeded', ['username' => $username, 'ip' => $ip]);
                 $error = 'Demasiadas tentativas. Aguarde 15 minutos.';
             }
 
@@ -43,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($user && password_verify($password, $user['password'])) {
                     if (!$user['ativo']) {
+                        AppLogger::security('Login attempt on disabled account', ['username' => $username, 'user_id' => $user['id']]);
                         $error = 'Conta desativada. Contacte o administrador.';
                     } else {
                         // Login OK - limpar tentativas
@@ -58,12 +60,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         session_regenerate_id(true);
                         setUserSession($user, $org);
 
+                        AppLogger::info('User logged in', ['user_id' => $user['id'], 'username' => $user['username']]);
+
                         header('Location: ' . BASE_PATH . '/dashboard.php');
                         exit;
                     }
                 } else {
                     // Registar tentativa falhada
                     $db->prepare('INSERT INTO login_attempts (ip, username) VALUES (?, ?)')->execute([$ip, $username]);
+                    AppLogger::security('Failed login', ['username' => $username, 'ip' => $ip]);
                     $error = 'Utilizador ou palavra-passe incorretos.';
                 }
             }

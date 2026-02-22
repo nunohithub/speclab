@@ -26,7 +26,7 @@ function getSmtpConfig(PDO $db, int $especificacaoId): array {
             'host' => $org['smtp_host'],
             'port' => $org['smtp_port'] ?: 587,
             'user' => $org['smtp_user'],
-            'pass' => $org['smtp_pass'],
+            'pass' => decryptValue($org['smtp_pass'] ?? ''),
             'from' => $org['smtp_from'] ?: $org['smtp_user'],
             'from_name' => $org['smtp_from_name'] ?: $org['org_nome'],
         ];
@@ -38,7 +38,7 @@ function getSmtpConfig(PDO $db, int $especificacaoId): array {
             'host' => 'mail.speclab.pt',
             'port' => 587,
             'user' => $org['email_speclab'],
-            'pass' => $org['email_speclab_pass'],
+            'pass' => decryptValue($org['email_speclab_pass'] ?? ''),
             'from' => $org['email_speclab'],
             'from_name' => $org['org_nome'],
         ];
@@ -52,7 +52,7 @@ function getSmtpConfig(PDO $db, int $especificacaoId): array {
             'host' => $globalHost,
             'port' => getConfiguracao('smtp_port', '465'),
             'user' => $globalUser,
-            'pass' => getConfiguracao('smtp_pass'),
+            'pass' => decryptValue(getConfiguracao('smtp_pass')),
             'from' => getConfiguracao('smtp_from') ?: $globalUser,
             'from_name' => getConfiguracao('smtp_from_name', 'SpecLab'),
         ];
