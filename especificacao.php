@@ -1441,9 +1441,18 @@ $breadcrumbs = [
                                                 <?php endforeach; ?>
                                             </tbody>
                                         </table>
-                                        <?php if ($pcLegenda): ?>
-                                        <div class="ensaios-legenda" style="font-size:<?= $pcLegTam ?>px; color:#666; font-style:italic; margin-top:4px; padding:2px 4px;"><?= sanitize($pcLegenda) ?></div>
-                                        <?php endif; ?>
+                                        <?php
+                                            $specLeg = $espec['legenda_parametros'] ?? '';
+                                            $specLegTam = (int)($espec['legenda_parametros_tamanho'] ?? 0);
+                                            $legText = $specLeg !== '' ? $specLeg : $pcLegenda;
+                                            $legSize = $specLegTam > 0 ? $specLegTam : $pcLegTam;
+                                        ?>
+                                        <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+                                            <label style="font-size:11px; color:#888; white-space:nowrap;">Legenda:</label>
+                                            <input type="text" class="param-legenda-text" value="<?= sanitize($legText) ?>" placeholder="Texto da legenda (opcional)" style="flex:1; font-size:12px; font-style:italic; padding:3px 6px; border:1px solid var(--color-border); border-radius:4px;">
+                                            <label style="font-size:11px; color:#888; white-space:nowrap;">Tam:</label>
+                                            <input type="number" class="param-legenda-tam" value="<?= $legSize ?>" min="6" max="14" style="width:55px; font-size:12px; padding:3px 4px; border:1px solid var(--color-border); border-radius:4px;">
+                                        </div>
                                         <div class="seccao-ensaios-actions">
                                             <button class="btn btn-secondary btn-sm" onclick="adicionarParamCatLinha(this, <?= (int)$pcTipoId ?>)">+ Categoria</button>
                                             <button class="btn btn-secondary btn-sm" onclick="adicionarParamCustomLinha(this, <?= (int)$pcTipoId ?>)">+ Linha</button>
@@ -4129,9 +4138,17 @@ $breadcrumbs = [
             senha_publica: (document.getElementById('senha_publica') || {}).value || '',
             codigo_acesso: (document.getElementById('codigo_acesso') || {}).value || '',
             config_visual: JSON.stringify(recolherConfigVisual()),
+            legenda_parametros: '',
+            legenda_parametros_tamanho: 9,
             seccoes: [],
             parametros: []
         };
+
+        // Legenda de parâmetros (do primeiro bloco de parâmetros encontrado)
+        var legInput = document.querySelector('.param-legenda-text');
+        var legTamInput = document.querySelector('.param-legenda-tam');
+        if (legInput) data.legenda_parametros = legInput.value;
+        if (legTamInput) data.legenda_parametros_tamanho = parseInt(legTamInput.value) || 9;
 
         // Secções dinâmicas (texto + ensaios)
         document.querySelectorAll('#seccoesContainer .seccao-block').forEach(function(block, i) {
@@ -4236,35 +4253,6 @@ $breadcrumbs = [
                 tipo: tipo,
                 ordem: i,
                 nivel: parseInt(block.getAttribute('data-nivel')) || 1
-            });
-        });
-
-        // Classes
-        document.querySelectorAll('#classRows .class-row').forEach(function(row) {
-            var inputs = row.querySelectorAll('input');
-            if (inputs.length >= 3) {
-                data.classes.push({
-                    id: row.getAttribute('data-class-id') || '',
-                    classe: inputs[0].value,
-                    defeitos_max: inputs[1].value,
-                    descricao: inputs[2].value
-                });
-            }
-        });
-
-        // Defeitos
-        ['critico', 'maior', 'menor'].forEach(function(sev) {
-            var containerId = 'defectRows' + sev.charAt(0).toUpperCase() + sev.slice(1);
-            document.querySelectorAll('#' + containerId + ' .defect-row').forEach(function(row) {
-                var inputs = row.querySelectorAll('input');
-                if (inputs.length >= 2) {
-                    data.defeitos.push({
-                        id: row.getAttribute('data-defect-id') || '',
-                        severidade: sev,
-                        nome: inputs[0].value,
-                        descricao: inputs[1].value
-                    });
-                }
             });
         });
 

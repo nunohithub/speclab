@@ -60,6 +60,8 @@ switch ($action) {
         $observacoes    = sanitizeRichText($_POST['observacoes'] ?? '');
         $config_visual  = $_POST['config_visual'] ?? null;
         $legislacao_json = $_POST['legislacao_json'] ?? null;
+        $legenda_parametros = sanitize($_POST['legenda_parametros'] ?? '');
+        $legenda_parametros_tamanho = (int)($_POST['legenda_parametros_tamanho'] ?? 0) ?: null;
 
         // Validacao basica
         if ($titulo === '') {
@@ -93,6 +95,7 @@ switch ($action) {
                     objetivo, ambito, definicao_material, regulamentacao,
                     processos, embalagem, aceitacao, arquivo_texto,
                     indemnizacao, observacoes, config_visual, legislacao_json,
+                    legenda_parametros, legenda_parametros_tamanho,
                     criado_por, organizacao_id, created_at, updated_at
                 ) VALUES (
                     ?, ?, ?, ?, ?, ?,
@@ -100,6 +103,7 @@ switch ($action) {
                     ?, ?, ?, ?,
                     ?, ?, ?, ?,
                     ?, ?, ?, ?,
+                    ?, ?,
                     ?, ?, NOW(), NOW()
                 )
             ');
@@ -109,6 +113,7 @@ switch ($action) {
                 $objetivo, $ambito, $definicao_material, $regulamentacao,
                 $processos, $embalagem, $aceitacao, $arquivo_texto,
                 $indemnizacao, $observacoes, $config_visual, $legislacao_json,
+                $legenda_parametros, $legenda_parametros_tamanho,
                 $user['id'], $user['org_id'],
             ]);
 
@@ -148,6 +153,7 @@ switch ($action) {
                     objetivo = ?, ambito = ?, definicao_material = ?, regulamentacao = ?,
                     processos = ?, embalagem = ?, aceitacao = ?, arquivo_texto = ?,
                     indemnizacao = ?, observacoes = ?, config_visual = ?, legislacao_json = ?,
+                    legenda_parametros = ?, legenda_parametros_tamanho = ?,
                     updated_at = NOW()
                     ' . $passwordUpdate . $codigoUpdate . '
                 WHERE id = ?
@@ -158,6 +164,7 @@ switch ($action) {
                 $objetivo, $ambito, $definicao_material, $regulamentacao,
                 $processos, $embalagem, $aceitacao, $arquivo_texto,
                 $indemnizacao, $observacoes, $config_visual, $legislacao_json,
+                $legenda_parametros, $legenda_parametros_tamanho,
             ];
             $executeParams = array_merge($executeParams, $extraParams, [$id]);
             $stmt->execute($executeParams);

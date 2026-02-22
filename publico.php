@@ -374,6 +374,9 @@ $L = $labels[$lang] ?? $labels['pt'];
                                 $ptRow = $stmtPt->fetch();
                                 if ($ptRow) { $pcColunas = json_decode($ptRow['colunas'], true) ?: []; $pcLegenda = $ptRow['legenda'] ?? ''; $pcLegTam = (int)($ptRow['legenda_tamanho'] ?? 9); }
                             }
+                            // Override por especificação
+                            if (!empty($espec['legenda_parametros'])) { $pcLegenda = $espec['legenda_parametros']; }
+                            if (!empty($espec['legenda_parametros_tamanho'])) { $pcLegTam = (int)$espec['legenda_parametros_tamanho']; }
                             if (empty($pcColunas) && !empty($pcRows)) {
                                 $firstDataRow = null; foreach ($pcRows as $pr) { if (!isset($pr['_cat'])) { $firstDataRow = $pr; break; } }
                                 if ($firstDataRow) { foreach (array_keys($firstDataRow) as $k) { if ($k !== '_cat') $pcColunas[] = ['nome' => $k, 'chave' => $k]; } }
