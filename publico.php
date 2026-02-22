@@ -8,6 +8,12 @@ require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/versioning.php';
 
+// Security headers
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+
 // Suporta acesso por código (?code=XXX) ou token individual (?token=XXX)
 $code = $_GET['code'] ?? '';
 $tokenStr = $_GET['token'] ?? '';
@@ -159,6 +165,8 @@ $L = $labels[$lang] ?? $labels['pt'];
             padding-bottom: 6px; margin-bottom: 12px;
         }
         .doc-section .content { font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+        .doc-section-sub { margin-left: 24px; border-left: 3px solid <?= $corPrimaria ?>; padding-left: 16px; }
+        .doc-section-sub h3 { font-size: 13px; color: <?= $corPrimaria ?>; border-bottom: 1px solid <?= $corPrimariaLight ?>; padding-bottom: 5px; margin-bottom: 10px; }
         .doc-meta {
             display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
             background: #f3f4f6; padding: 12px; border-radius: 8px; font-size: 12px;
@@ -263,12 +271,21 @@ $L = $labels[$lang] ?? $labels['pt'];
             </div>
 
             <!-- Secções -->
-            <?php if (!empty($data['seccoes'])): ?>
+            <?php if (!empty($data['seccoes'])):
+                $hierNumbers = []; $mainC = 0; $subC = 0;
+                foreach ($data['seccoes'] as $si => $s) {
+                    $niv = (int)($s['nivel'] ?? 1);
+                    if ($niv === 1) { $mainC++; $subC = 0; $hierNumbers[$si] = $mainC . '.'; }
+                    else { $subC++; $hierNumbers[$si] = $mainC . '.' . $subC . '.'; }
+                }
+            ?>
                 <?php foreach ($data['seccoes'] as $i => $sec):
                     $secTipo = $sec['tipo'] ?? 'texto';
+                    $secNivel = (int)($sec['nivel'] ?? 1);
+                    $secNum = $hierNumbers[$i] ?? ($i + 1) . '.';
                 ?>
-                    <div class="doc-section">
-                        <h2><?= ($i + 1) . '. ' . san($sec['titulo']) ?></h2>
+                    <div class="doc-section<?= $secNivel === 2 ? ' doc-section-sub' : '' ?>">
+                        <<?= $secNivel === 2 ? 'h3' : 'h2' ?>><?= $secNum . ' ' . san($sec['titulo']) ?></<?= $secNivel === 2 ? 'h3' : 'h2' ?>>
                         <?php if ($secTipo === 'ensaios'): ?>
                             <?php
                             $ensaiosRaw = json_decode($sec['conteudo'] ?? '[]', true);
@@ -281,13 +298,9 @@ $L = $labels[$lang] ?? $labels['pt'];
                                 $colWidths = [20, 22, 18, 13, 13, 10];
                                 $merges = [];
                             }
-                            if (count($colWidths) >= 6) {
-                                $outCw = array_slice($colWidths, 1, 5);
-                                $colShift = 1;
-                            } else {
-                                $outCw = array_slice($colWidths, 0, 5);
-                                $colShift = 0;
-                            }
+                            // 6 colWidths = editor (Ensaio,Espec,Norma,NEI,NQA,Unid) → usar 0..4
+                            $outCw = array_slice($colWidths, 0, 5);
+                            $colShift = 0;
                             if (count($outCw) < 5) $outCw = [26, 22, 18, 15, 14];
                             $cwSum = array_sum($outCw) ?: 1;
                             $cwPct = array_map(function($v) use ($cwSum) { return round($v / $cwSum * 100, 1); }, $outCw);

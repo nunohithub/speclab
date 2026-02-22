@@ -3,6 +3,18 @@
  * SpecLab - Cadernos de Encargos
  * Geração de PDF (mPDF ou fallback para impressão)
  */
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+header("Expires: 0");
+
+// Security headers
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+
+
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/auth.php';
@@ -56,12 +68,12 @@ if (!$code && isset($_SESSION['user_id'])) {
 // Traduções dos rótulos do PDF conforme idioma da spec
 $lang = $data['idioma'] ?? 'pt';
 $labels = [
-    'pt' => ['produto'=>'Produto','cliente'=>'Cliente','fornecedor'=>'Fornecedor','emissao'=>'Emissão','revisao'=>'Revisão','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovacao'=>'Aprovação','pendente'=>'Pendente','aguarda'=>'Aguarda validação','pagina'=>'Página','de'=>'de','assinatura'=>'Assinatura / Aprovação','versao'=>'Versão'],
-    'en' => ['produto'=>'Product','cliente'=>'Client','fornecedor'=>'Supplier','emissao'=>'Issue Date','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Prepared by','aprovacao'=>'Approval','pendente'=>'Pending','aguarda'=>'Awaiting validation','pagina'=>'Page','de'=>'of','assinatura'=>'Signature / Approval','versao'=>'Version'],
-    'es' => ['produto'=>'Producto','cliente'=>'Cliente','fornecedor'=>'Proveedor','emissao'=>'Emisión','revisao'=>'Revisión','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovacao'=>'Aprobación','pendente'=>'Pendiente','aguarda'=>'En espera de validación','pagina'=>'Página','de'=>'de','assinatura'=>'Firma / Aprobación','versao'=>'Versión'],
-    'fr' => ['produto'=>'Produit','cliente'=>'Client','fornecedor'=>'Fournisseur','emissao'=>'Émission','revisao'=>'Révision','estado'=>'Statut','elaborado_por'=>'Préparé par','aprovacao'=>'Approbation','pendente'=>'En attente','aguarda'=>'En attente de validation','pagina'=>'Page','de'=>'de','assinatura'=>'Signature / Approbation','versao'=>'Version'],
-    'de' => ['produto'=>'Produkt','cliente'=>'Kunde','fornecedor'=>'Lieferant','emissao'=>'Ausgabe','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Erstellt von','aprovacao'=>'Genehmigung','pendente'=>'Ausstehend','aguarda'=>'Warten auf Validierung','pagina'=>'Seite','de'=>'von','assinatura'=>'Unterschrift / Genehmigung','versao'=>'Version'],
-    'it' => ['produto'=>'Prodotto','cliente'=>'Cliente','fornecedor'=>'Fornitore','emissao'=>'Emissione','revisao'=>'Revisione','estado'=>'Stato','elaborado_por'=>'Preparato da','aprovacao'=>'Approvazione','pendente'=>'In sospeso','aguarda'=>'In attesa di validazione','pagina'=>'Pagina','de'=>'di','assinatura'=>'Firma / Approvazione','versao'=>'Versione'],
+    'pt' => ['produto'=>'Produto','cliente'=>'Cliente','fornecedor'=>'Fornecedor','emissao'=>'Data de Emissão','revisao'=>'Revisão','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovacao'=>'Aprovação','pendente'=>'Pendente','aguarda'=>'Aguarda validação','pagina'=>'Página','de'=>'de','assinatura'=>'Assinatura / Aprovação','versao'=>'Versão','ensaio'=>'Ensaio / Controlo','especificacao'=>'Especificação','norma'=>'Norma','nei'=>'NEI','nqa'=>'NQA','rascunho'=>'RASCUNHO','ficheiros'=>'Ficheiros Anexos'],
+    'en' => ['produto'=>'Product','cliente'=>'Client','fornecedor'=>'Supplier','emissao'=>'Issue Date','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Prepared by','aprovacao'=>'Approval','pendente'=>'Pending','aguarda'=>'Awaiting validation','pagina'=>'Page','de'=>'of','assinatura'=>'Signature / Approval','versao'=>'Version','ensaio'=>'Test / Control','especificacao'=>'Specification','norma'=>'Standard','nei'=>'SIL','nqa'=>'AQL','rascunho'=>'DRAFT','ficheiros'=>'Attached Files'],
+    'es' => ['produto'=>'Producto','cliente'=>'Cliente','fornecedor'=>'Proveedor','emissao'=>'Fecha de Emisión','revisao'=>'Revisión','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovacao'=>'Aprobación','pendente'=>'Pendiente','aguarda'=>'Pendiente de validación','pagina'=>'Página','de'=>'de','assinatura'=>'Firma / Aprobación','versao'=>'Versión','ensaio'=>'Ensayo / Control','especificacao'=>'Especificación','norma'=>'Norma','nei'=>'NEI','nqa'=>'NCA','rascunho'=>'BORRADOR','ficheiros'=>'Archivos Adjuntos'],
+    'fr' => ['produto'=>'Produit','cliente'=>'Client','fornecedor'=>'Fournisseur','emissao'=>'Date d\'émission','revisao'=>'Révision','estado'=>'Statut','elaborado_por'=>'Préparé par','aprovacao'=>'Approbation','pendente'=>'En attente','aguarda'=>'En attente de validation','pagina'=>'Page','de'=>'de','assinatura'=>'Signature / Approbation','versao'=>'Version','ensaio'=>'Essai / Contrôle','especificacao'=>'Spécification','norma'=>'Norme','nei'=>'NEI','nqa'=>'NQA','rascunho'=>'BROUILLON','ficheiros'=>'Fichiers Joints'],
+    'de' => ['produto'=>'Produkt','cliente'=>'Kunde','fornecedor'=>'Lieferant','emissao'=>'Ausgabedatum','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Erstellt von','aprovacao'=>'Genehmigung','pendente'=>'Ausstehend','aguarda'=>'Warten auf Validierung','pagina'=>'Seite','de'=>'von','assinatura'=>'Unterschrift / Genehmigung','versao'=>'Version','ensaio'=>'Prüfung / Kontrolle','especificacao'=>'Spezifikation','norma'=>'Norm','nei'=>'NEI','nqa'=>'AQL','rascunho'=>'ENTWURF','ficheiros'=>'Angehängte Dateien'],
+    'it' => ['produto'=>'Prodotto','cliente'=>'Cliente','fornecedor'=>'Fornitore','emissao'=>'Data di Emissione','revisao'=>'Revisione','estado'=>'Stato','elaborado_por'=>'Preparato da','aprovacao'=>'Approvazione','pendente'=>'In sospeso','aguarda'=>'In attesa di validazione','pagina'=>'Pagina','de'=>'di','assinatura'=>'Firma / Approvazione','versao'=>'Versione','ensaio'=>'Prova / Controllo','especificacao'=>'Specifica','norma'=>'Norma','nei'=>'NEI','nqa'=>'NQA','rascunho'=>'BOZZA','ficheiros'=>'File Allegati'],
 ];
 $L = $labels[$lang] ?? $labels['pt'];
 
@@ -113,17 +125,21 @@ $useMpdf = file_exists(__DIR__ . '/vendor/autoload.php');
 if ($useMpdf) {
     require_once __DIR__ . '/vendor/autoload.php';
 
+    $tmpDir = __DIR__ . '/tmp';
+    if (!is_dir($tmpDir)) mkdir($tmpDir, 0755, true);
+
     $mpdf = new \Mpdf\Mpdf([
         'mode' => 'utf-8',
         'format' => 'A4',
         'margin_left' => 15,
         'margin_right' => 15,
-        'margin_top' => 30,
-        'margin_bottom' => 20,
-        'margin_header' => 10,
-        'margin_footer' => 10,
+        'margin_top' => 25,
+        'margin_bottom' => 18,
+        'margin_header' => 8,
+        'margin_footer' => 8,
         'default_font' => 'dejavusans',
         'default_font_size' => 10,
+        'tempDir' => $tmpDir,
     ]);
 
     $mpdf->SetTitle(san($data['titulo']));
@@ -131,7 +147,7 @@ if ($useMpdf) {
 
     // Watermark RASCUNHO se não publicado
     if (($data['estado'] ?? 'rascunho') !== 'ativo') {
-        $mpdf->SetWatermarkText('RASCUNHO', 0.08);
+        $mpdf->SetWatermarkText($L['rascunho'], 0.08);
         $mpdf->showWatermarkText = true;
     }
 
@@ -154,16 +170,19 @@ if ($useMpdf) {
     }
 
     // Config visual
-    $cvDefaults = ['cor_titulos' => $orgCorPrimaria, 'cor_linhas' => $orgCorPrimaria, 'cor_nome' => $orgCorPrimaria, 'tamanho_titulos' => '14', 'tamanho_nome' => '16', 'logo_custom' => ''];
+    $cvDefaults = ['cor_titulos' => $orgCorPrimaria, 'cor_subtitulos' => $orgCorPrimaria, 'cor_linhas' => $orgCorPrimaria, 'cor_nome' => $orgCorPrimaria, 'tamanho_titulos' => '14', 'tamanho_subtitulos' => '12', 'subtitulos_bold' => '1', 'tamanho_nome' => '16', 'logo_custom' => ''];
     $cv = $cvDefaults;
     if (!empty($data['config_visual'])) {
         $parsed = is_string($data['config_visual']) ? json_decode($data['config_visual'], true) : $data['config_visual'];
         if (is_array($parsed)) $cv = array_merge($cvDefaults, $parsed);
     }
     $corTitulos = $cv['cor_titulos'];
+    $corSubtitulos = $cv['cor_subtitulos'];
     $corLinhas  = $cv['cor_linhas'];
     $corNome    = $cv['cor_nome'];
     $tamTitulos = (int)$cv['tamanho_titulos'];
+    $tamSubtitulos = (int)$cv['tamanho_subtitulos'];
+    $subBold = ($cv['subtitulos_bold'] ?? '1') === '1' ? 'bold' : 'normal';
     $tamNome    = (int)$cv['tamanho_nome'];
 
     // Cor mais clara para backgrounds (aproximação)
@@ -178,12 +197,12 @@ if ($useMpdf) {
         $customLogo = UPLOAD_DIR . 'logos/' . $cv['logo_custom'];
         if (file_exists($customLogo)) $logoPath = $customLogo;
     }
-    $logoHtml = file_exists($logoPath) ? '<img src="' . $logoPath . '" height="35">' : san($orgNome);
+    $logoHtml = file_exists($logoPath) ? '<img src="' . $logoPath . '" style="height:10mm; width:auto; max-width:35mm;">' : san($orgNome);
 
-    $headerHtml = '<table width="100%" style="border-bottom:2pt solid ' . san($corLinhas) . ';margin-bottom:5mm;"><tr>'
-        . '<td width="30%">' . $logoHtml . '</td>'
-        . '<td width="70%" style="text-align:right;">'
-        . '<span style="font-size:12pt;font-weight:bold;color:' . san($corNome) . ';">' . san($data['titulo']) . '</span><br>'
+    $headerHtml = '<table width="100%" style="border-bottom:2pt solid ' . san($corLinhas) . ';"><tr>'
+        . '<td width="25%" style="vertical-align:middle;">' . $logoHtml . '</td>'
+        . '<td width="75%" style="text-align:right;vertical-align:middle;">'
+        . '<span style="font-size:' . $tamNome . 'pt;font-weight:bold;color:' . san($corNome) . ';">' . san($data['titulo']) . '</span><br>'
         . '<span style="font-size:8pt;color:#666;">' . san($data['numero']) . ' | ' . $L['versao'] . ' ' . san($data['versao']) . '</span>'
         . '</td></tr></table>';
     $footerHtml = '<table width="100%" style="border-top:0.5pt solid #ddd;font-size:8pt;color:#999;"><tr>'
@@ -197,8 +216,8 @@ if ($useMpdf) {
     // CSS para PDF — carregado do ficheiro externo
     $pdfCssRaw = file_get_contents(__DIR__ . '/assets/css/pdf.css');
     $pdfCssRaw = str_replace(
-        ['{{COR_TITULOS}}', '{{COR_LINHAS}}', '{{COR_NOME}}', '{{COR_PRIMARIA}}', '{{COR_PRIMARIA_LIGHT}}', '{{COR_PRIMARIA_DARK}}', '{{TAM_TITULOS}}', '{{TAM_NOME}}'],
-        [san($corTitulos), san($corLinhas), san($corNome), san($corPrimaria), san($corPrimariaLight), san($corPrimariaDark), $tamTitulos, $tamNome],
+        ['{{COR_TITULOS}}', '{{COR_SUBTITULOS}}', '{{COR_LINHAS}}', '{{COR_NOME}}', '{{COR_PRIMARIA}}', '{{COR_PRIMARIA_LIGHT}}', '{{COR_PRIMARIA_DARK}}', '{{TAM_TITULOS}}', '{{TAM_SUBTITULOS}}', '{{SUB_BOLD}}', '{{TAM_NOME}}'],
+        [san($corTitulos), san($corSubtitulos), san($corLinhas), san($corNome), san($corPrimaria), san($corPrimariaLight), san($corPrimariaDark), $tamTitulos, $tamSubtitulos, $subBold, $tamNome],
         $pdfCssRaw
     );
 
@@ -254,18 +273,34 @@ if ($useMpdf) {
 
     // Secções dinâmicas (prioridade) ou campos fixos (backward compat)
     if (!empty($data['seccoes'])) {
+        // Numeração hierárquica
+        $hierNumbers = []; $mainC = 0; $subC = 0;
+        foreach ($data['seccoes'] as $si => $s) {
+            $niv = (int)($s['nivel'] ?? 1);
+            if ($niv === 1) { $mainC++; $subC = 0; $hierNumbers[$si] = $mainC . '.'; }
+            else { $subC++; $hierNumbers[$si] = $mainC . '.' . $subC . '.'; }
+        }
+
         foreach ($data['seccoes'] as $i => $sec) {
             $secTipo = $sec['tipo'] ?? 'texto';
+            $secNivel = (int)($sec['nivel'] ?? 1);
+            $secNum = $hierNumbers[$i] ?? ($i + 1) . '.';
+            $hTag = $secNivel === 2 ? 'h3' : 'h2';
+            $subStyle = $secNivel === 2 ? ' style="margin-left:15mm;"' : '';
 
             // Secção ficheiros
             if ($secTipo === 'ficheiros') {
-                if ($ficheirosPos === 'local' && !empty($validFiles)) {
-                    $ficheirosRenderedPdf = true;
-                    $ficTitulo = ($i + 1) . '. ' . san($sec['titulo'] ?? 'Ficheiros Anexos');
+                $ficConf = json_decode($sec['conteudo'] ?? '{}', true);
+                $secGrupo = $ficConf['grupo'] ?? 'default';
+                $secFiles = array_filter($validFiles, function($f) use ($secGrupo) {
+                    return ($f['grupo'] ?? 'default') === $secGrupo;
+                });
+                if (!empty($secFiles)) {
+                    $ficTitulo = $secNum . ' ' . san($sec['titulo'] ?? 'Ficheiros Anexos');
                     // Título na página do relatório (antes dos anexos)
-                    $html .= '<div class="section"><h2>' . $ficTitulo . '</h2>';
+                    $html .= '<div class="section"' . $subStyle . '><' . $hTag . '>' . $ficTitulo . '</' . $hTag . '>';
                     // Lista de ficheiros como referência
-                    foreach ($validFiles as $fi => $f) {
+                    foreach ($secFiles as $fi => $f) {
                         $html .= '<div class="file-item">&#8226; ' . san($f['nome_original']) . ' (' . formatFileSize($f['tamanho']) . ')</div>';
                     }
                     $html .= '</div>';
@@ -273,7 +308,7 @@ if ($useMpdf) {
                     $html = '';
                     // PDFs: importar páginas tal como são (sem escala, sem título overlay)
                     $mpdf->SetHTMLHeader('');
-                    foreach ($validFiles as $f) {
+                    foreach ($secFiles as $f) {
                         $fExt = strtolower(pathinfo($f['nome_original'], PATHINFO_EXTENSION));
                         $filepath = UPLOAD_DIR . $f['nome_servidor'];
                         if ($fExt === 'pdf') {
@@ -282,18 +317,27 @@ if ($useMpdf) {
                                 for ($p = 1; $p <= $pageCount; $p++) {
                                     $tplId = $mpdf->importPage($p);
                                     $size = $mpdf->getTemplateSize($tplId);
-                                    $wMm = $size['width'] * 25.4 / 72;
-                                    $hMm = $size['height'] * 25.4 / 72;
+                                    $srcW = $size['width'];   // já em mm
+                                    $srcH = $size['height'];
+                                    // Normalizar: sempre A4, escalar conteúdo proporcionalmente
+                                    $a4W = 210; $a4H = 297; $margin = 10;
+                                    $usableW = $a4W - 2 * $margin;
+                                    $usableH = $a4H - 2 * $margin;
+                                    $scale = min($usableW / $srcW, $usableH / $srcH, 1);
+                                    $renderW = $srcW * $scale;
+                                    $renderH = $srcH * $scale;
+                                    $offsetX = $margin + ($usableW - $renderW) / 2;
+                                    $offsetY = $margin + ($usableH - $renderH) / 2;
                                     $mpdf->AddPageByArray([
-                                        'orientation' => $wMm > $hMm ? 'L' : 'P',
-                                        'sheet-size' => [$wMm, $hMm],
+                                        'orientation' => 'P',
+                                        'sheet-size' => [$a4W, $a4H],
                                         'margin-left' => 0, 'margin-right' => 0,
                                         'margin-top' => 0, 'margin-bottom' => 0,
                                         'margin-header' => 0, 'margin-footer' => 0,
                                     ]);
                                     $mpdf->SetHTMLFooter('');
                                     $mpdf->SetPageTemplate('');
-                                    $mpdf->useTemplate($tplId, 0, 0, $wMm, $hMm);
+                                    $mpdf->useTemplate($tplId, $offsetX, $offsetY, $renderW, $renderH);
                                 }
                             } catch (Exception $e) {}
                         } elseif (in_array($fExt, ['jpg','jpeg','png','gif','bmp','tif','tiff'])) {
@@ -301,8 +345,8 @@ if ($useMpdf) {
                             $mpdf->SetHTMLHeader($headerHtml);
                             $mpdf->AddPageByArray([
                                 'margin-left' => 15, 'margin-right' => 15,
-                                'margin-top' => 30, 'margin-bottom' => 20,
-                                'margin-header' => 10, 'margin-footer' => 10,
+                                'margin-top' => 25, 'margin-bottom' => 18,
+                                'margin-header' => 8, 'margin-footer' => 8,
                             ]);
                             $mpdf->SetHTMLFooter($footerHtml);
                             $imgHtml = '<div style="text-align:center;">';
@@ -317,8 +361,8 @@ if ($useMpdf) {
                     $mpdf->SetHTMLHeader($headerHtml);
                     $mpdf->AddPageByArray([
                         'margin-left' => 15, 'margin-right' => 15,
-                        'margin-top' => 30, 'margin-bottom' => 20,
-                        'margin-header' => 10, 'margin-footer' => 10,
+                        'margin-top' => 25, 'margin-bottom' => 18,
+                        'margin-header' => 8, 'margin-footer' => 8,
                     ]);
                     $mpdf->SetHTMLFooter($footerHtml);
                 }
@@ -326,7 +370,7 @@ if ($useMpdf) {
             }
 
             if ($secTipo === 'ensaios') {
-                $html .= '<div class="section">';
+                $html .= '<div class="section"' . $subStyle . '>';
                 $ensaiosRaw = json_decode($sec['conteudo'] ?? '[]', true);
                 if (isset($ensaiosRaw['rows'])) {
                     $ensaiosData = $ensaiosRaw['rows'];
@@ -337,13 +381,9 @@ if ($useMpdf) {
                     $colWidths = [20, 22, 18, 13, 13, 10];
                     $merges = [];
                 }
-                if (count($colWidths) >= 6) {
-                    $outCw = array_slice($colWidths, 1, 5);
-                    $colShift = 1;
-                } else {
-                    $outCw = array_slice($colWidths, 0, 5);
-                    $colShift = 0;
-                }
+                // 6 colWidths = editor (Ensaio,Espec,Norma,NEI,NQA,Unid) → usar 0..4
+                $outCw = array_slice($colWidths, 0, 5);
+                $colShift = 0;
                 if (count($outCw) < 5) $outCw = [26, 22, 18, 15, 14];
                 $cwSum = array_sum($outCw) ?: 1;
                 $cwPct = array_map(function($v) use ($cwSum) { return round($v / $cwSum * 100, 1); }, $outCw);
@@ -368,7 +408,7 @@ if ($useMpdf) {
                     }
                 }
                 if (!empty($ensaiosData)) {
-                    $headers = ['Ensaio / Controlo','Especificação','Norma','NEI','NQA'];
+                    $headers = [$L['ensaio'],$L['especificacao'],$L['norma'],$L['nei'],$L['nqa']];
                     $fields = ['ensaio','especificacao','norma','nivel_especial','nqa'];
                     $secTitulo = san($sec['titulo']);
                     $colspanN = count($headers);
@@ -389,7 +429,10 @@ if ($useMpdf) {
                         $theadCols .= '<th class="ensaio-th" style="width:' . $cwPct[$hi] . '%;">' . $hName . '</th>';
                     }
                     $theadCols .= '</tr>';
-                    $theadTitle = '<tr class="ensaio-titulo-row"><td colspan="' . $colspanN . '" style="font-size:' . $tamTitulos . 'pt;">' . ($i + 1) . '. ' . $secTitulo . '</td></tr>';
+                    $ensaioTitleSize = $secNivel === 2 ? $tamSubtitulos : $tamTitulos;
+                    $ensaioTitleColor = $secNivel === 2 ? san($corSubtitulos) : san($corTitulos);
+                    $ensaioTitleWeight = $secNivel === 2 ? $subBold : 'bold';
+                    $theadTitle = '<tr class="ensaio-titulo-row"><td colspan="' . $colspanN . '" style="font-size:' . $ensaioTitleSize . 'pt; color:' . $ensaioTitleColor . '; font-weight:' . $ensaioTitleWeight . ';">' . $secNum . ' ' . $secTitulo . '</td></tr>';
                     // Uma tabela por categoria
                     foreach ($groups as $gIdx => $group) {
                         $mt = $gIdx === 0 ? ' style="margin-top:6px;"' : '';
@@ -428,7 +471,7 @@ if ($useMpdf) {
                     }
                 }
             } else {
-                $html .= '<div class="section"><h2>' . ($i + 1) . '. ' . san($sec['titulo']) . '</h2>';
+                $html .= '<div class="section"' . $subStyle . '><' . $hTag . '>' . $secNum . ' ' . san($sec['titulo']) . '</' . $hTag . '>';
                 $secContent = $sec['conteudo'] ?? '';
                 if (strip_tags($secContent) === $secContent) {
                     $secContent = nl2br(san($secContent));
@@ -494,15 +537,6 @@ if ($useMpdf) {
         $html .= '</tbody></table></div>';
     }
 
-    // Files list at end (only if not rendered inline)
-    if (!$ficheirosRenderedPdf && !empty($validFiles)) {
-        $html .= '<div class="section"><h2>Documentos Anexos</h2><div class="file-list">';
-        foreach ($validFiles as $f) {
-            $html .= '<div class="file-item">&#8226; ' . san($f['nome_original']) . ' (' . formatFileSize($f['tamanho']) . ')</div>';
-        }
-        $html .= '</div></div>';
-    }
-
     // Signature block dinâmico
     $html .= '<div class="sig-block">';
     $html .= '<table class="sig-table"><tr>';
@@ -537,54 +571,15 @@ if ($useMpdf) {
     $html .= '</td>';
     $html .= '</tr></table></div>';
 
+    // Debug: timestamp visível + guardar HTML
+    $isDebug = isset($_GET['debug']) || getConfiguracao('debug_pdf', '0') === '1';
+    if ($isDebug) {
+        $html .= '<div style="font-size:7pt;color:red;margin-top:5mm;border-top:0.5pt dashed red;padding-top:2mm;">DEBUG — Gerado em: ' . date('Y-m-d H:i:s') . '</div>';
+        file_put_contents($tmpDir . '/last_pdf.html', '<html><head><meta charset="utf-8"><style>' . $pdfCssRaw . '</style></head><body>' . $html . '</body></html>');
+    }
+
     $mpdf->WriteHTML($html);
 
-    // Anexos no final (só quando posição = final)
-    if (!$ficheirosRenderedPdf && !empty($validFiles)) {
-        // PDFs: importar páginas tal como são
-        $mpdf->SetHTMLHeader('');
-        foreach ($validFiles as $f) {
-            $ext = strtolower(pathinfo($f['nome_original'], PATHINFO_EXTENSION));
-            $filepath = UPLOAD_DIR . $f['nome_servidor'];
-            if ($ext === 'pdf') {
-                try {
-                    $mpdf->SetPageTemplate('');
-                    $pageCount = $mpdf->setSourceFile($filepath);
-                    for ($p = 1; $p <= $pageCount; $p++) {
-                        $tplId = $mpdf->importPage($p);
-                        $size = $mpdf->getTemplateSize($tplId);
-                        $wMm = $size['width'] * 25.4 / 72;
-                        $hMm = $size['height'] * 25.4 / 72;
-                        $mpdf->AddPageByArray([
-                            'orientation' => $wMm > $hMm ? 'L' : 'P',
-                            'sheet-size' => [$wMm, $hMm],
-                            'margin-left' => 0, 'margin-right' => 0,
-                            'margin-top' => 0, 'margin-bottom' => 0,
-                            'margin-header' => 0, 'margin-footer' => 0,
-                        ]);
-                        $mpdf->SetHTMLFooter('');
-                        $mpdf->SetPageTemplate('');
-                        $mpdf->useTemplate($tplId, 0, 0, $wMm, $hMm);
-                    }
-                } catch (Exception $e) {}
-            } elseif (in_array($ext, ['jpg','jpeg','png','gif','bmp','tif','tiff'])) {
-                // Imagens: página dedicada com margens
-                $mpdf->SetHTMLHeader($headerHtml);
-                $mpdf->AddPageByArray([
-                    'margin-left' => 15, 'margin-right' => 15,
-                    'margin-top' => 30, 'margin-bottom' => 20,
-                    'margin-header' => 10, 'margin-footer' => 10,
-                ]);
-                $mpdf->SetHTMLFooter($footerHtml);
-                $imgHtml = '<div style="text-align:center;">';
-                $imgHtml .= '<div style="font-size:9pt; color:#666; margin-bottom:3mm;">' . san($f['nome_original']) . '</div>';
-                $imgHtml .= '<img src="' . $filepath . '" style="max-width:170mm; max-height:230mm;">';
-                $imgHtml .= '</div>';
-                $mpdf->WriteHTML($imgHtml);
-                $mpdf->SetHTMLHeader('');
-            }
-        }
-    }
 
     // PDF Protection
     $protegido = !empty($data['pdf_protegido']);
@@ -607,8 +602,8 @@ if ($useMpdf) {
             'orientation' => 'P',
             'sheet-size' => [210, 297],
             'margin-left' => 15, 'margin-right' => 15,
-            'margin-top' => 30, 'margin-bottom' => 20,
-            'margin-header' => 10, 'margin-footer' => 10,
+            'margin-top' => 25, 'margin-bottom' => 18,
+            'margin-header' => 8, 'margin-footer' => 8,
         ]);
         $mpdf->SetHTMLHeader($headerHtml);
         $mpdf->SetHTMLFooter($footerHtml);
@@ -623,30 +618,26 @@ if ($useMpdf) {
         $mpdf->WriteHTML($sigHtml);
     }
 
-    // Debug: guardar HTML final em tmp/last_pdf.html
-    $debugPdf = getConfiguracao('debug_pdf', '0');
-    if ($debugPdf === '1') {
-        $tmpDir = __DIR__ . '/tmp';
-        if (!is_dir($tmpDir)) mkdir($tmpDir, 0755, true);
-        file_put_contents($tmpDir . '/last_pdf.html', '<html><head><meta charset="utf-8"><style>' . $pdfCssRaw . '</style></head><body>' . $html . '</body></html>');
-    }
-
     $filename = 'Caderno_Encargos_' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $data['numero']) . '.pdf';
-    $mpdf->Output($filename, \Mpdf\Output\Destination::DOWNLOAD);
+    $dest = isset($_GET['view']) ? \Mpdf\Output\Destination::INLINE : \Mpdf\Output\Destination::DOWNLOAD;
+    $mpdf->Output($filename, $dest);
     exit;
 }
 
 // Fallback: HTML para impressão (sem mPDF)
-$cvDefaults = ['cor_titulos' => $orgCorPrimaria, 'cor_linhas' => $orgCorPrimaria, 'cor_nome' => $orgCorPrimaria, 'tamanho_titulos' => '14', 'tamanho_nome' => '16', 'logo_custom' => ''];
+$cvDefaults = ['cor_titulos' => $orgCorPrimaria, 'cor_subtitulos' => $orgCorPrimaria, 'cor_linhas' => $orgCorPrimaria, 'cor_nome' => $orgCorPrimaria, 'tamanho_titulos' => '14', 'tamanho_subtitulos' => '12', 'subtitulos_bold' => '1', 'tamanho_nome' => '16', 'logo_custom' => ''];
 $cv = $cvDefaults;
 if (!empty($data['config_visual'])) {
     $parsed = is_string($data['config_visual']) ? json_decode($data['config_visual'], true) : $data['config_visual'];
     if (is_array($parsed)) $cv = array_merge($cvDefaults, $parsed);
 }
 $corTitulos = $cv['cor_titulos'];
+$corSubtitulos = $cv['cor_subtitulos'];
 $corLinhas  = $cv['cor_linhas'];
 $corNome    = $cv['cor_nome'];
 $tamTitulos = (int)$cv['tamanho_titulos'];
+$tamSubtitulos = (int)$cv['tamanho_subtitulos'];
+$subBold = ($cv['subtitulos_bold'] ?? '1') === '1' ? 'bold' : 'normal';
 $tamNome    = (int)$cv['tamanho_nome'];
 ?>
 <!DOCTYPE html>
@@ -666,10 +657,11 @@ $tamNome    = (int)$cv['tamanho_nome'];
         .btn:hover { opacity: 0.9; }
         h1 { font-size: <?= $tamNome ?>pt; color: <?= san($corNome) ?>; margin: 0 0 5mm; }
         h2 { font-size: <?= $tamTitulos ?>pt; color: <?= san($corTitulos) ?>; border-bottom: 1px solid <?= san($corLinhas) ?>; padding-bottom: 2mm; margin: 6mm 0 3mm; }
+        h3 { font-size: <?= $tamSubtitulos ?>pt; font-weight: <?= $subBold ?>; color: <?= san($corSubtitulos) ?>; border-bottom: 1px solid <?= san($corLinhas) ?>; padding-bottom: 1mm; margin: 4mm 0 2mm; }
         .header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 3mm; border-bottom: 3pt solid <?= san($corLinhas) ?>; margin-bottom: 5mm; }
         .header img { height: 48px; }
         .header .title { text-align: right; }
-        .header .title h1 { margin: 0; font-size: 14pt; }
+        .header .title h1 { margin: 0; font-size: <?= $tamNome ?>pt; }
         .header .title p { margin: 2px 0 0; font-size: 9pt; color: #667085; }
         .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: #f3f4f6; padding: 8px 12px; border-radius: 4px; margin-bottom: 5mm; font-size: 9pt; }
         .meta .meta-full { grid-column: 1 / -1; }
@@ -685,7 +677,7 @@ $tamNome    = (int)$cv['tamanho_nome'];
         .signatures { margin-top: 15mm; display: flex; gap: 20mm; }
         .sig-box { flex: 1; text-align: center; padding-top: 15mm; border-top: 1px solid #999; font-size: 9pt; color: #667085; }
         .embed-section { page-break-before: always; margin-top: 10mm; }
-        .embed-section h3 { font-size: 11pt; color: <?= san($corTitulos) ?>; margin-bottom: 5mm; }
+        .embed-section h3 { font-size: <?= $tamSubtitulos ?>pt; font-weight: <?= $subBold ?>; color: <?= san($corSubtitulos) ?>; margin-bottom: 5mm; }
         .embed-frame { width: 100%; height: 80vh; border: 1px solid #e5e7eb; border-radius: 4px; }
         @media print {
             .toolbar { display: none !important; }
@@ -740,13 +732,22 @@ $tamNome    = (int)$cv['tamanho_nome'];
         <div><span><?= $L['elaborado_por'] ?>:</span> <strong><?= san($data['criado_por_nome'] ?? '-') ?></strong></div>
     </div>
 
-    <?php if (!empty($data['seccoes'])): ?>
+    <?php if (!empty($data['seccoes'])):
+        $hierN2 = []; $mC2 = 0; $sC2 = 0;
+        foreach ($data['seccoes'] as $si2 => $s2) {
+            $nv2 = (int)($s2['nivel'] ?? 1);
+            if ($nv2 === 1) { $mC2++; $sC2 = 0; $hierN2[$si2] = $mC2 . '.'; }
+            else { $sC2++; $hierN2[$si2] = $mC2 . '.' . $sC2 . '.'; }
+        }
+    ?>
         <?php foreach ($data['seccoes'] as $i => $sec):
             $secTipo = $sec['tipo'] ?? 'texto';
             if ($secTipo === 'ficheiros') continue;
+            $secNivel2 = (int)($sec['nivel'] ?? 1);
+            $secNum2 = $hierN2[$i] ?? ($i + 1) . '.';
         ?>
-            <div class="section">
-                <h2><?= ($i + 1) . '. ' . san($sec['titulo']) ?></h2>
+            <div class="section"<?= $secNivel2 === 2 ? ' style="margin-left:15mm;"' : '' ?>>
+                <<?= $secNivel2 === 2 ? 'h3' : 'h2' ?>><?= $secNum2 . ' ' . san($sec['titulo']) ?></<?= $secNivel2 === 2 ? 'h3' : 'h2' ?>>
                 <?php if ($secTipo === 'ensaios'): ?>
                     <?php
                     $ensaiosRaw = json_decode($sec['conteudo'] ?? '[]', true);
@@ -759,13 +760,9 @@ $tamNome    = (int)$cv['tamanho_nome'];
                         $colWidths = [20, 22, 18, 13, 13, 10];
                         $merges = [];
                     }
-                    if (count($colWidths) >= 6) {
-                        $outCw = array_slice($colWidths, 1, 5);
-                        $colShift = 1;
-                    } else {
-                        $outCw = array_slice($colWidths, 0, 5);
-                        $colShift = 0;
-                    }
+                    // 6 colWidths = editor (Ensaio,Espec,Norma,NEI,NQA,Unid) → usar 0..4
+                    $outCw = array_slice($colWidths, 0, 5);
+                    $colShift = 0;
                     if (count($outCw) < 5) $outCw = [26, 22, 18, 15, 14];
                     $cwSum = array_sum($outCw) ?: 1;
                     $cwPct = array_map(function($v) use ($cwSum) { return round($v / $cwSum * 100, 1); }, $outCw);
@@ -795,11 +792,11 @@ $tamNome    = (int)$cv['tamanho_nome'];
                     <table class="doc-table">
                         <thead>
                             <tr>
-                                <th style="width:<?= $cwPct[0] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;">Ensaio / Controlo</th>
-                                <th style="width:<?= $cwPct[1] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;">Especificação</th>
-                                <th style="width:<?= $cwPct[2] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;">Norma</th>
-                                <th style="width:<?= $cwPct[3] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;">NEI</th>
-                                <th style="width:<?= $cwPct[4] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;">NQA</th>
+                                <th style="width:<?= $cwPct[0] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;"><?= san($L['ensaio']) ?></th>
+                                <th style="width:<?= $cwPct[1] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;"><?= san($L['especificacao']) ?></th>
+                                <th style="width:<?= $cwPct[2] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;"><?= san($L['norma']) ?></th>
+                                <th style="width:<?= $cwPct[3] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;"><?= san($L['nei']) ?></th>
+                                <th style="width:<?= $cwPct[4] ?>%; background:<?= $corPrimaria ?>; color:white; padding:6px 10px; text-align:left; font-weight:600;"><?= san($L['nqa']) ?></th>
                             </tr>
                         </thead>
                         <tbody>

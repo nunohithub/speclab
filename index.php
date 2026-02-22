@@ -92,23 +92,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
 
-        <form method="POST" action="">
+        <form method="POST" action="" id="loginForm" novalidate>
             <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
             <div class="form-group">
                 <label for="username">Utilizador</label>
                 <input type="text" id="username" name="username" required autofocus
-                       autocomplete="username"
+                       autocomplete="username" minlength="3"
                        value="<?= htmlspecialchars($username ?? '') ?>"
                        placeholder="O seu utilizador">
+                <div class="field-error" id="username-error"></div>
             </div>
             <div class="form-group">
                 <label for="password">Palavra-passe</label>
                 <input type="password" id="password" name="password" required
-                       autocomplete="current-password"
+                       autocomplete="current-password" minlength="6"
                        placeholder="A sua palavra-passe">
+                <div class="field-error" id="password-error"></div>
             </div>
             <button type="submit" class="btn btn-primary btn-lg">Entrar</button>
         </form>
+        <script>
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            var user = document.getElementById('username');
+            var pass = document.getElementById('password');
+            var userErr = document.getElementById('username-error');
+            var passErr = document.getElementById('password-error');
+            var valid = true;
+            userErr.textContent = '';
+            passErr.textContent = '';
+
+            if (!user.value.trim()) {
+                userErr.textContent = 'Introduza o seu utilizador.';
+                valid = false;
+            } else if (user.value.trim().length < 3) {
+                userErr.textContent = 'O utilizador deve ter pelo menos 3 caracteres.';
+                valid = false;
+            }
+
+            if (!pass.value) {
+                passErr.textContent = 'Introduza a palavra-passe.';
+                valid = false;
+            } else if (pass.value.length < 6) {
+                passErr.textContent = 'A palavra-passe deve ter pelo menos 6 caracteres.';
+                valid = false;
+            }
+
+            if (!valid) e.preventDefault();
+        });
+        </script>
 
         <p style="margin-top: 24px; font-size: 11px; color: #999;">&copy; SpecLab <?= date('Y') ?></p>
     </div>

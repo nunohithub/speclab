@@ -11,10 +11,12 @@ function getEspecificacaoCompleta(PDO $db, int $id): ?array {
     $stmt = $db->prepare('
         SELECT e.*,
                c.nome as cliente_nome, c.sigla as cliente_sigla, c.email as cliente_email,
-               u.nome as criado_por_nome
+               u.nome as criado_por_nome,
+               org.nome as org_nome, org.logo as org_logo
         FROM especificacoes e
         LEFT JOIN clientes c ON e.cliente_id = c.id
         LEFT JOIN utilizadores u ON e.criado_por = u.id
+        LEFT JOIN organizacoes org ON e.organizacao_id = org.id
         WHERE e.id = ?
     ');
     $stmt->execute([$id]);
@@ -82,10 +84,16 @@ function getEspecificacaoCompleta(PDO $db, int $id): ?array {
 /**
  * Obter categorias de parâmetros padrão baseadas nos cadernos de encargo analisados
  */
-function getCategoriasPadrao(): array {
+function getCategoriasPadrao(?int $orgId = null): array {
     try {
         $db = getDB();
-        $rows = $db->query('SELECT categoria, ensaio, metodo, nivel_especial, nqa, exemplo, unidade FROM ensaios_banco WHERE ativo = 1 ORDER BY ordem, categoria, ensaio')->fetchAll();
+        if ($orgId) {
+            $stmt = $db->prepare('SELECT categoria, ensaio, metodo, nivel_especial, nqa, exemplo, unidade FROM ensaios_banco WHERE ativo = 1 AND organizacao_id = ? ORDER BY ordem, categoria, ensaio');
+            $stmt->execute([$orgId]);
+            $rows = $stmt->fetchAll();
+        } else {
+            $rows = $db->query('SELECT categoria, ensaio, metodo, nivel_especial, nqa, exemplo, unidade FROM ensaios_banco WHERE ativo = 1 ORDER BY ordem, categoria, ensaio')->fetchAll();
+        }
         $result = [];
         foreach ($rows as $row) {
             $result[$row['categoria']][] = [

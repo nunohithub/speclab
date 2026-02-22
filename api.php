@@ -491,8 +491,8 @@ try {
                 if (!empty($seccoes) && is_array($seccoes)) {
                     $stmt = $db->prepare('
                         INSERT INTO especificacao_seccoes
-                            (especificacao_id, titulo, conteudo, tipo, ordem)
-                        VALUES (?, ?, ?, ?, ?)
+                            (especificacao_id, titulo, conteudo, tipo, nivel, ordem)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     ');
                     foreach ($seccoes as $i => $s) {
                         $titulo = trim($s['titulo'] ?? '');
@@ -509,6 +509,7 @@ try {
                             $titulo,
                             $conteudo,
                             $tipo,
+                            (int)($s['nivel'] ?? 1),
                             (int)($s['ordem'] ?? $i),
                         ]);
                     }
@@ -614,6 +615,14 @@ try {
                 jsonError('Formato inválido. Use PNG ou JPG.');
             }
 
+            // Validar MIME type real do ficheiro
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $realMimeType = $finfo->file($file['tmp_name']);
+            $logoMimes = ['jpg' => ['image/jpeg'], 'jpeg' => ['image/jpeg'], 'png' => ['image/png']];
+            if (isset($logoMimes[$ext]) && !in_array($realMimeType, $logoMimes[$ext])) {
+                jsonError('Tipo de ficheiro inválido (MIME type não corresponde à extensão).');
+            }
+
             $logosDir = UPLOAD_DIR . 'logos/';
             if (!is_dir($logosDir)) {
                 mkdir($logosDir, 0755, true);
@@ -633,9 +642,9 @@ try {
             $cv = $currentConfig ? json_decode($currentConfig, true) : [];
             if (!is_array($cv)) $cv = [];
 
-            // Remover logo antigo se existir
-            if (!empty($cv['logo_custom']) && file_exists($logosDir . $cv['logo_custom'])) {
-                unlink($logosDir . $cv['logo_custom']);
+            // Remover logo antigo se existir (basename para prevenir path traversal)
+            if (!empty($cv['logo_custom']) && file_exists($logosDir . basename($cv['logo_custom']))) {
+                unlink($logosDir . basename($cv['logo_custom']));
             }
 
             $cv['logo_custom'] = $filename;
@@ -684,6 +693,27 @@ try {
             $extension    = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
             if (!in_array($extension, $allowedExtensions)) {
                 jsonError('Tipo de ficheiro não permitido. Extensões permitidas: ' . implode(', ', $allowedExtensions));
+            }
+
+            // Validar MIME type real do ficheiro
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $realMimeType = $finfo->file($file['tmp_name']);
+            $allowedMimes = [
+                'jpg'  => ['image/jpeg'],
+                'jpeg' => ['image/jpeg'],
+                'png'  => ['image/png'],
+                'gif'  => ['image/gif'],
+                'pdf'  => ['application/pdf'],
+                'doc'  => ['application/msword'],
+                'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+                'xls'  => ['application/vnd.ms-excel'],
+                'xlsx' => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+                'txt'  => ['text/plain'],
+                'csv'  => ['text/csv', 'text/plain'],
+                'zip'  => ['application/zip', 'application/x-zip-compressed'],
+            ];
+            if (isset($allowedMimes[$extension]) && !in_array($realMimeType, $allowedMimes[$extension])) {
+                jsonError('Tipo de ficheiro inválido (MIME type não corresponde à extensão).');
             }
 
             // Criar diretório de uploads se não existir
@@ -760,13 +790,16 @@ try {
             }
 
             // Inserir na base de dados
+            $grupo = trim($_POST['grupo'] ?? 'default');
+            if ($grupo === '') $grupo = 'default';
             $stmt = $db->prepare('
                 INSERT INTO especificacao_ficheiros
-                    (especificacao_id, nome_original, nome_servidor, tamanho, tipo_ficheiro, uploaded_at)
-                VALUES (?, ?, ?, ?, ?, NOW())
+                    (especificacao_id, grupo, nome_original, nome_servidor, tamanho, tipo_ficheiro, uploaded_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
             ');
             $stmt->execute([
                 $especificacao_id,
+                $grupo,
                 $originalName,
                 $uniqueName,
                 $file['size'],
@@ -1246,8 +1279,8 @@ try {
                 if (!empty($espec['seccoes'])) {
                     $stmt = $db->prepare('
                         INSERT INTO especificacao_seccoes
-                            (especificacao_id, titulo, conteudo, tipo, ordem)
-                        VALUES (?, ?, ?, ?, ?)
+                            (especificacao_id, titulo, conteudo, tipo, nivel, ordem)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     ');
                     foreach ($espec['seccoes'] as $s) {
                         $stmt->execute([
@@ -1255,6 +1288,7 @@ try {
                             $s['titulo'],
                             $s['conteudo'],
                             $s['tipo'] ?? 'texto',
+                            (int)($s['nivel'] ?? 1),
                             $s['ordem'],
                         ]);
                     }
@@ -1556,6 +1590,14 @@ try {
                 jsonError('Formato inválido. Use PNG ou JPG.');
             }
 
+            // Validar MIME type real do ficheiro
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $realMimeType = $finfo->file($file['tmp_name']);
+            $logoMimes = ['jpg' => ['image/jpeg'], 'jpeg' => ['image/jpeg'], 'png' => ['image/png']];
+            if (isset($logoMimes[$ext]) && !in_array($realMimeType, $logoMimes[$ext])) {
+                jsonError('Tipo de ficheiro inválido (MIME type não corresponde à extensão).');
+            }
+
             $logosDir = UPLOAD_DIR . 'logos/';
             if (!is_dir($logosDir)) {
                 mkdir($logosDir, 0755, true);
@@ -1585,9 +1627,12 @@ try {
         // ===================================================================
         case 'get_legislacao_banco':
             if (isSuperAdmin() && !empty($_GET['all'])) {
-                $stmt = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo, link_url, ativo FROM legislacao_banco ORDER BY ativo DESC, legislacao_norma');
-            } else {
+                $stmt = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo, link_url, ativo, organizacao_id FROM legislacao_banco ORDER BY ativo DESC, legislacao_norma');
+            } elseif (isSuperAdmin()) {
                 $stmt = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo, link_url FROM legislacao_banco WHERE ativo = 1 ORDER BY legislacao_norma');
+            } else {
+                $stmt = $db->prepare('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo, link_url FROM legislacao_banco WHERE ativo = 1 AND organizacao_id = ? ORDER BY legislacao_norma');
+                $stmt->execute([$user['org_id']]);
             }
             jsonSuccess('OK', ['legislacao' => $stmt->fetchAll()]);
             break;
@@ -1602,11 +1647,11 @@ try {
             $ativoL = (int)($_POST['ativo'] ?? 1);
             if ($norma === '') jsonError('Introduza a legislação/norma.');
             if ($lid > 0) {
-                $stmt = $db->prepare('UPDATE legislacao_banco SET legislacao_norma = ?, rolhas_aplicaveis = ?, resumo = ?, link_url = ?, ativo = ? WHERE id = ?');
-                $stmt->execute([$norma, $rolhas, $resumo, $linkUrl ?: null, $ativoL, $lid]);
+                $stmt = $db->prepare('UPDATE legislacao_banco SET legislacao_norma = ?, rolhas_aplicaveis = ?, resumo = ?, link_url = ?, ativo = ? WHERE id = ? AND organizacao_id = ?');
+                $stmt->execute([$norma, $rolhas, $resumo, $linkUrl ?: null, $ativoL, $lid, $user['org_id']]);
             } else {
-                $stmt = $db->prepare('INSERT INTO legislacao_banco (legislacao_norma, rolhas_aplicaveis, resumo, link_url, ativo) VALUES (?, ?, ?, ?, ?)');
-                $stmt->execute([$norma, $rolhas, $resumo, $linkUrl ?: null, $ativoL]);
+                $stmt = $db->prepare('INSERT INTO legislacao_banco (legislacao_norma, rolhas_aplicaveis, resumo, link_url, ativo, organizacao_id) VALUES (?, ?, ?, ?, ?, ?)');
+                $stmt->execute([$norma, $rolhas, $resumo, $linkUrl ?: null, $ativoL, $user['org_id']]);
                 $lid = $db->lastInsertId();
             }
             jsonSuccess(['id' => $lid, 'msg' => 'Legislação guardada.']);
@@ -1617,14 +1662,14 @@ try {
             $lid = (int)($_POST['id'] ?? 0);
             if ($lid <= 0) jsonError('ID inválido.');
             // Log before delete
-            $stmtDel = $db->prepare('SELECT * FROM legislacao_banco WHERE id = ?');
-            $stmtDel->execute([$lid]);
+            $stmtDel = $db->prepare('SELECT * FROM legislacao_banco WHERE id = ? AND organizacao_id = ?');
+            $stmtDel->execute([$lid, $user['org_id']]);
             $delData = $stmtDel->fetch();
             if ($delData) {
                 $db->prepare('INSERT INTO legislacao_log (legislacao_id, acao, dados_anteriores, notas, alterado_por) VALUES (?, ?, ?, ?, ?)')
                    ->execute([$lid, 'eliminada', json_encode($delData, JSON_UNESCAPED_UNICODE), 'Eliminada manualmente', $user['id']]);
             }
-            $db->prepare('DELETE FROM legislacao_banco WHERE id = ?')->execute([$lid]);
+            $db->prepare('DELETE FROM legislacao_banco WHERE id = ? AND organizacao_id = ?')->execute([$lid, $user['org_id']]);
             jsonSuccess('Legislação removida.');
             break;
 
@@ -1638,7 +1683,9 @@ try {
             $apiKey = getConfiguracao('openai_api_key', '');
             if (!$apiKey) jsonError('Chave OpenAI não configurada em Configurações.');
 
-            $legs = $db->query('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo FROM legislacao_banco WHERE ativo = 1 ORDER BY legislacao_norma')->fetchAll();
+            $stmtLeg = $db->prepare('SELECT id, legislacao_norma, rolhas_aplicaveis, resumo FROM legislacao_banco WHERE ativo = 1 AND organizacao_id = ? ORDER BY legislacao_norma');
+            $stmtLeg->execute([$user['org_id']]);
+            $legs = $stmtLeg->fetchAll();
             if (empty($legs)) jsonError('Nenhuma legislação ativa para verificar.');
 
             $legJson = json_encode($legs, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
@@ -1724,8 +1771,8 @@ try {
 
             if ($lid <= 0 || $norma === '') jsonError('Dados inválidos.');
 
-            $stmtA = $db->prepare('SELECT * FROM legislacao_banco WHERE id = ?');
-            $stmtA->execute([$lid]);
+            $stmtA = $db->prepare('SELECT * FROM legislacao_banco WHERE id = ? AND organizacao_id = ?');
+            $stmtA->execute([$lid, $user['org_id']]);
             $atual = $stmtA->fetch();
             if (!$atual) jsonError('Legislação não encontrada.');
 
@@ -1737,13 +1784,13 @@ try {
             ], JSON_UNESCAPED_UNICODE);
 
             if ($status === 'revogada') {
-                $db->prepare('UPDATE legislacao_banco SET ativo = 0 WHERE id = ?')->execute([$lid]);
+                $db->prepare('UPDATE legislacao_banco SET ativo = 0 WHERE id = ? AND organizacao_id = ?')->execute([$lid, $user['org_id']]);
                 $dadosNovos = json_encode(['ativo' => 0], JSON_UNESCAPED_UNICODE);
                 $acao = 'desativada';
             } elseif ($status === 'atualizada') {
-                $db->prepare('UPDATE legislacao_banco SET ativo = 0 WHERE id = ?')->execute([$lid]);
-                $db->prepare('INSERT INTO legislacao_banco (legislacao_norma, rolhas_aplicaveis, resumo, ativo) VALUES (?, ?, ?, 1)')
-                   ->execute([$norma, $rolhas, $resumo]);
+                $db->prepare('UPDATE legislacao_banco SET ativo = 0 WHERE id = ? AND organizacao_id = ?')->execute([$lid, $user['org_id']]);
+                $db->prepare('INSERT INTO legislacao_banco (legislacao_norma, rolhas_aplicaveis, resumo, ativo, organizacao_id) VALUES (?, ?, ?, 1, ?)')
+                   ->execute([$norma, $rolhas, $resumo, $user['org_id']]);
                 $newId = (int)$db->lastInsertId();
                 $dadosNovos = json_encode([
                     'novo_id' => $newId, 'legislacao_norma' => $norma,
@@ -1751,8 +1798,8 @@ try {
                 ], JSON_UNESCAPED_UNICODE);
                 $acao = 'atualizada';
             } else {
-                $db->prepare('UPDATE legislacao_banco SET legislacao_norma = ?, rolhas_aplicaveis = ?, resumo = ? WHERE id = ?')
-                   ->execute([$norma, $rolhas, $resumo, $lid]);
+                $db->prepare('UPDATE legislacao_banco SET legislacao_norma = ?, rolhas_aplicaveis = ?, resumo = ? WHERE id = ? AND organizacao_id = ?')
+                   ->execute([$norma, $rolhas, $resumo, $lid, $user['org_id']]);
                 $dadosNovos = json_encode([
                     'legislacao_norma' => $norma, 'rolhas_aplicaveis' => $rolhas, 'resumo' => $resumo
                 ], JSON_UNESCAPED_UNICODE);
@@ -1775,7 +1822,9 @@ try {
             $apiKey = getConfiguracao('openai_api_key', '');
             if (!$apiKey) jsonError('Chave OpenAI não configurada.');
 
-            $legs = $db->query('SELECT legislacao_norma, rolhas_aplicaveis, resumo, ativo FROM legislacao_banco ORDER BY ativo DESC, legislacao_norma')->fetchAll();
+            $stmtLeg = $db->prepare('SELECT legislacao_norma, rolhas_aplicaveis, resumo, ativo FROM legislacao_banco WHERE organizacao_id = ? ORDER BY ativo DESC, legislacao_norma');
+            $stmtLeg->execute([$user['org_id']]);
+            $legs = $stmtLeg->fetchAll();
             $legJson = json_encode($legs, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
             $systemMsg = "És um especialista em legislação europeia de materiais em contacto com alimentos, focado na indústria de rolhas de cortiça. Responde em português de Portugal, de forma clara e concisa. REGRA ABSOLUTA: NÃO INVENTES NADA — não inventes normas, números, datas, artigos ou informação que não tenhas a certeza de ser factual. Se não sabes, diz que não sabes.\n\nBase de legislação atual do sistema:\n{$legJson}";
@@ -1825,9 +1874,14 @@ try {
         // ===================================================================
         case 'get_ensaios_banco':
             if (isset($_GET['all']) && isSuperAdmin()) {
-                $stmt = $db->query('SELECT * FROM ensaios_banco ORDER BY ordem, categoria, ensaio');
+                $stmt = $db->prepare('SELECT * FROM ensaios_banco WHERE organizacao_id = ? ORDER BY ordem, categoria, ensaio');
+                $stmt->execute([$user['org_id']]);
+            } elseif (isSuperAdmin()) {
+                $stmt = $db->prepare('SELECT id, categoria, ensaio, metodo, nivel_especial, nqa, exemplo FROM ensaios_banco WHERE ativo = 1 AND organizacao_id = ? ORDER BY ordem, categoria, ensaio');
+                $stmt->execute([$user['org_id']]);
             } else {
-                $stmt = $db->query('SELECT id, categoria, ensaio, metodo, nivel_especial, nqa, exemplo FROM ensaios_banco WHERE ativo = 1 ORDER BY ordem, categoria, ensaio');
+                $stmt = $db->prepare('SELECT id, categoria, ensaio, metodo, nivel_especial, nqa, exemplo FROM ensaios_banco WHERE ativo = 1 AND organizacao_id = ? ORDER BY ordem, categoria, ensaio');
+                $stmt->execute([$user['org_id']]);
             }
             jsonSuccess('OK', ['ensaios' => $stmt->fetchAll()]);
             break;
@@ -1844,12 +1898,14 @@ try {
             $ativoE = (int)($_POST['ativo'] ?? 1);
             if (!$cat || !$ens) jsonError('Categoria e ensaio são obrigatórios.');
             if ($eid > 0) {
-                $stmt = $db->prepare('UPDATE ensaios_banco SET categoria = ?, ensaio = ?, metodo = ?, nivel_especial = ?, nqa = ?, exemplo = ?, ativo = ? WHERE id = ?');
-                $stmt->execute([$cat, $ens, $met, $niv, $nqa, $ex, $ativoE, $eid]);
+                $stmt = $db->prepare('UPDATE ensaios_banco SET categoria = ?, ensaio = ?, metodo = ?, nivel_especial = ?, nqa = ?, exemplo = ?, ativo = ? WHERE id = ? AND organizacao_id = ?');
+                $stmt->execute([$cat, $ens, $met, $niv, $nqa, $ex, $ativoE, $eid, $user['org_id']]);
             } else {
-                $maxOrdem = $db->query('SELECT COALESCE(MAX(ordem),0)+1 FROM ensaios_banco')->fetchColumn();
-                $stmt = $db->prepare('INSERT INTO ensaios_banco (categoria, ensaio, metodo, nivel_especial, nqa, exemplo, ativo, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-                $stmt->execute([$cat, $ens, $met, $niv, $nqa, $ex, $ativoE, $maxOrdem]);
+                $stmtMax = $db->prepare('SELECT COALESCE(MAX(ordem),0)+1 FROM ensaios_banco WHERE organizacao_id = ?');
+                $stmtMax->execute([$user['org_id']]);
+                $maxOrdem = $stmtMax->fetchColumn();
+                $stmt = $db->prepare('INSERT INTO ensaios_banco (categoria, ensaio, metodo, nivel_especial, nqa, exemplo, ativo, ordem, organizacao_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+                $stmt->execute([$cat, $ens, $met, $niv, $nqa, $ex, $ativoE, $maxOrdem, $user['org_id']]);
                 $eid = (int)$db->lastInsertId();
             }
             jsonSuccess('Ensaio guardado.', ['id' => $eid]);
@@ -1859,7 +1915,7 @@ try {
             if (!isSuperAdmin()) jsonError('Acesso negado.', 403);
             $eid = (int)($_POST['id'] ?? 0);
             if ($eid > 0) {
-                $db->prepare('DELETE FROM ensaios_banco WHERE id = ?')->execute([$eid]);
+                $db->prepare('DELETE FROM ensaios_banco WHERE id = ? AND organizacao_id = ?')->execute([$eid, $user['org_id']]);
             }
             jsonSuccess('Ensaio eliminado.');
             break;
@@ -2165,8 +2221,24 @@ try {
             $orig = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$orig) jsonError('Especificação não encontrada.');
 
+            // Contexto do produto e cliente para o prompt IA
+            $ctxProduto = '';
+            if (!empty($orig['produto_id'])) {
+                $stmtP = $db->prepare('SELECT nome FROM produtos WHERE id = ?');
+                $stmtP->execute([$orig['produto_id']]);
+                $ctxProduto = $stmtP->fetchColumn() ?: '';
+            }
+            $ctxCliente = '';
+            if (!empty($orig['cliente_id'])) {
+                $stmtC = $db->prepare('SELECT nome FROM clientes WHERE id = ?');
+                $stmtC->execute([$orig['cliente_id']]);
+                $ctxCliente = $stmtC->fetchColumn() ?: '';
+            }
+            $ctxTipoDoc = $orig['tipo_doc'] ?? 'Caderno de Encargos';
+            $ctxTitulo = $orig['titulo'] ?? '';
+
             // Carregar secções
-            $stmt = $db->prepare('SELECT id, titulo, conteudo, tipo, ordem FROM especificacao_seccoes WHERE especificacao_id = ? ORDER BY ordem');
+            $stmt = $db->prepare('SELECT id, titulo, conteudo, tipo, nivel, ordem FROM especificacao_seccoes WHERE especificacao_id = ? ORDER BY ordem');
             $stmt->execute([$especId]);
             $seccoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -2184,7 +2256,27 @@ try {
             }
 
             $nomeLang = $idiomasValidos[$idiomaDest];
-            $systemMsg = "You are a professional translator for technical specification documents (cork stoppers industry). Translate to {$nomeLang}. Keep HTML tags intact. Keep technical terms accurate. Return ONLY valid JSON with the same keys.";
+            $ctxLines = "DOCUMENT CONTEXT (use this to choose the correct technical terminology):";
+            if ($ctxTitulo) $ctxLines .= "\n- Title: {$ctxTitulo}";
+            if ($ctxProduto) $ctxLines .= "\n- Product: {$ctxProduto}";
+            if ($ctxCliente) $ctxLines .= "\n- Client: {$ctxCliente}";
+            $ctxLines .= "\n- Document type: {$ctxTipoDoc}";
+
+            $systemMsg = <<<PROMPT
+You are an expert technical translator for industrial product specification documents.
+
+Target language: {$nomeLang}.
+
+{$ctxLines}
+
+STRICT RULES:
+1. FAITHFUL TRANSLATION — translate the exact meaning. Never add, remove, paraphrase, or invent content.
+2. TECHNICAL ACCURACY — identify the industry/sector from the document context above and use the correct domain-specific terminology in the target language. Adapt vocabulary to the product type (e.g., cork stoppers, packaging, food, cosmetics, etc.).
+3. DO NOT TRANSLATE — keep these exactly as they are: ISO/EN/NP standard references (e.g., "iso 9727-1"), unit abbreviations (mm, %, kg/m³, daN, bar), code references (It04, S-4), proper nouns, brand names, product codes, NQA/NEI values, chemical formulas.
+4. PRESERVE HTML — keep all HTML tags, attributes, and structure exactly intact (<b>, <ul>, <li>, <br>, <table>, etc.).
+5. FORMAL REGISTER — use formal language appropriate for contractual/normative technical documents.
+6. Return ONLY valid JSON with the exact same keys. No explanations, no markdown.
+PROMPT;
             $userMsg = "Translate the following JSON values (not keys) to {$nomeLang}. Return ONLY the JSON object with translated values:\n\n" . json_encode($paraTraduzir, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
             $payload = [
@@ -2279,8 +2371,8 @@ try {
                     if ($sec['tipo'] !== 'ensaios' && isset($traduzido['sec_' . $i . '_conteudo'])) {
                         $conteudoTrad = $traduzido['sec_' . $i . '_conteudo'];
                     }
-                    $db->prepare('INSERT INTO especificacao_seccoes (especificacao_id, titulo, conteudo, tipo, ordem) VALUES (?, ?, ?, ?, ?)')
-                        ->execute([$novoId, sanitize($tituloTrad), $conteudoTrad, $sec['tipo'], $sec['ordem']]);
+                    $db->prepare('INSERT INTO especificacao_seccoes (especificacao_id, titulo, conteudo, tipo, nivel, ordem) VALUES (?, ?, ?, ?, ?, ?)')
+                        ->execute([$novoId, sanitize($tituloTrad), $conteudoTrad, $sec['tipo'], (int)($sec['nivel'] ?? 1), $sec['ordem']]);
                 }
 
                 // Clonar parametros, classes, defeitos, produtos, fornecedores

@@ -13,32 +13,54 @@ $orgId = $user['org_id'];
 $isSA = isSuperAdmin();
 
 // Estatísticas (scoped por org, super_admin vê tudo)
+// Otimizado: 6 queries → 2 queries (specs agrupadas + entidades via UNION ALL)
 if ($isSA) {
-    $stats['total'] = (int)$db->query("SELECT COUNT(*) FROM especificacoes")->fetchColumn();
-    $stats['ativos'] = (int)$db->query("SELECT COUNT(*) FROM especificacoes WHERE estado = 'ativo'")->fetchColumn();
-    $stats['rascunhos'] = (int)$db->query("SELECT COUNT(*) FROM especificacoes WHERE estado = 'rascunho'")->fetchColumn();
-    $stats['clientes'] = (int)$db->query("SELECT COUNT(*) FROM clientes WHERE ativo = 1")->fetchColumn();
-    $stats['produtos'] = (int)$db->query("SELECT COUNT(*) FROM produtos WHERE ativo = 1")->fetchColumn();
+    $specStats = $db->query("
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN estado = 'ativo' THEN 1 ELSE 0 END) as ativos,
+               SUM(CASE WHEN estado = 'rascunho' THEN 1 ELSE 0 END) as rascunhos
+        FROM especificacoes
+    ")->fetch();
+    $stats['total'] = (int)$specStats['total'];
+    $stats['ativos'] = (int)$specStats['ativos'];
+    $stats['rascunhos'] = (int)$specStats['rascunhos'];
+
+    $entityStats = $db->query("
+        SELECT 'clientes' as tipo, COUNT(*) as total FROM clientes WHERE ativo = 1
+        UNION ALL
+        SELECT 'produtos', COUNT(*) FROM produtos WHERE ativo = 1
+        UNION ALL
+        SELECT 'fornecedores', COUNT(*) FROM fornecedores WHERE ativo = 1
+    ")->fetchAll();
+    foreach ($entityStats as $row) {
+        $stats[$row['tipo']] = (int)$row['total'];
+    }
 } else {
-    $stmt = $db->prepare("SELECT COUNT(*) FROM especificacoes WHERE organizacao_id = ?");
+    $stmt = $db->prepare("
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN estado = 'ativo' THEN 1 ELSE 0 END) as ativos,
+               SUM(CASE WHEN estado = 'rascunho' THEN 1 ELSE 0 END) as rascunhos
+        FROM especificacoes
+        WHERE organizacao_id = ?
+    ");
     $stmt->execute([$orgId]);
-    $stats['total'] = (int)$stmt->fetchColumn();
+    $specStats = $stmt->fetch();
+    $stats['total'] = (int)$specStats['total'];
+    $stats['ativos'] = (int)$specStats['ativos'];
+    $stats['rascunhos'] = (int)$specStats['rascunhos'];
 
-    $stmt = $db->prepare("SELECT COUNT(*) FROM especificacoes WHERE estado = 'ativo' AND organizacao_id = ?");
-    $stmt->execute([$orgId]);
-    $stats['ativos'] = (int)$stmt->fetchColumn();
-
-    $stmt = $db->prepare("SELECT COUNT(*) FROM especificacoes WHERE estado = 'rascunho' AND organizacao_id = ?");
-    $stmt->execute([$orgId]);
-    $stats['rascunhos'] = (int)$stmt->fetchColumn();
-
-    $stmt = $db->prepare("SELECT COUNT(*) FROM clientes WHERE ativo = 1 AND organizacao_id = ?");
-    $stmt->execute([$orgId]);
-    $stats['clientes'] = (int)$stmt->fetchColumn();
-
-    $stmt = $db->prepare("SELECT COUNT(*) FROM produtos WHERE ativo = 1 AND (organizacao_id IS NULL OR organizacao_id = ?)");
-    $stmt->execute([$orgId]);
-    $stats['produtos'] = (int)$stmt->fetchColumn();
+    $stmt = $db->prepare("
+        SELECT 'clientes' as tipo, COUNT(*) as total FROM clientes WHERE ativo = 1 AND organizacao_id = ?
+        UNION ALL
+        SELECT 'produtos', COUNT(*) FROM produtos WHERE ativo = 1 AND (organizacao_id IS NULL OR organizacao_id = ?)
+        UNION ALL
+        SELECT 'fornecedores', COUNT(*) FROM fornecedores WHERE ativo = 1 AND organizacao_id = ?
+    ");
+    $stmt->execute([$orgId, $orgId, $orgId]);
+    $entityStats = $stmt->fetchAll();
+    foreach ($entityStats as $row) {
+        $stats[$row['tipo']] = (int)$row['total'];
+    }
 }
 
 // Filtros
@@ -151,7 +173,7 @@ $pageTitle = 'Cadernos de Encargos';
 $pageSubtitle = 'Sistema de Especificações Técnicas';
 $showNav = true;
 $activeNav = 'especificacoes';
-$breadcrumbs = [['label' => 'Dashboard']];
+$breadcrumbs = [];
 ?>
 <!DOCTYPE html>
 <html lang="pt-PT">
@@ -174,7 +196,7 @@ $breadcrumbs = [['label' => 'Dashboard']];
             </div>
             <div class="stat-card">
                 <div class="stat-number"><?= $stats['ativos'] ?></div>
-                <div class="stat-label">Ativos</div>
+                <div class="stat-label">Em Vigor</div>
             </div>
             <div class="stat-card">
                 <div class="stat-number"><?= $stats['rascunhos'] ?></div>
@@ -186,6 +208,10 @@ $breadcrumbs = [['label' => 'Dashboard']];
                 <div class="stat-label">Clientes</div>
             </div>
             <?php endif; ?>
+            <div class="stat-card">
+                <div class="stat-number"><?= $stats['fornecedores'] ?></div>
+                <div class="stat-label">Fornecedores</div>
+            </div>
             <div class="stat-card">
                 <div class="stat-number"><?= $stats['produtos'] ?></div>
                 <div class="stat-label">Produtos</div>

@@ -169,16 +169,19 @@ if (!$isNew && $grupoVersao) {
 }
 
 // Templates de parâmetros
-$categoriasPadrao = getCategoriasPadrao();
+$categoriasPadrao = getCategoriasPadrao($orgId);
 $classesPadrao = getClassesPadrao();
 $defeitosPadrao = getDefeitosPadrao();
 // Config visual (JSON -> array com defaults, usando cores da org)
 $orgCor = $user['org_cor'] ?? '#2596be';
 $configVisualDefaults = [
     'cor_titulos' => $orgCor,
+    'cor_subtitulos' => $orgCor,
     'cor_linhas' => $orgCor,
     'cor_nome' => $orgCor,
     'tamanho_titulos' => '14',
+    'tamanho_subtitulos' => '12',
+    'subtitulos_bold' => '1',
     'tamanho_nome' => '16',
     'logo_custom' => '',
 ];
@@ -552,6 +555,25 @@ $breadcrumbs = [
             display: inline-flex;
             align-items: center;
         }
+        /* Secções secundárias (nivel 2) — indentação */
+        .seccao-block[data-nivel="2"] {
+            margin-left: 32px;
+            border-left: 3px solid var(--color-primary, #2563eb);
+            padding-left: 12px;
+        }
+        .seccao-block[data-nivel="2"] .seccao-numero {
+            font-size: 13px;
+            color: var(--color-muted, #6b7280);
+        }
+        /* Modal Nivel */
+        .nivel-modal-btns { display: flex; gap: 16px; justify-content: center; margin-top: 16px; }
+        .nivel-modal-btns .btn-nivel {
+            flex: 1; padding: 16px; border: 2px solid var(--color-border, #e5e7eb); border-radius: 8px;
+            background: white; cursor: pointer; text-align: center; transition: all 0.15s;
+        }
+        .nivel-modal-btns .btn-nivel:hover { border-color: var(--color-primary, #2563eb); background: #f0f7ff; }
+        .nivel-modal-btns .btn-nivel strong { display: block; font-size: 15px; margin-bottom: 4px; }
+        .nivel-modal-btns .btn-nivel span { font-size: 12px; color: var(--color-muted, #6b7280); }
 
         /* Secção de ensaios inline (tabela editável) */
         .seccao-ensaios-table {
@@ -924,7 +946,7 @@ $breadcrumbs = [
                 <?php if (!$isNew): ?>
                 <button class="btn btn-outline-primary btn-sm" onclick="traduzirEspecificacao()" title="Traduzir para outro idioma com IA">Traduzir</button>
                 <?php endif; ?>
-                <a href="<?= BASE_PATH ?>/pdf.php?id=<?= $espec['id'] ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Exportar PDF" id="btnPdf"<?= $isNew ? ' style="display:none"' : '' ?>>PDF</a>
+                <a href="<?= BASE_PATH ?>/pdf.php?id=<?= $espec['id'] ?>&view=1&t=<?= time() ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Exportar PDF" id="btnPdf"<?= $isNew ? ' style="display:none"' : '' ?>>PDF</a>
                 <a href="<?= BASE_PATH ?>/ver.php?id=<?= $espec['id'] ?>" class="btn btn-outline-primary btn-sm" target="_blank" title="Ver documento completo" id="btnVer"<?= $isNew ? ' style="display:none"' : '' ?>>Ver</a>
                 <button class="btn btn-outline-primary btn-sm" onclick="window.print()" title="Imprimir">Imprimir</button>
                 <?php if (!$isNew && in_array($user['role'], ['super_admin', 'org_admin'])): ?>
@@ -1124,13 +1146,30 @@ $breadcrumbs = [
                         </div>
 
                         <div id="seccoesContainer">
+                            <?php
+                            // Calcular numeração hierárquica
+                            $hierNumbers = [];
+                            $mainCounter = 0;
+                            $subCounter = 0;
+                            foreach ($espec['seccoes'] as $si => $s) {
+                                $niv = (int)($s['nivel'] ?? 1);
+                                if ($niv === 1) {
+                                    $mainCounter++;
+                                    $subCounter = 0;
+                                    $hierNumbers[$si] = $mainCounter . '.';
+                                } else {
+                                    $subCounter++;
+                                    $hierNumbers[$si] = $mainCounter . '.' . $subCounter . '.';
+                                }
+                            }
+                            ?>
                             <?php foreach ($espec['seccoes'] as $i => $sec):
                                 $secTipo = $sec['tipo'] ?? 'texto';
                             ?>
                                 <?php if ($secTipo === 'texto'): ?>
-                                <div class="seccao-block" data-seccao-idx="<?= $i ?>" data-tipo="texto">
+                                <div class="seccao-block" data-seccao-idx="<?= $i ?>" data-tipo="texto" data-nivel="<?= (int)($sec['nivel'] ?? 1) ?>">
                                     <div class="seccao-header">
-                                        <span class="seccao-numero"><?= $i + 1 ?>.</span>
+                                        <span class="seccao-numero"><?= $hierNumbers[$i] ?? ($i + 1) . '.' ?></span>
                                         <input type="text" class="seccao-titulo" value="<?= sanitize($sec['titulo'] ?? '') ?>" placeholder="Título da secção">
                                         <div class="seccao-ai-btns">
                                             <button class="btn-ai" onclick="abrirAI(this, 'sugerir')" title="Sugerir conteúdo com IA"><span class="ai-icon">&#10024;</span> Sugerir</button>
@@ -1149,10 +1188,11 @@ $breadcrumbs = [
                                 <?php
                                     $ficConf = json_decode($sec['conteudo'] ?? '{}', true);
                                     $ficPosicao = $ficConf['posicao'] ?? 'final';
+                                    $ficGrupo = $ficConf['grupo'] ?? 'default';
                                 ?>
-                                <div class="seccao-block" data-seccao-idx="<?= $i ?>" data-tipo="ficheiros" id="ficheirosSection">
+                                <div class="seccao-block" data-seccao-idx="<?= $i ?>" data-tipo="ficheiros" data-nivel="<?= (int)($sec['nivel'] ?? 1) ?>" data-grupo="<?= sanitize($ficGrupo) ?>">
                                     <div class="seccao-header">
-                                        <span class="seccao-numero"><?= $i + 1 ?>.</span>
+                                        <span class="seccao-numero"><?= $hierNumbers[$i] ?? ($i + 1) . '.' ?></span>
                                         <input type="text" class="seccao-titulo" value="<?= sanitize($sec['titulo'] ?? 'Ficheiros Anexos') ?>" placeholder="Título">
                                         <span class="pill pill-info" style="font-size:10px; padding:2px 8px;">Ficheiros</span>
                                         <div class="seccao-actions">
@@ -1164,22 +1204,22 @@ $breadcrumbs = [
                                     <div style="padding: var(--spacing-md);">
                                         <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">
                                             <label style="font-size:12px; font-weight:600; color:var(--color-text);">No PDF:</label>
-                                            <select id="ficheiros_posicao" style="font-size:12px; padding:4px 8px; border:1px solid var(--color-border); border-radius:4px;">
+                                            <select class="fic-posicao" style="font-size:12px; padding:4px 8px; border:1px solid var(--color-border); border-radius:4px;">
                                                 <option value="local" <?= $ficPosicao === 'local' ? 'selected' : '' ?>>Mostrar neste local</option>
                                                 <option value="final" <?= $ficPosicao === 'final' ? 'selected' : '' ?>>Mostrar no final do documento</option>
                                             </select>
                                         </div>
-                                        <div class="upload-zone" id="uploadZone" style="cursor:pointer; padding:20px; border:2px dashed var(--color-border); border-radius:8px; text-align:center;">
+                                        <div class="upload-zone" style="cursor:pointer; padding:20px; border:2px dashed var(--color-border); border-radius:8px; text-align:center;">
                                             <div class="icon">&#128206;</div>
                                             <p><strong>Arraste ficheiros ou clique para selecionar</strong></p>
                                             <p class="muted" style="font-size:12px;">Máx. 50MB. Formatos: PDF, DOC, XLS, JPG, PNG</p>
-                                            <input type="file" id="fileInput" multiple style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.bmp,.tif,.tiff,.csv,.txt">
+                                            <input type="file" class="fic-file-input" multiple style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.bmp,.tif,.tiff,.csv,.txt">
                                         </div>
-                                        <div id="uploadProgress" class="hidden" style="margin-top:8px;">
-                                            <div class="flex-between"><span class="muted" id="uploadFileName">A enviar...</span><span class="muted" id="uploadPercent">0%</span></div>
-                                            <div class="progress-bar-container"><div class="progress-bar-fill" id="uploadBar" style="width:0%"></div></div>
+                                        <div class="fic-progress hidden" style="margin-top:8px;">
+                                            <div class="flex-between"><span class="muted fic-file-name">A enviar...</span><span class="muted fic-percent">0%</span></div>
+                                            <div class="progress-bar-container"><div class="progress-bar-fill fic-bar" style="width:0%"></div></div>
                                         </div>
-                                        <ul class="file-list" id="fileList" style="margin-top:8px;"></ul>
+                                        <ul class="file-list fic-file-list" style="margin-top:8px;"></ul>
                                     </div>
                                 </div>
                                 <?php elseif ($secTipo === 'ensaios'): ?>
@@ -1210,9 +1250,9 @@ $breadcrumbs = [
                                     }
                                     $prevCat = null;
                                 ?>
-                                <div class="seccao-block" data-seccao-idx="<?= $i ?>" data-tipo="ensaios">
+                                <div class="seccao-block" data-seccao-idx="<?= $i ?>" data-tipo="ensaios" data-nivel="<?= (int)($sec['nivel'] ?? 1) ?>">
                                     <div class="seccao-header">
-                                        <span class="seccao-numero"><?= $i + 1 ?>.</span>
+                                        <span class="seccao-numero"><?= $hierNumbers[$i] ?? ($i + 1) . '.' ?></span>
                                         <input type="text" class="seccao-titulo" value="<?= sanitize($sec['titulo'] ?? 'Características Técnicas') ?>" placeholder="Título da secção">
                                         <span class="pill pill-info" style="font-size:10px; padding:2px 8px;">Ensaios</span>
                                         <div class="seccao-actions">
@@ -1280,10 +1320,10 @@ $breadcrumbs = [
 
                         <!-- Barra fixa de ações -->
                         <div class="content-actions-bar">
-                            <button class="btn btn-primary btn-sm" onclick="adicionarSeccao()">&#128196; + Secção</button>
-                            <button class="btn btn-secondary btn-sm" onclick="abrirSelectorEnsaios()">&#9881; + Ensaios</button>
-                            <button class="btn btn-secondary btn-sm" onclick="abrirSelectorLegConteudo()">&#9878; + Legislação</button>
-                            <button class="btn btn-secondary btn-sm" onclick="adicionarSeccaoFicheiros()">&#128206; + Ficheiros</button>
+                            <button class="btn btn-primary btn-sm" onclick="pedirNivelSeccao('texto')">&#128196; + Texto</button>
+                            <button class="btn btn-secondary btn-sm" onclick="pedirNivelSeccao('ensaios')">&#9881; + Ensaios</button>
+                            <button class="btn btn-secondary btn-sm" onclick="pedirNivelSeccao('legislacao')">&#9878; + Legislação</button>
+                            <button class="btn btn-secondary btn-sm" onclick="pedirNivelSeccao('ficheiros')">&#128206; + Ficheiros</button>
                         </div>
                     </div>
                 </div>
@@ -1754,7 +1794,7 @@ $breadcrumbs = [
                             <div class="form-group">
                                 <label for="cfg_tamanho_nome">Tamanho</label>
                                 <div style="display:flex; align-items:center; gap:8px;">
-                                    <input type="range" id="cfg_tamanho_nome" min="12" max="28" value="<?= (int)$configVisual['tamanho_nome'] ?>" style="flex:1;">
+                                    <input type="range" id="cfg_tamanho_nome" min="8" max="28" value="<?= (int)$configVisual['tamanho_nome'] ?>" style="flex:1;">
                                     <span id="cfg_tamanho_nome_val" style="font-weight:600; min-width:36px; font-size:12px;"><?= (int)$configVisual['tamanho_nome'] ?>pt</span>
                                 </div>
                             </div>
@@ -1773,9 +1813,35 @@ $breadcrumbs = [
                             <div class="form-group">
                                 <label for="cfg_tamanho_titulos">Tamanho</label>
                                 <div style="display:flex; align-items:center; gap:8px;">
-                                    <input type="range" id="cfg_tamanho_titulos" min="10" max="24" value="<?= (int)$configVisual['tamanho_titulos'] ?>" style="flex:1;">
+                                    <input type="range" id="cfg_tamanho_titulos" min="8" max="28" value="<?= (int)$configVisual['tamanho_titulos'] ?>" style="flex:1;">
                                     <span id="cfg_tamanho_titulos_val" style="font-weight:600; min-width:36px; font-size:12px;"><?= (int)$configVisual['tamanho_titulos'] ?>pt</span>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Subtítulos (secções secundárias) -->
+                        <div class="section-label" style="margin-top:var(--spacing-md); margin-bottom:var(--spacing-sm);">Subtítulos (Secções Secundárias)</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="cfg_cor_subtitulos">Cor</label>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <input type="color" id="cfg_cor_subtitulos" value="<?= sanitize($configVisual['cor_subtitulos']) ?>" style="width:40px; height:32px; padding:2px; border:1px solid var(--color-border); border-radius:4px; cursor:pointer;">
+                                    <input type="text" id="cfg_cor_subtitulos_hex" value="<?= sanitize($configVisual['cor_subtitulos']) ?>" style="width:80px; font-family:monospace; font-size:12px;" maxlength="7">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="cfg_tamanho_subtitulos">Tamanho</label>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <input type="range" id="cfg_tamanho_subtitulos" min="8" max="28" value="<?= (int)$configVisual['tamanho_subtitulos'] ?>" style="flex:1;">
+                                    <span id="cfg_tamanho_subtitulos_val" style="font-weight:600; min-width:36px; font-size:12px;"><?= (int)$configVisual['tamanho_subtitulos'] ?>pt</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label style="margin-bottom:4px;">Estilo</label>
+                                <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
+                                    <input type="checkbox" id="cfg_subtitulos_bold" <?= ($configVisual['subtitulos_bold'] ?? '1') === '1' ? 'checked' : '' ?> style="width:16px; height:16px;">
+                                    Negrito
+                                </label>
                             </div>
                         </div>
 
@@ -1799,6 +1865,9 @@ $breadcrumbs = [
                             </div>
                             <div id="cfgPreviewTitle" style="font-weight:700; color:<?= sanitize($configVisual['cor_titulos']) ?>; font-size:<?= (int)$configVisual['tamanho_titulos'] ?>pt; padding-bottom:6px; border-bottom:2px solid <?= sanitize($configVisual['cor_linhas']) ?>; margin-bottom:8px;">
                                 1. Exemplo de Título de Secção
+                            </div>
+                            <div id="cfgPreviewSubtitle" style="font-weight:700; color:<?= sanitize($configVisual['cor_subtitulos']) ?>; font-size:<?= (int)$configVisual['tamanho_subtitulos'] ?>pt; padding-bottom:4px; border-bottom:1px solid <?= sanitize($configVisual['cor_linhas']) ?>; margin-bottom:8px; margin-left:15px;">
+                                1.1. Exemplo de Subtítulo
                             </div>
                             <p style="font-size: var(--font-size-sm); color: var(--color-text-secondary); margin:0;">
                                 Texto de exemplo do conteúdo da secção...
@@ -1989,6 +2058,30 @@ $breadcrumbs = [
         </div>
     </div>
 
+    <!-- MODAL: NIVEL DA SECÇÃO -->
+    <div class="modal-overlay hidden" id="nivelModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+        <div class="modal-box" style="max-width:400px;">
+            <div class="modal-header">
+                <h3>Tipo de Secção</h3>
+                <button class="modal-close" onclick="fecharNivelModal()">&times;</button>
+            </div>
+            <p style="text-align:center; margin:8px 0 0; color:var(--color-muted);">Escolha o nível hierárquico desta secção:</p>
+            <div class="nivel-modal-btns">
+                <button class="btn-nivel" onclick="confirmarNivel(1)">
+                    <strong>Principal</strong>
+                    <span>1. / 2. / 3.</span>
+                </button>
+                <button class="btn-nivel" onclick="confirmarNivel(2)">
+                    <strong>Secundária</strong>
+                    <span>1.1 / 1.2 / 2.1</span>
+                </button>
+            </div>
+            <div class="modal-footer" style="justify-content:center;">
+                <button class="btn btn-secondary btn-sm" onclick="fecharNivelModal()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: ALERTA / CONFIRMACAO -->
     <div class="modal-overlay hidden" id="modalAlert">
         <div class="modal-box">
@@ -2141,13 +2234,64 @@ $breadcrumbs = [
     <?php endforeach; ?>
 
     // ============================================================
+    // NIVEL DE SECÇÃO (modal)
+    // ============================================================
+    var _pendingNivel = 1;
+    var _pendingAction = null;
+
+    function pedirNivelSeccao(action) {
+        var container = document.getElementById('seccoesContainer');
+        var blocks = container.querySelectorAll('.seccao-block');
+        // Se não houver secções, auto-principal
+        if (blocks.length === 0) {
+            _pendingNivel = 1;
+            executarAcaoSeccao(action);
+            return;
+        }
+        _pendingAction = action;
+        var m = document.getElementById('nivelModal');
+        m.classList.remove('hidden');
+        m.style.display = 'flex';
+    }
+
+    function confirmarNivel(nivel) {
+        _pendingNivel = nivel;
+        var action = _pendingAction;
+        fecharNivelModal();
+        if (action) {
+            executarAcaoSeccao(action);
+        }
+    }
+
+    function fecharNivelModal() {
+        var m = document.getElementById('nivelModal');
+        m.style.display = 'none';
+        m.classList.add('hidden');
+        _pendingAction = null;
+    }
+
+    function executarAcaoSeccao(action) {
+        if (action === 'texto') {
+            adicionarSeccao();
+        } else if (action === 'ensaios') {
+            abrirSelectorEnsaios();
+        } else if (action === 'legislacao') {
+            abrirSelectorLegConteudo();
+        } else if (action === 'ficheiros') {
+            adicionarSeccaoFicheiros();
+        }
+    }
+
+    // ============================================================
     // SECÇÕES DINÂMICAS
     // ============================================================
-    function criarSeccao(titulo, conteudo, idx) {
+    function criarSeccao(titulo, conteudo, idx, nivel) {
+        nivel = nivel || 1;
         var block = document.createElement('div');
         block.className = 'seccao-block';
         block.setAttribute('data-seccao-idx', idx);
         block.setAttribute('data-tipo', 'texto');
+        block.setAttribute('data-nivel', nivel);
 
         var headerHtml =
             '<div class="seccao-header">' +
@@ -2174,11 +2318,13 @@ $breadcrumbs = [
         return { block: block, editorId: editorId };
     }
 
-    function criarSeccaoEnsaios(titulo, ensaiosArr, idx) {
+    function criarSeccaoEnsaios(titulo, ensaiosArr, idx, nivel) {
+        nivel = nivel || 1;
         var block = document.createElement('div');
         block.className = 'seccao-block';
         block.setAttribute('data-seccao-idx', idx);
         block.setAttribute('data-tipo', 'ensaios');
+        block.setAttribute('data-nivel', nivel);
 
         var headerHtml =
             '<div class="seccao-header">' +
@@ -2332,11 +2478,11 @@ $breadcrumbs = [
         });
     }
 
-    function adicionarSeccao(tipo, titulo, conteudo) {
+    function adicionarSeccao(tipo, titulo, conteudo, nivel) {
         var container = document.getElementById('seccoesContainer');
         var idx = seccaoCounter++;
 
-        var result = criarSeccao(titulo || '', conteudo || '', idx);
+        var result = criarSeccao(titulo || '', conteudo || '', idx, nivel || _pendingNivel);
         container.appendChild(result.block);
 
         var empty = document.getElementById('seccoesEmpty');
@@ -2348,11 +2494,11 @@ $breadcrumbs = [
         result.block.querySelector('.seccao-titulo').focus();
     }
 
-    function adicionarSeccaoEnsaios(ensaiosArr, titulo) {
+    function adicionarSeccaoEnsaios(ensaiosArr, titulo, nivel) {
         var container = document.getElementById('seccoesContainer');
         var idx = seccaoCounter++;
 
-        var result = criarSeccaoEnsaios(titulo || 'Características Técnicas', ensaiosArr, idx);
+        var result = criarSeccaoEnsaios(titulo || 'Características Técnicas', ensaiosArr, idx, nivel || _pendingNivel);
         container.appendChild(result.block);
 
         var empty = document.getElementById('seccoesEmpty');
@@ -3025,8 +3171,19 @@ $breadcrumbs = [
 
     function renumerarSeccoes() {
         var container = document.getElementById('seccoesContainer');
-        container.querySelectorAll('.seccao-block').forEach(function(block, i) {
-            block.querySelector('.seccao-numero').textContent = (i + 1) + '.';
+        var mainCounter = 0, subCounter = 0;
+        container.querySelectorAll('.seccao-block').forEach(function(block) {
+            var nivel = parseInt(block.getAttribute('data-nivel')) || 1;
+            var numStr;
+            if (nivel === 1) {
+                mainCounter++;
+                subCounter = 0;
+                numStr = mainCounter + '.';
+            } else {
+                subCounter++;
+                numStr = mainCounter + '.' + subCounter + '.';
+            }
+            block.querySelector('.seccao-numero').textContent = numStr;
         });
     }
 
@@ -3173,11 +3330,23 @@ $breadcrumbs = [
         });
     }
     syncColorInputs('cfg_cor_titulos', 'cfg_cor_titulos_hex');
+    syncColorInputs('cfg_cor_subtitulos', 'cfg_cor_subtitulos_hex');
     syncColorInputs('cfg_cor_linhas', 'cfg_cor_linhas_hex');
     syncColorInputs('cfg_cor_nome', 'cfg_cor_nome_hex');
 
     document.getElementById('cfg_tamanho_titulos').addEventListener('input', function() {
         document.getElementById('cfg_tamanho_titulos_val').textContent = this.value + 'pt';
+        atualizarConfigPreview();
+        marcarAlterado();
+    });
+
+    document.getElementById('cfg_tamanho_subtitulos').addEventListener('input', function() {
+        document.getElementById('cfg_tamanho_subtitulos_val').textContent = this.value + 'pt';
+        atualizarConfigPreview();
+        marcarAlterado();
+    });
+
+    document.getElementById('cfg_subtitulos_bold').addEventListener('change', function() {
         atualizarConfigPreview();
         marcarAlterado();
     });
@@ -3190,16 +3359,28 @@ $breadcrumbs = [
 
     function atualizarConfigPreview() {
         var corTitulos = document.getElementById('cfg_cor_titulos').value;
+        var corSubtitulos = document.getElementById('cfg_cor_subtitulos').value;
         var corLinhas = document.getElementById('cfg_cor_linhas').value;
         var tamTitulos = document.getElementById('cfg_tamanho_titulos').value;
+        var tamSubtitulos = document.getElementById('cfg_tamanho_subtitulos').value;
         var corNome = document.getElementById('cfg_cor_nome').value;
         var tamNome = document.getElementById('cfg_tamanho_nome').value;
+        var subBold = document.getElementById('cfg_subtitulos_bold').checked;
 
         // Preview no tab config - secção title
         var prev = document.getElementById('cfgPreviewTitle');
         prev.style.color = corTitulos;
         prev.style.fontSize = tamTitulos + 'pt';
         prev.style.borderBottomColor = corLinhas;
+
+        // Preview no tab config - subtítulo
+        var prevSub = document.getElementById('cfgPreviewSubtitle');
+        if (prevSub) {
+            prevSub.style.color = corSubtitulos;
+            prevSub.style.fontSize = tamSubtitulos + 'pt';
+            prevSub.style.fontWeight = subBold ? 'bold' : 'normal';
+            prevSub.style.borderBottomColor = corLinhas;
+        }
 
         // Preview no tab config - nome
         var prevNome = document.getElementById('cfgPreviewNome');
@@ -3210,8 +3391,11 @@ $breadcrumbs = [
 
         // Aplicar na sidebar preview
         configVisual.cor_titulos = corTitulos;
+        configVisual.cor_subtitulos = corSubtitulos;
         configVisual.cor_linhas = corLinhas;
         configVisual.tamanho_titulos = tamTitulos;
+        configVisual.tamanho_subtitulos = tamSubtitulos;
+        configVisual.subtitulos_bold = subBold ? '1' : '0';
         configVisual.cor_nome = corNome;
         configVisual.tamanho_nome = tamNome;
         aplicarConfigPreviewSidebar();
@@ -3235,8 +3419,11 @@ $breadcrumbs = [
     function recolherConfigVisual() {
         return {
             cor_titulos: document.getElementById('cfg_cor_titulos').value,
+            cor_subtitulos: document.getElementById('cfg_cor_subtitulos').value,
             cor_linhas: document.getElementById('cfg_cor_linhas').value,
             tamanho_titulos: document.getElementById('cfg_tamanho_titulos').value,
+            tamanho_subtitulos: document.getElementById('cfg_tamanho_subtitulos').value,
+            subtitulos_bold: document.getElementById('cfg_subtitulos_bold').checked ? '1' : '0',
             cor_nome: document.getElementById('cfg_cor_nome').value,
             tamanho_nome: document.getElementById('cfg_tamanho_nome').value,
             logo_custom: configVisual.logo_custom || ''
@@ -3476,10 +3663,10 @@ $breadcrumbs = [
         marcarAlterado();
     }
 
-    function adicionarSeccaoTexto(titulo, conteudo) {
+    function adicionarSeccaoTexto(titulo, conteudo, nivel) {
         var container = document.getElementById('seccoesContainer');
         var idx = seccaoCounter++;
-        var result = criarSeccao(titulo, conteudo, idx);
+        var result = criarSeccao(titulo, conteudo, idx, nivel || _pendingNivel);
         container.appendChild(result.block);
         var empty = document.getElementById('seccoesEmpty');
         if (empty) empty.remove();
@@ -3566,8 +3753,9 @@ $breadcrumbs = [
                 }
                 conteudo = JSON.stringify({ colWidths: colWidths, rows: ensaiosArr, merges: merges });
             } else if (tipo === 'ficheiros') {
-                var posSelect = block.querySelector('#ficheiros_posicao');
-                conteudo = JSON.stringify({ posicao: posSelect ? posSelect.value : 'final' });
+                var posSelect = block.querySelector('.fic-posicao');
+                var grupo = block.getAttribute('data-grupo') || 'default';
+                conteudo = JSON.stringify({ posicao: posSelect ? posSelect.value : 'final', grupo: grupo });
             } else {
                 var editorEl = block.querySelector('.seccao-editor');
                 if (editorEl) {
@@ -3579,7 +3767,8 @@ $breadcrumbs = [
                 titulo: titulo,
                 conteudo: conteudo,
                 tipo: tipo,
-                ordem: i
+                ordem: i,
+                nivel: parseInt(block.getAttribute('data-nivel')) || 1
             });
         });
 
@@ -3638,7 +3827,7 @@ $breadcrumbs = [
                     // Mostrar botões Ver e PDF
                     var btnPdf = document.getElementById('btnPdf');
                     var btnVer = document.getElementById('btnVer');
-                    if (btnPdf) { btnPdf.href = BASE_PATH + '/pdf.php?id=' + especId; btnPdf.style.display = ''; }
+                    if (btnPdf) { btnPdf.href = BASE_PATH + '/pdf.php?id=' + especId + '&view=1&t=' + Date.now(); btnPdf.style.display = ''; }
                     if (btnVer) { btnVer.href = BASE_PATH + '/ver.php?id=' + especId; btnVer.style.display = ''; }
                 }
 
@@ -3974,20 +4163,18 @@ $breadcrumbs = [
     // FICHEIROS - Secção no conteúdo
     // ============================================================
     function adicionarSeccaoFicheiros() {
-        // Evitar duplicados
-        if (document.getElementById('ficheirosSection')) {
-            showToast('Já existe uma secção de ficheiros.', 'warning');
-            return;
-        }
         criarSeccaoFicheiros();
     }
 
-    function criarSeccaoFicheiros() {
+    function criarSeccaoFicheiros(nivel, grupo) {
+        nivel = nivel || _pendingNivel || 1;
+        grupo = grupo || ('g' + Date.now() + Math.random().toString(36).substr(2, 4));
         var container = document.getElementById('seccoesContainer');
         var block = document.createElement('div');
         block.className = 'seccao-block';
-        block.id = 'ficheirosSection';
         block.setAttribute('data-tipo', 'ficheiros');
+        block.setAttribute('data-nivel', nivel);
+        block.setAttribute('data-grupo', grupo);
 
         block.innerHTML =
             '<div class="seccao-header">' +
@@ -4003,35 +4190,36 @@ $breadcrumbs = [
             '<div style="padding: var(--spacing-md);">' +
                 '<div style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">' +
                     '<label style="font-size:12px; font-weight:600; color:var(--color-text);">No PDF:</label>' +
-                    '<select id="ficheiros_posicao" style="font-size:12px; padding:4px 8px; border:1px solid var(--color-border); border-radius:4px;">' +
+                    '<select class="fic-posicao" style="font-size:12px; padding:4px 8px; border:1px solid var(--color-border); border-radius:4px;">' +
                         '<option value="local">Mostrar neste local</option>' +
                         '<option value="final">Mostrar no final do documento</option>' +
                     '</select>' +
                 '</div>' +
-                '<div class="upload-zone" id="uploadZone" style="cursor:pointer; padding:20px; border:2px dashed var(--color-border); border-radius:8px; text-align:center;">' +
+                '<div class="upload-zone" style="cursor:pointer; padding:20px; border:2px dashed var(--color-border); border-radius:8px; text-align:center;">' +
                     '<div class="icon">&#128206;</div>' +
                     '<p><strong>Arraste ficheiros ou clique para selecionar</strong></p>' +
                     '<p class="muted" style="font-size:12px;">Máx. 50MB. Formatos: PDF, DOC, XLS, JPG, PNG</p>' +
-                    '<input type="file" id="fileInput" multiple style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.bmp,.tif,.tiff,.csv,.txt">' +
+                    '<input type="file" class="fic-file-input" multiple style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.bmp,.tif,.tiff,.csv,.txt">' +
                 '</div>' +
-                '<div id="uploadProgress" class="hidden" style="margin-top:8px;">' +
-                    '<div class="flex-between"><span class="muted" id="uploadFileName">A enviar...</span><span class="muted" id="uploadPercent">0%</span></div>' +
-                    '<div class="progress-bar-container"><div class="progress-bar-fill" id="uploadBar" style="width:0%"></div></div>' +
+                '<div class="fic-progress hidden" style="margin-top:8px;">' +
+                    '<div class="flex-between"><span class="muted fic-file-name">A enviar...</span><span class="muted fic-percent">0%</span></div>' +
+                    '<div class="progress-bar-container"><div class="progress-bar-fill fic-bar" style="width:0%"></div></div>' +
                 '</div>' +
-                '<ul class="file-list" id="fileList" style="margin-top:8px;"></ul>' +
+                '<ul class="file-list fic-file-list" style="margin-top:8px;"></ul>' +
             '</div>';
 
         container.appendChild(block);
         var empty = document.getElementById('seccoesEmpty');
         if (empty) empty.remove();
         renumerarSeccoes();
-        initUploadListeners();
+        initUploadListeners(block);
         marcarAlterado();
+        return block;
     }
 
-    function initUploadListeners() {
-        var uploadZone = document.getElementById('uploadZone');
-        var fileInput = document.getElementById('fileInput');
+    function initUploadListeners(block) {
+        var uploadZone = block.querySelector('.upload-zone');
+        var fileInput = block.querySelector('.fic-file-input');
         if (!uploadZone || !fileInput) return;
 
         uploadZone.addEventListener('click', function() { fileInput.click(); });
@@ -4039,26 +4227,27 @@ $breadcrumbs = [
         uploadZone.addEventListener('dragleave', function(e) { e.preventDefault(); e.stopPropagation(); uploadZone.classList.remove('dragover'); });
         uploadZone.addEventListener('drop', function(e) {
             e.preventDefault(); e.stopPropagation(); uploadZone.classList.remove('dragover');
-            if (e.dataTransfer.files.length > 0) enviarFicheiros(e.dataTransfer.files);
+            if (e.dataTransfer.files.length > 0) enviarFicheiros(e.dataTransfer.files, block);
         });
         fileInput.addEventListener('change', function() {
-            if (this.files.length > 0) { enviarFicheiros(this.files); this.value = ''; }
+            if (this.files.length > 0) { enviarFicheiros(this.files, block); this.value = ''; }
         });
     }
 
-    function enviarFicheiros(files) {
+    function enviarFicheiros(files, block) {
         if (especId === 0) {
             showToast('Guarde a especificação antes de anexar ficheiros.', 'warning');
             return;
         }
-        for (var i = 0; i < files.length; i++) enviarFicheiro(files[i]);
+        for (var i = 0; i < files.length; i++) enviarFicheiro(files[i], block);
     }
 
-    function enviarFicheiro(file) {
-        var progressEl = document.getElementById('uploadProgress');
-        var barEl = document.getElementById('uploadBar');
-        var nameEl = document.getElementById('uploadFileName');
-        var percentEl = document.getElementById('uploadPercent');
+    function enviarFicheiro(file, block) {
+        var progressEl = block.querySelector('.fic-progress');
+        var barEl = block.querySelector('.fic-bar');
+        var nameEl = block.querySelector('.fic-file-name');
+        var percentEl = block.querySelector('.fic-percent');
+        var grupo = block.getAttribute('data-grupo') || 'default';
 
         progressEl.classList.remove('hidden');
         nameEl.textContent = file.name;
@@ -4068,6 +4257,7 @@ $breadcrumbs = [
         var formData = new FormData();
         formData.append('action', 'upload_ficheiro');
         formData.append('especificacao_id', especId);
+        formData.append('grupo', grupo);
         formData.append('ficheiro', file);
 
         var xhr = new XMLHttpRequest();
@@ -4087,11 +4277,8 @@ $breadcrumbs = [
             try {
                 var result = JSON.parse(xhr.responseText);
                 if (result.success) {
-                    adicionarFicheiroLista(result.data);
+                    adicionarFicheiroLista(result.data, block);
                     showToast('Ficheiro "' + file.name + '" enviado.', 'success');
-
-                    var empty = document.getElementById('fileEmpty');
-                    if (empty) empty.remove();
                 } else {
                     showToast(result.error || result.message || 'Erro ao enviar ficheiro.', 'error');
                 }
@@ -4108,8 +4295,8 @@ $breadcrumbs = [
         xhr.send(formData);
     }
 
-    function adicionarFicheiroLista(ficheiro) {
-        var list = document.getElementById('fileList');
+    function adicionarFicheiroLista(ficheiro, block) {
+        var list = block.querySelector('.fic-file-list');
         var li = document.createElement('li');
         li.className = 'file-item';
         li.setAttribute('data-file-id', ficheiro.id);
@@ -4374,9 +4561,24 @@ $breadcrumbs = [
 
         // Secções dinâmicas (texto + ensaios)
         var sectionsHtml = '';
-        document.querySelectorAll('#seccoesContainer .seccao-block').forEach(function(block, i) {
+        // Numeração hierárquica para preview
+        var prevMainC = 0, prevSubC = 0;
+        var prevBlocks = document.querySelectorAll('#seccoesContainer .seccao-block');
+        var prevNums = [];
+        prevBlocks.forEach(function(b) {
+            var niv = parseInt(b.getAttribute('data-nivel') || '1');
+            if (niv === 1) { prevMainC++; prevSubC = 0; prevNums.push(prevMainC + '.'); }
+            else { prevSubC++; prevNums.push(prevMainC + '.' + prevSubC + '.'); }
+        });
+        prevBlocks.forEach(function(block, i) {
             var titulo = block.querySelector('.seccao-titulo').value || ('Secção ' + (i + 1));
             var tipo = block.getAttribute('data-tipo') || 'texto';
+            var nivel = parseInt(block.getAttribute('data-nivel') || '1');
+            var secNum = prevNums[i] || (i + 1) + '.';
+            var hColor = nivel === 2 ? (configVisual.cor_subtitulos || configVisual.cor_titulos) : configVisual.cor_titulos;
+            var hSize = nivel === 2 ? (configVisual.tamanho_subtitulos || configVisual.tamanho_titulos) : configVisual.tamanho_titulos;
+            var hWeight = nivel === 2 ? ((configVisual.subtitulos_bold === '1') ? 'bold' : 'normal') : 'bold';
+            var hMargin = nivel === 2 ? ' margin-left:12px;' : '';
 
             if (tipo === 'ensaios') {
                 // Renderizar tabela de ensaios no preview (4 colunas + cat headers)
@@ -4423,18 +4625,19 @@ $breadcrumbs = [
                             prevCatDisplayed = rc;
                         }
                     }
-                    sectionsHtml += '<h4 style="color:' + configVisual.cor_titulos + '; font-size:' + configVisual.tamanho_titulos + 'pt;">' + (i + 1) + '. ' + escapeHtml(titulo) + '</h4>';
-                    sectionsHtml += '<table style="width:100%; font-size:9px; border-collapse:collapse; margin-bottom:8px;"><thead><tr>';
+                    sectionsHtml += '<h4 style="color:' + hColor + '; font-size:' + hSize + 'pt; font-weight:' + hWeight + ';' + hMargin + '">' + secNum + ' ' + escapeHtml(titulo) + '</h4>';
+                    sectionsHtml += '<table style="width:100%; font-size:9px; border-collapse:collapse; margin-bottom:8px;' + hMargin + '"><thead><tr>';
                     sectionsHtml += '<th style="width:' + cwPct[0] + '%; padding:3px 4px; text-align:left; font-weight:600; background-color:' + configVisual.cor_titulos + '; color:white;">Ensaio</th>';
                     sectionsHtml += '<th style="width:' + cwPct[1] + '%; padding:3px 4px; text-align:left; font-weight:600; background-color:' + configVisual.cor_titulos + '; color:white;">Espec.</th>';
                     sectionsHtml += '<th style="width:' + cwPct[2] + '%; padding:3px 4px; text-align:left; font-weight:600; background-color:' + configVisual.cor_titulos + '; color:white;">Norma</th>';
-                    sectionsHtml += '<th style="width:' + cwPct[3] + '%; padding:3px 4px; text-align:left; font-weight:600; background-color:' + configVisual.cor_titulos + '; color:white;">NQA</th>';
+                    sectionsHtml += '<th style="padding:3px 4px; text-align:left; font-weight:600; background-color:' + configVisual.cor_titulos + '; color:white;">NEI</th>';
+                    sectionsHtml += '<th style="padding:3px 4px; text-align:left; font-weight:600; background-color:' + configVisual.cor_titulos + '; color:white;">NQA</th>';
                     sectionsHtml += '</tr></thead><tbody>';
                     dataRowsPrev.forEach(function(tr, rIdx) {
                         if (catHeadersPrev[rIdx]) {
-                            sectionsHtml += '<tr><td colspan="4" style="background-color:' + orgCores.light + '; font-weight:600; padding:3px 6px; color:' + orgCores.dark + '; text-align:center;">' + escapeHtml(catHeadersPrev[rIdx]) + '</td></tr>';
+                            sectionsHtml += '<tr><td colspan="5" style="background-color:' + orgCores.light + '; font-weight:600; padding:3px 6px; color:' + orgCores.dark + '; text-align:center;">' + escapeHtml(catHeadersPrev[rIdx]) + '</td></tr>';
                         }
-                        var vals = { 0: '', 1: '', 2: '', 3: '' };
+                        var vals = { 0: '', 1: '', 2: '', 3: '', 4: '' };
                         tr.querySelectorAll('input[data-field]').forEach(function(input) {
                             var ci2 = fieldToCol[input.getAttribute('data-field')];
                             if (ci2 !== undefined) vals[ci2] = input.value;
@@ -4450,7 +4653,7 @@ $breadcrumbs = [
                             }
                         });
                         sectionsHtml += '<tr>';
-                        for (var c = 0; c < 4; c++) {
+                        for (var c = 0; c < 5; c++) {
                             var key = rIdx + '_' + c;
                             if (hiddenMap[key]) continue;
                             var rs = spanMap[key] ? ' rowspan="' + spanMap[key] + '"' : '';
@@ -4466,9 +4669,9 @@ $breadcrumbs = [
                 }
             } else if (tipo === 'ficheiros') {
                 // Mostrar lista de ficheiros no preview
-                var fileList = block.querySelector('#fileList');
+                var fileList = block.querySelector('.fic-file-list');
                 var fileItems = fileList ? fileList.querySelectorAll('.file-item') : [];
-                sectionsHtml += '<h4 style="color:' + configVisual.cor_titulos + '; border-bottom-color:' + configVisual.cor_linhas + '; font-size:' + configVisual.tamanho_titulos + 'pt;">' + (i + 1) + '. ' + escapeHtml(titulo) + '</h4>';
+                sectionsHtml += '<h4 style="color:' + hColor + '; border-bottom-color:' + configVisual.cor_linhas + '; font-size:' + hSize + 'pt; font-weight:' + hWeight + ';' + hMargin + '">' + secNum + ' ' + escapeHtml(titulo) + '</h4>';
                 if (fileItems.length > 0) {
                     sectionsHtml += '<div style="font-size:9px; margin-bottom:8px;">';
                     fileItems.forEach(function(fi) {
@@ -4484,8 +4687,8 @@ $breadcrumbs = [
                 if (editorEl) {
                     var conteudo = getEditorContent(editorEl.id);
                     if (conteudo && conteudo.trim()) {
-                        sectionsHtml += '<h4 style="color:' + configVisual.cor_titulos + '; border-bottom-color:' + configVisual.cor_linhas + '; font-size:' + configVisual.tamanho_titulos + 'pt;">' + (i + 1) + '. ' + escapeHtml(titulo) + '</h4>';
-                        sectionsHtml += '<div class="preview-section-content">' + conteudo + '</div>';
+                        sectionsHtml += '<h4 style="color:' + hColor + '; border-bottom-color:' + configVisual.cor_linhas + '; font-size:' + hSize + 'pt; font-weight:' + hWeight + ';' + hMargin + '">' + secNum + ' ' + escapeHtml(titulo) + '</h4>';
+                        sectionsHtml += '<div class="preview-section-content" style="' + hMargin + '">' + conteudo + '</div>';
                     }
                 }
             }
@@ -4567,43 +4770,64 @@ $breadcrumbs = [
         });
     });
 
-    // Carregar ficheiros existentes na secção
-    <?php
-    $temSeccaoFicheiros = false;
-    if (!empty($espec['seccoes'])) {
-        foreach ($espec['seccoes'] as $sec) {
-            if (($sec['tipo'] ?? '') === 'ficheiros') $temSeccaoFicheiros = true;
-        }
-    }
-    ?>
-    <?php if (!empty($espec['ficheiros'])): ?>
+    // Inicializar listeners de upload para todas as secções ficheiros
     (function() {
-        <?php if (!$temSeccaoFicheiros): ?>
-        // Sem secção ficheiros guardada - criar automaticamente
-        criarSeccaoFicheiros();
-        <?php else: ?>
-        // Secção ficheiros já renderizada pelo PHP - apenas init listeners
-        initUploadListeners();
+        document.querySelectorAll('.seccao-block[data-tipo="ficheiros"]').forEach(function(block) {
+            initUploadListeners(block);
+        });
+    })();
+
+    // Carregar ficheiros existentes nas secções certas (por grupo)
+    <?php
+    if (!empty($espec['ficheiros'])):
+        // Agrupar ficheiros por grupo
+        $ficPorGrupo = [];
+        foreach ($espec['ficheiros'] as $f) {
+            $g = $f['grupo'] ?? 'default';
+            $ficPorGrupo[$g][] = $f;
+        }
+        // Se há ficheiros sem secção (grupo default sem secção), criar secção auto
+        $temGrupoDefault = false;
+        if (!empty($espec['seccoes'])) {
+            foreach ($espec['seccoes'] as $sec) {
+                if (($sec['tipo'] ?? '') === 'ficheiros') {
+                    $conf = json_decode($sec['conteudo'] ?? '{}', true);
+                    if (($conf['grupo'] ?? 'default') === 'default') $temGrupoDefault = true;
+                }
+            }
+        }
+    ?>
+    (function() {
+        <?php if (!empty($ficPorGrupo['default']) && !$temGrupoDefault): ?>
+        // Ficheiros antigos sem secção - criar secção auto
+        var autoBlock = criarSeccaoFicheiros(1, 'default');
         <?php endif; ?>
-        var list = document.getElementById('fileList');
-        <?php foreach ($espec['ficheiros'] as $f): ?>
+
+        <?php foreach ($ficPorGrupo as $grupo => $files): ?>
         (function() {
-            var li = document.createElement('li');
-            li.className = 'file-item';
-            li.setAttribute('data-file-id', '<?= $f['id'] ?>');
-            li.innerHTML =
-                '<span class="file-name" title="<?= sanitize($f['nome_original']) ?>">&#128196; <?= sanitize($f['nome_original']) ?></span>' +
-                '<span class="file-size"><?= formatFileSize($f['tamanho'] ?? 0) ?></span>' +
-                '<span class="muted"><?= formatDate($f['uploaded_at'] ?? '') ?></span>' +
-                '<div class="flex gap-sm" style="margin-left:auto;">' +
-                    '<a href="<?= BASE_PATH ?>/download.php?id=<?= $f['id'] ?>" class="btn btn-ghost btn-sm" title="Descarregar">&#11015;</a>' +
-                    '<button class="btn btn-danger btn-sm" onclick="removerFicheiro(<?= $f['id'] ?>)" title="Remover">&times;</button>' +
-                '</div>';
-            list.appendChild(li);
+            var block = document.querySelector('.seccao-block[data-tipo="ficheiros"][data-grupo="<?= sanitize($grupo) ?>"]');
+            if (!block) return;
+            var list = block.querySelector('.fic-file-list');
+            if (!list) return;
+            <?php foreach ($files as $f): ?>
+            (function() {
+                var li = document.createElement('li');
+                li.className = 'file-item';
+                li.setAttribute('data-file-id', '<?= $f['id'] ?>');
+                li.innerHTML =
+                    '<span class="file-name" title="<?= sanitize($f['nome_original']) ?>">&#128196; <?= sanitize($f['nome_original']) ?></span>' +
+                    '<span class="file-size"><?= formatFileSize($f['tamanho'] ?? 0) ?></span>' +
+                    '<span class="muted"><?= formatDate($f['uploaded_at'] ?? '') ?></span>' +
+                    '<div class="flex gap-sm" style="margin-left:auto;">' +
+                        '<a href="<?= BASE_PATH ?>/download.php?id=<?= $f['id'] ?>" class="btn btn-ghost btn-sm" title="Descarregar">&#11015;</a>' +
+                        '<button class="btn btn-danger btn-sm" onclick="removerFicheiro(<?= $f['id'] ?>)" title="Remover">&times;</button>' +
+                    '</div>';
+                list.appendChild(li);
+            })();
+            <?php endforeach; ?>
         })();
         <?php endforeach; ?>
         isDirty = false;
-        // Atualizar preview após popular ficheiros
         if (typeof atualizarPreview === 'function') atualizarPreview();
     })();
     <?php endif; ?>

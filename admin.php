@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $db->prepare('UPDATE utilizadores SET password = ? WHERE id = ?')->execute([$hash, $uid]);
             }
         } else {
-            if (empty($password)) $password = bin2hex(random_bytes(4));
+            if (empty($password)) $password = bin2hex(random_bytes(8));
             $hash = password_hash($password, PASSWORD_DEFAULT);
             $db->prepare('INSERT INTO utilizadores (nome, username, password, role, ativo, organizacao_id) VALUES (?, ?, ?, ?, ?, ?)')
                 ->execute([$nome, $username, $hash, $role, $ativo, $userOrgId]);
@@ -105,18 +105,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $ext = strtolower(pathinfo($_FILES['assinatura']['name'], PATHINFO_EXTENSION));
             if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'svg'])) {
-                $filename = 'assinatura_' . $uid . '_' . time() . '.' . $ext;
-                $filepath = $uploadDir . $filename;
-                if (move_uploaded_file($_FILES['assinatura']['tmp_name'], $filepath)) {
-                    if ($ext === 'svg') sanitizeSvg($filepath);
-                    // Remover assinatura anterior
-                    $old = $db->prepare('SELECT assinatura FROM utilizadores WHERE id = ?');
-                    $old->execute([$uid]);
-                    $oldFile = $old->fetchColumn();
-                    if ($oldFile && file_exists($uploadDir . $oldFile)) {
-                        unlink($uploadDir . $oldFile);
+                // Validar MIME type real do ficheiro
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $realMimeType = $finfo->file($_FILES['assinatura']['tmp_name']);
+                $assinaturaMimes = [
+                    'jpg' => ['image/jpeg'], 'jpeg' => ['image/jpeg'], 'png' => ['image/png'],
+                    'gif' => ['image/gif'], 'svg' => ['image/svg+xml', 'text/xml', 'application/xml'],
+                ];
+                if (isset($assinaturaMimes[$ext]) && !in_array($realMimeType, $assinaturaMimes[$ext])) {
+                    $error = 'Tipo de ficheiro inválido (MIME type não corresponde à extensão).';
+                } else {
+                    $filename = 'assinatura_' . $uid . '_' . time() . '.' . $ext;
+                    $filepath = $uploadDir . $filename;
+                    if (move_uploaded_file($_FILES['assinatura']['tmp_name'], $filepath)) {
+                        if ($ext === 'svg') sanitizeSvg($filepath);
+                        // Remover assinatura anterior
+                        $old = $db->prepare('SELECT assinatura FROM utilizadores WHERE id = ?');
+                        $old->execute([$uid]);
+                        $oldFile = $old->fetchColumn();
+                        if ($oldFile && file_exists($uploadDir . $oldFile)) {
+                            unlink($uploadDir . $oldFile);
+                        }
+                        $db->prepare('UPDATE utilizadores SET assinatura = ? WHERE id = ?')->execute([$filename, $uid]);
                     }
-                    $db->prepare('UPDATE utilizadores SET assinatura = ? WHERE id = ?')->execute([$filename, $uid]);
                 }
             }
         } elseif (!empty($_POST['remover_assinatura']) && $_POST['remover_assinatura'] === '1') {
@@ -262,17 +273,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $ext = strtolower(pathinfo($_FILES['logo_file']['name'], PATHINFO_EXTENSION));
             if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'svg'])) {
-                $filename = 'org_' . $oid . '_' . time() . '.' . $ext;
-                if (move_uploaded_file($_FILES['logo_file']['tmp_name'], $uploadDir . $filename)) {
-                    if ($ext === 'svg') sanitizeSvg($uploadDir . $filename);
-                    // Remover logo anterior
-                    $old = $db->prepare('SELECT logo FROM organizacoes WHERE id = ?');
-                    $old->execute([$oid]);
-                    $oldLogo = $old->fetchColumn();
-                    if ($oldLogo && file_exists($uploadDir . $oldLogo)) {
-                        unlink($uploadDir . $oldLogo);
+                // Validar MIME type real do ficheiro
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $realMimeType = $finfo->file($_FILES['logo_file']['tmp_name']);
+                $logoMimes = [
+                    'jpg' => ['image/jpeg'], 'jpeg' => ['image/jpeg'], 'png' => ['image/png'],
+                    'gif' => ['image/gif'], 'svg' => ['image/svg+xml', 'text/xml', 'application/xml'],
+                ];
+                if (isset($logoMimes[$ext]) && !in_array($realMimeType, $logoMimes[$ext])) {
+                    $error = 'Tipo de ficheiro inválido (MIME type não corresponde à extensão).';
+                } else {
+                    $filename = 'org_' . $oid . '_' . time() . '.' . $ext;
+                    if (move_uploaded_file($_FILES['logo_file']['tmp_name'], $uploadDir . $filename)) {
+                        if ($ext === 'svg') sanitizeSvg($uploadDir . $filename);
+                        // Remover logo anterior
+                        $old = $db->prepare('SELECT logo FROM organizacoes WHERE id = ?');
+                        $old->execute([$oid]);
+                        $oldLogo = $old->fetchColumn();
+                        if ($oldLogo && file_exists($uploadDir . $oldLogo)) {
+                            unlink($uploadDir . $oldLogo);
+                        }
+                        $db->prepare('UPDATE organizacoes SET logo = ? WHERE id = ?')->execute([$filename, $oid]);
                     }
-                    $db->prepare('UPDATE organizacoes SET logo = ? WHERE id = ?')->execute([$filename, $oid]);
                 }
             }
         }
@@ -386,14 +408,25 @@ if ($action === 'save_org_branding' && $user['role'] === 'org_admin' && $orgId) 
         if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
         $ext = strtolower(pathinfo($_FILES['logo_file']['name'], PATHINFO_EXTENSION));
         if (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'svg'])) {
-            $filename = 'org_' . $orgId . '_' . time() . '.' . $ext;
-            if (move_uploaded_file($_FILES['logo_file']['tmp_name'], $uploadDir . $filename)) {
-                if ($ext === 'svg') sanitizeSvg($uploadDir . $filename);
-                $old = $db->prepare('SELECT logo FROM organizacoes WHERE id = ?');
-                $old->execute([$orgId]);
-                $oldLogo = $old->fetchColumn();
-                if ($oldLogo && file_exists($uploadDir . $oldLogo)) unlink($uploadDir . $oldLogo);
-                $db->prepare('UPDATE organizacoes SET logo = ? WHERE id = ?')->execute([$filename, $orgId]);
+            // Validar MIME type real do ficheiro
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $realMimeType = $finfo->file($_FILES['logo_file']['tmp_name']);
+            $logoMimes = [
+                'jpg' => ['image/jpeg'], 'jpeg' => ['image/jpeg'], 'png' => ['image/png'],
+                'gif' => ['image/gif'], 'svg' => ['image/svg+xml', 'text/xml', 'application/xml'],
+            ];
+            if (isset($logoMimes[$ext]) && !in_array($realMimeType, $logoMimes[$ext])) {
+                $error = 'Tipo de ficheiro inválido (MIME type não corresponde à extensão).';
+            } else {
+                $filename = 'org_' . $orgId . '_' . time() . '.' . $ext;
+                if (move_uploaded_file($_FILES['logo_file']['tmp_name'], $uploadDir . $filename)) {
+                    if ($ext === 'svg') sanitizeSvg($uploadDir . $filename);
+                    $old = $db->prepare('SELECT logo FROM organizacoes WHERE id = ?');
+                    $old->execute([$orgId]);
+                    $oldLogo = $old->fetchColumn();
+                    if ($oldLogo && file_exists($uploadDir . $oldLogo)) unlink($uploadDir . $oldLogo);
+                    $db->prepare('UPDATE organizacoes SET logo = ? WHERE id = ?')->execute([$filename, $orgId]);
+                }
             }
         }
     }
@@ -805,12 +838,12 @@ $breadcrumbs = [
                         <input type="hidden" name="action" value="save_user">
                         <input type="hidden" name="user_id" id="user_id" value="0">
                         <div class="form-group">
-                            <label>Nome</label>
-                            <input type="text" name="nome" id="user_nome" required>
+                            <label>Nome *</label>
+                            <input type="text" name="nome" id="user_nome" required minlength="2" placeholder="Nome completo">
                         </div>
                         <div class="form-group">
-                            <label>Username</label>
-                            <input type="text" name="username" id="user_username" required>
+                            <label>Username *</label>
+                            <input type="text" name="username" id="user_username" required minlength="3" placeholder="Nome de utilizador">
                         </div>
                         <div class="form-group">
                             <label id="user_password_label">Palavra-passe <span class="muted">(deixe vazio para gerar automaticamente)</span></label>
@@ -940,17 +973,17 @@ $breadcrumbs = [
                         <?php endif; ?>
 
                         <div class="form-row">
-                            <div class="form-group"><label>Nome</label><input type="text" name="nome" id="cl_nome" required></div>
-                            <div class="form-group"><label>Sigla</label><input type="text" name="sigla" id="cl_sigla" required></div>
+                            <div class="form-group"><label>Nome *</label><input type="text" name="nome" id="cl_nome" required minlength="2" placeholder="Nome do cliente"></div>
+                            <div class="form-group"><label>Sigla *</label><input type="text" name="sigla" id="cl_sigla" required placeholder="Sigla/Abreviatura"></div>
                         </div>
-                        <div class="form-group"><label>Morada</label><input type="text" name="morada" id="cl_morada"></div>
+                        <div class="form-group"><label>Morada</label><input type="text" name="morada" id="cl_morada" placeholder="Morada completa"></div>
                         <div class="form-row">
-                            <div class="form-group"><label>Telefone</label><input type="text" name="telefone" id="cl_telefone"></div>
-                            <div class="form-group"><label>Email</label><input type="email" name="email" id="cl_email"></div>
+                            <div class="form-group"><label>Telefone</label><input type="tel" name="telefone" id="cl_telefone" pattern="[0-9+\s\-]{9,20}" placeholder="Ex: 912345678"></div>
+                            <div class="form-group"><label>Email</label><input type="email" name="email" id="cl_email" placeholder="email@exemplo.com"></div>
                         </div>
                         <div class="form-row">
-                            <div class="form-group"><label>NIF</label><input type="text" name="nif" id="cl_nif"></div>
-                            <div class="form-group"><label>Contacto</label><input type="text" name="contacto" id="cl_contacto"></div>
+                            <div class="form-group"><label>NIF</label><input type="text" name="nif" id="cl_nif" pattern="[0-9]{9}" title="NIF deve ter 9 dígitos" placeholder="123456789"></div>
+                            <div class="form-group"><label>Contacto</label><input type="text" name="contacto" id="cl_contacto" placeholder="Pessoa de contacto"></div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" onclick="document.getElementById('clienteModal').style.display='none'">Cancelar</button>
@@ -1038,17 +1071,17 @@ $breadcrumbs = [
                         <?php endif; ?>
 
                         <div class="form-row">
-                            <div class="form-group"><label>Nome *</label><input type="text" name="nome" id="fn_nome" required></div>
-                            <div class="form-group"><label>Sigla</label><input type="text" name="sigla" id="fn_sigla"></div>
+                            <div class="form-group"><label>Nome *</label><input type="text" name="nome" id="fn_nome" required minlength="2" placeholder="Nome do fornecedor"></div>
+                            <div class="form-group"><label>Sigla</label><input type="text" name="sigla" id="fn_sigla" placeholder="Sigla/Abreviatura"></div>
                         </div>
-                        <div class="form-group"><label>Morada</label><input type="text" name="morada" id="fn_morada"></div>
+                        <div class="form-group"><label>Morada</label><input type="text" name="morada" id="fn_morada" placeholder="Morada completa"></div>
                         <div class="form-row">
-                            <div class="form-group"><label>Telefone</label><input type="text" name="telefone" id="fn_telefone"></div>
-                            <div class="form-group"><label>Email</label><input type="email" name="email" id="fn_email"></div>
+                            <div class="form-group"><label>Telefone</label><input type="tel" name="telefone" id="fn_telefone" pattern="[0-9+\s\-]{9,20}" placeholder="Ex: 912345678"></div>
+                            <div class="form-group"><label>Email</label><input type="email" name="email" id="fn_email" placeholder="email@exemplo.com"></div>
                         </div>
                         <div class="form-row">
-                            <div class="form-group"><label>NIF</label><input type="text" name="nif" id="fn_nif"></div>
-                            <div class="form-group"><label>Contacto</label><input type="text" name="contacto" id="fn_contacto"></div>
+                            <div class="form-group"><label>NIF</label><input type="text" name="nif" id="fn_nif" pattern="[0-9]{9}" title="NIF deve ter 9 dígitos" placeholder="123456789"></div>
+                            <div class="form-group"><label>Contacto</label><input type="text" name="contacto" id="fn_contacto" placeholder="Pessoa de contacto"></div>
                         </div>
                         <div class="form-group"><label>Certificações</label><input type="text" name="certificacoes" id="fn_certificacoes" placeholder="Ex: ISO 9001, FSSC 22000, FSC..."></div>
                         <div class="form-group"><label>Notas</label><textarea name="notas" id="fn_notas" rows="2" placeholder="Observações internas sobre o fornecedor..."></textarea></div>
@@ -1155,8 +1188,8 @@ $breadcrumbs = [
                             <input type="hidden" name="organizacao_id" value="<?= (int)$orgId ?>">
                         <?php endif; ?>
 
-                        <div class="form-group"><label>Nome</label><input type="text" name="nome" id="pr_nome" required></div>
-                        <div class="form-group"><label>Descrição</label><textarea name="descricao" id="pr_descricao" rows="3"></textarea></div>
+                        <div class="form-group"><label>Nome *</label><input type="text" name="nome" id="pr_nome" required minlength="2" placeholder="Nome do produto"></div>
+                        <div class="form-group"><label>Descrição</label><textarea name="descricao" id="pr_descricao" rows="3" placeholder="Descrição do produto (opcional)"></textarea></div>
 
                         <?php if ($isSuperAdminUser): ?>
                             <div class="form-group">

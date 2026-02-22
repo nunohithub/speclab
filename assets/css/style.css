@@ -517,7 +517,7 @@ tr:hover { background: var(--color-primary-lighter); }
 
 @media (min-width: 1024px) {
     .content-grid.with-sidebar {
-        grid-template-columns: 2fr 1fr;
+        grid-template-columns: 5fr 3fr;
     }
 }
 
@@ -1202,4 +1202,32 @@ tr:hover { background: var(--color-primary-lighter); }
     background: var(--color-surface);
     font-size: var(--font-size-sm);
     font-family: monospace;
+}
+
+/* ---- FORM VALIDATION STATES ---- */
+input:invalid:not(:placeholder-shown):not(:focus),
+select:invalid:not(:placeholder-shown):not(:focus),
+textarea:invalid:not(:placeholder-shown):not(:focus) {
+    border-color: var(--color-error, #dc3545);
+}
+
+input:invalid:not(:placeholder-shown):not(:focus) ~ .field-error,
+select:invalid:not(:placeholder-shown):not(:focus) ~ .field-error {
+    display: block;
+}
+
+input:valid:not(:placeholder-shown) {
+    border-color: var(--color-success, #1a7f37);
+}
+
+.field-error {
+    color: var(--color-error, #dc3545);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+    min-height: 1.2em;
+}
+
+input:required + .field-error:empty,
+select:required + .field-error:empty {
+    min-height: 0;
 }
