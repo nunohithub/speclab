@@ -65,7 +65,7 @@ function getSmtpConfig(PDO $db, int $especificacaoId): array {
 /**
  * Envia email com especificação (link ou PDF anexo)
  */
-function enviarEmail(PDO $db, int $especificacaoId, string $destinatario, string $assunto, string $corpo, bool $anexarPdf = false, ?int $enviadoPor = null): array {
+function enviarEmail(PDO $db, int $especificacaoId, string $destinatario, string $assunto, string $corpo, bool $anexarPdf = false, ?int $enviadoPor = null, ?string $bcc = null): array {
     // Determinar SMTP: organização própria ou global (speclab.pt)
     $smtp = getSmtpConfig($db, $especificacaoId);
 
@@ -112,6 +112,9 @@ function enviarEmail(PDO $db, int $especificacaoId, string $destinatario, string
 
         $mail->setFrom($smtpFrom ?: $smtpUser, $smtpFromName);
         $mail->addAddress($destinatario);
+        if ($bcc) {
+            $mail->addBCC($bcc);
+        }
 
         $mail->isHTML(true);
         $mail->Subject = $assunto;
@@ -270,7 +273,17 @@ function enviarLinkAceitacao(PDO $db, int $especId, int $tokenId, string $baseUr
     // Corpo do email com botão de aceitação
     $corpo = gerarCorpoEmailAceitacao($espec, $link, $tk['destinatario_nome']);
 
-    $result = enviarEmail($db, $especId, $tk['destinatario_email'], 'Caderno de Encargos para aprovação: ' . $tk['numero'], $corpo, false, $enviadoPor);
+    // BCC para o remetente quando usa email do servidor (@speclab.pt)
+    $bcc = null;
+    $smtp = getSmtpConfig($db, $especId);
+    if (!isset($smtp['error']) && stripos($smtp['from'] ?? '', '@speclab.pt') !== false && $enviadoPor) {
+        $stmtUser = $db->prepare('SELECT email FROM utilizadores WHERE id = ?');
+        $stmtUser->execute([$enviadoPor]);
+        $senderEmail = $stmtUser->fetchColumn();
+        if ($senderEmail) $bcc = $senderEmail;
+    }
+
+    $result = enviarEmail($db, $especId, $tk['destinatario_email'], 'Caderno de Encargos para aprovação: ' . $tk['numero'], $corpo, false, $enviadoPor, $bcc);
 
     // Marcar token como enviado
     if ($result['success']) {

@@ -1659,6 +1659,37 @@ $breadcrumbs = [
                             <span class="card-title">Enviar para Aceitação</span>
                             <span class="muted">Cada pessoa recebe um link pessoal para ver, aceitar ou rejeitar o documento</span>
                         </div>
+                        <!-- FORNECEDORES ASSOCIADOS -->
+                        <?php
+                        $fornecedoresLista = $espec['fornecedores_lista'] ?? [];
+                        if (!empty($fornecedoresLista)):
+                            $emailsPendentes = array_map(function($t) { return strtolower($t['destinatario_email']); }, $tokensPendentes);
+                        ?>
+                        <div style="margin-bottom:var(--spacing-md); border-bottom:1px solid var(--color-border); padding-bottom:var(--spacing-md);">
+                            <label style="font-weight:600; font-size:13px; margin-bottom:8px; display:block;">Fornecedores desta especificação</label>
+                            <?php foreach ($fornecedoresLista as $f):
+                                $fEmail = trim($f['email'] ?? '');
+                                $jaEnviado = $fEmail && in_array(strtolower($fEmail), $emailsPendentes);
+                            ?>
+                            <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+                                <span style="min-width:140px; font-size:13px; font-weight:500;"><?= sanitize($f['nome']) ?></span>
+                                <?php if ($fEmail): ?>
+                                    <span style="flex:1; font-size:13px; color:#666;"><?= sanitize($fEmail) ?></span>
+                                    <?php if ($jaEnviado): ?>
+                                        <span class="muted" style="font-size:11px;">Pendente</span>
+                                    <?php else: ?>
+                                        <button class="btn btn-primary btn-sm" onclick="enviarParaFornecedor(<?= htmlspecialchars(json_encode($f['nome'])) ?>, <?= htmlspecialchars(json_encode($fEmail)) ?>)">Enviar</button>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <input type="email" id="forn_email_<?= $f['id'] ?>" placeholder="email@exemplo.com" style="flex:1; font-size:13px;" oninput="toggleFornBtn(<?= $f['id'] ?>)">
+                                    <button class="btn btn-ghost btn-sm" disabled id="forn_btn_<?= $f['id'] ?>" onclick="enviarParaFornecedor(<?= htmlspecialchars(json_encode($f['nome'])) ?>, document.getElementById('forn_email_<?= $f['id'] ?>').value)">Falta email</button>
+                                <?php endif; ?>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+
+                        <!-- ADICIONAR OUTRO DESTINATÁRIO -->
                         <div style="display:flex; gap:var(--spacing-sm); align-items:end; flex-wrap:wrap; margin-bottom:var(--spacing-md);">
                             <div class="form-group" style="flex:1; min-width:150px; margin:0;">
                                 <label for="dest_nome">Nome</label>
@@ -5778,6 +5809,38 @@ $breadcrumbs = [
                 showToast(data.error || 'Erro.', 'danger');
             }
         });
+    }
+
+    function enviarParaFornecedor(nome, email) {
+        if (!email) { showToast('Preencha o email.', 'warning'); return; }
+        appConfirm('Enviar link de aceitação para ' + nome + ' (' + email + ')?', function() {
+            fetch(BASE_PATH + '/api.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                body: JSON.stringify({ action: 'gerar_token', especificacao_id: especId, nome: nome, email: email, tipo: 'fornecedor', enviar_email: true, base_url: window.location.origin + BASE_PATH })
+            })
+            .then(function(r) { return checkSession(r); })
+            .then(function(data) {
+                if (data.success) {
+                    showToast(data.email_enviado ? 'Token criado e email enviado!' : 'Token criado (email não enviado).', data.email_enviado ? 'success' : 'warning');
+                    setTimeout(function() { reloadToTab('partilha'); }, 800);
+                } else {
+                    showToast(data.error || 'Erro.', 'danger');
+                }
+            })
+            .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro.', 'danger'); });
+        }, 'Enviar');
+    }
+
+    function toggleFornBtn(fornId) {
+        var input = document.getElementById('forn_email_' + fornId);
+        var btn = document.getElementById('forn_btn_' + fornId);
+        if (input && btn) {
+            var hasEmail = input.value.trim().length > 0;
+            btn.disabled = !hasEmail;
+            btn.textContent = hasEmail ? 'Enviar' : 'Falta email';
+            btn.className = hasEmail ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+        }
     }
 
     function enviarLinkToken(tokenId) {

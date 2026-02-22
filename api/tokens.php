@@ -19,7 +19,16 @@ switch ($action) {
         $tipo = sanitize($jsonBody['tipo'] ?? $_POST['tipo'] ?? 'outro');
         if (!$especId || !$nome || !$email) jsonError('Dados incompletos.');
         $token = gerarTokenDestinatario($db, $especId, $user['id'], $nome, $email, $tipo);
-        echo json_encode(['success' => true, 'token' => $token]);
+        $tokenId = (int)$db->lastInsertId();
+        $emailEnviado = false;
+        if (!empty($jsonBody['enviar_email']) && $tokenId) {
+            require_once __DIR__ . '/../includes/email.php';
+            $baseUrl = rtrim(($jsonBody['base_url'] ?? ''), '/');
+            if (!$baseUrl) $baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_PATH;
+            $result = enviarLinkAceitacao($db, $especId, $tokenId, $baseUrl, $user['id']);
+            $emailEnviado = $result['success'];
+        }
+        echo json_encode(['success' => true, 'token' => $token, 'token_id' => $tokenId, 'email_enviado' => $emailEnviado]);
         exit;
 
     // ===================================================================
