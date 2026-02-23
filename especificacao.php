@@ -1426,11 +1426,13 @@ $breadcrumbs = [
                                         }
                                     }
                                 ?>
-                                <div class="seccao-block" data-seccao-idx="<?= $i ?>" data-tipo="parametros" data-tipo-id="<?= (int)$pcTipoId ?>" data-tipo-slug="<?= sanitize($pcTipoSlug) ?>" data-nivel="<?= (int)($sec['nivel'] ?? 1) ?>">
+                                <?php $pcOrientacao = $pcRaw['orientacao'] ?? 'horizontal'; ?>
+                                <div class="seccao-block" data-seccao-idx="<?= $i ?>" data-tipo="parametros" data-tipo-id="<?= (int)$pcTipoId ?>" data-tipo-slug="<?= sanitize($pcTipoSlug) ?>" data-nivel="<?= (int)($sec['nivel'] ?? 1) ?>" data-orientacao="<?= $pcOrientacao ?>">
                                     <div class="seccao-header">
                                         <span class="seccao-numero"><?= $hierNumbers[$i] ?? ($i + 1) . '.' ?></span>
                                         <input type="text" class="seccao-titulo" value="<?= sanitize($sec['titulo'] ?? $pcTipoNome) ?>" placeholder="Título da secção">
                                         <span class="pill pill-info" style="font-size:10px; padding:2px 8px;"><?= sanitize($pcTipoNome) ?></span>
+                                        <button class="btn btn-ghost btn-sm param-orientacao-btn" onclick="toggleOrientacao(this)" title="Alternar orientação" style="font-size:11px; padding:2px 8px;"><?= $pcOrientacao === 'vertical' ? '↕ Vertical' : '↔ Horizontal' ?></button>
                                         <div class="seccao-actions">
                                             <button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, -1)" title="Mover acima">&#9650;</button>
                                             <button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, 1)" title="Mover abaixo">&#9660;</button>
@@ -3501,6 +3503,15 @@ $breadcrumbs = [
         return html;
     }
 
+    function toggleOrientacao(btn) {
+        var block = btn.closest('.seccao-block');
+        var current = block.getAttribute('data-orientacao') || 'horizontal';
+        var novo = current === 'horizontal' ? 'vertical' : 'horizontal';
+        block.setAttribute('data-orientacao', novo);
+        btn.textContent = novo === 'vertical' ? '↕ Vertical' : '↔ Horizontal';
+        marcarAlterado();
+    }
+
     function adicionarParamCatLinha(btn, tipoId) {
         var tipo = _paramTiposCache ? _paramTiposCache.find(function(t) { return t.id == tipoId; }) : null;
         if (!tipo) return;
@@ -4351,7 +4362,8 @@ $breadcrumbs = [
                     if (!w || isNaN(w)) w = (pcThs[pi].offsetWidth / pcTblW * 100);
                     pcColWidths.push(Math.round(w * 10) / 10);
                 }
-                conteudo = JSON.stringify({ tipo_id: pcTipoId, tipo_slug: pcTipoSlug, colWidths: pcColWidths, rows: pcRows });
+                var pcOrientacao = block.getAttribute('data-orientacao') || 'horizontal';
+                conteudo = JSON.stringify({ tipo_id: pcTipoId, tipo_slug: pcTipoSlug, colWidths: pcColWidths, rows: pcRows, orientacao: pcOrientacao });
             } else if (tipo === 'ficheiros') {
                 var posSelect = block.querySelector('.fic-posicao');
                 var grupo = block.getAttribute('data-grupo') || 'default';

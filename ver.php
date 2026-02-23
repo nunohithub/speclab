@@ -485,7 +485,25 @@ if (!empty($data['seccoes'])) {
                             }
                             $pcCw = count($pcColWidths) ? $pcColWidths : array_fill(0, count($pcColunas), floor(100 / max(1, count($pcColunas))));
                             ?>
-                            <?php if (!empty($pcRows)): ?>
+                            <?php if (!empty($pcRows)):
+                                $pcOrientacao = $pcRaw['orientacao'] ?? 'horizontal';
+                                // Filtrar rows de dados (sem _cat) para transposta
+                                $pcDataRows = array_values(array_filter($pcRows, function($r) { return !isset($r['_cat']); }));
+                            ?>
+                            <?php if ($pcOrientacao === 'vertical' && !empty($pcDataRows)): ?>
+                            <table class="doc-table">
+                                <tbody>
+                                    <?php foreach ($pcColunas as $pcCol): ?>
+                                    <tr>
+                                        <th style="width:<?= max(15, floor(100 / (count($pcDataRows) + 1))) ?>%; text-align:left;"><?= san($pcCol['nome']) ?></th>
+                                        <?php foreach ($pcDataRows as $pcRow): ?>
+                                        <td><?= nl2br(san($pcRow[$pcCol['chave']] ?? '')) ?></td>
+                                        <?php endforeach; ?>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                            <?php else: ?>
                             <table class="doc-table">
                                 <thead><tr>
                                     <?php foreach ($pcColunas as $ci => $pcCol): ?>
@@ -506,6 +524,7 @@ if (!empty($data['seccoes'])) {
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
+                            <?php endif; ?>
                             <?php if (!empty($pcLegenda)): ?>
                             <p style="font-size:<?= $pcLegTam ?>px; color:#888; font-style:italic; margin:3px 0 0 0;"><?= san($pcLegenda) ?></p>
                             <?php endif; ?>

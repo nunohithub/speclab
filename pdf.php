@@ -530,6 +530,28 @@ if ($useMpdf) {
                 }
                 if (!empty($pcRows) && $nCols > 0) {
                     $secTitulo = san($sec['titulo']);
+                    $pcOrientacao = $pcRaw['orientacao'] ?? 'horizontal';
+                    $pTitleSize = $secNivel === 2 ? $tamSubtitulos : $tamTitulos;
+                    $pTitleColor = $secNivel === 2 ? san($corSubtitulos) : san($corTitulos);
+                    $pTitleWeight = $secNivel === 2 ? $subBold : 'bold';
+
+                    if ($pcOrientacao === 'vertical') {
+                        // Tabela transposta: colunas viram linhas
+                        $pcDataRows = array_values(array_filter($pcRows, function($r) { return !isset($r['_cat']); }));
+                        $nDataRows = count($pcDataRows);
+                        $html .= '<table class="params" repeat_header="1" style="margin-top:6px;">';
+                        $html .= '<thead><tr class="ensaio-titulo-row"><td colspan="' . ($nDataRows + 1) . '" style="font-size:' . $pTitleSize . 'pt; color:' . $pTitleColor . '; font-weight:' . $pTitleWeight . ';">' . $secNum . ' ' . $secTitulo . '</td></tr></thead>';
+                        $html .= '<tbody>';
+                        foreach ($pcColunas as $pcCol) {
+                            $html .= '<tr><th class="ensaio-th" style="text-align:left;">' . san($pcCol['nome']) . '</th>';
+                            foreach ($pcDataRows as $row) {
+                                $html .= '<td class="ensaio-td">' . nl2br(san($row[$pcCol['chave']] ?? '')) . '</td>';
+                            }
+                            $html .= '</tr>';
+                        }
+                        $html .= '</tbody></table>';
+                    } else {
+                    // Tabela horizontal (padrão)
                     $groups = []; $curCat = null; $curRows = [];
                     foreach ($pcRows as $row) {
                         if (isset($row['_cat'])) {
@@ -543,9 +565,6 @@ if ($useMpdf) {
                         $theadCols .= '<th class="ensaio-th" style="width:' . ($cwPct[$ci] ?? 20) . '%;">' . san($pcCol['nome']) . '</th>';
                     }
                     $theadCols .= '</tr>';
-                    $pTitleSize = $secNivel === 2 ? $tamSubtitulos : $tamTitulos;
-                    $pTitleColor = $secNivel === 2 ? san($corSubtitulos) : san($corTitulos);
-                    $pTitleWeight = $secNivel === 2 ? $subBold : 'bold';
                     $theadTitle = '<tr class="ensaio-titulo-row"><td colspan="' . $nCols . '" style="font-size:' . $pTitleSize . 'pt; color:' . $pTitleColor . '; font-weight:' . $pTitleWeight . ';">' . $secNum . ' ' . $secTitulo . '</td></tr>';
                     foreach ($groups as $gIdx => $group) {
                         $mt = $gIdx === 0 ? ' style="margin-top:6px;"' : '';
@@ -563,6 +582,7 @@ if ($useMpdf) {
                             $html .= '</tr>';
                         }
                         $html .= '</tbody></table>';
+                    }
                     }
                     if (!empty($pcLegenda)) {
                         $html .= '<p class="legenda" style="font-size:' . $pcLegTam . 'pt;">' . san($pcLegenda) . '</p>';
