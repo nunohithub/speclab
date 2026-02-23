@@ -9,13 +9,24 @@
     --color-primary-light: #e6f4f9;
     --color-primary-lighter: #f0f8fb;
     --color-success: #1a7f37;
+    --color-success-light: #dcfce7;
     --color-warning: #b35c00;
+    --color-warning-light: #fef3c7;
+    --color-warning-text: #92400e;
+    --color-warning-border: #f59e0b;
     --color-error: #b42318;
+    --color-error-light: #fef2f2;
+    --color-error-bright: #ef4444;
+    --color-danger: #dc2626;
     --color-muted: #667085;
+    --color-muted-light: #999;
+    --color-muted-dark: #555;
+    --color-link: #2563eb;
     --color-bg: #f3f4f6;
     --color-bg-alt: #f8f9fa;
     --color-surface: #ffffff;
     --color-border: #e5e7eb;
+    --color-border-light: #f0f0f0;
     --color-text: #111827;
     --color-text-secondary: #374151;
     --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -287,6 +298,13 @@ a:hover { color: var(--color-primary-dark); }
 }
 
 .btn-ghost:hover { background: var(--color-primary-light); }
+
+.btn-delete {
+    background: transparent;
+    color: var(--color-danger);
+    padding: 6px 12px;
+}
+.btn-delete:hover { background: var(--color-error-light); color: var(--color-error); }
 
 .btn-sm { padding: 5px 10px; font-size: var(--font-size-sm); }
 .btn-lg { padding: 12px 24px; font-size: var(--font-size-lg); width: 100%; justify-content: center; }
@@ -1092,6 +1110,15 @@ tr:hover { background: var(--color-primary-lighter); }
     margin: var(--spacing-xs) 0;
 }
 
+/* ---- UTILITY CLASSES ---- */
+.text-danger { color: var(--color-error) !important; }
+.text-success { color: var(--color-success) !important; }
+.text-warning { color: var(--color-warning-text) !important; }
+.text-muted { color: var(--color-muted) !important; }
+.bg-warning-light { background: var(--color-warning-light); border-color: var(--color-warning-border); color: var(--color-warning-text); }
+.bg-success-light { background: var(--color-success-light); }
+.bg-error-light { background: var(--color-error-light); }
+
 /* ---- RESPONSIVE ---- */
 @media (max-width: 768px) {
     .app-header { flex-wrap: wrap; gap: var(--spacing-sm); }
@@ -1102,6 +1129,19 @@ tr:hover { background: var(--color-primary-lighter); }
     .search-bar input[type="search"] { width: 100%; }
     .sf-top { flex-direction: column; }
     .sf-filters { grid-template-columns: 1fr 1fr; }
+    .breadcrumbs { font-size: var(--font-size-xs); }
+    .pagination { flex-wrap: wrap; font-size: var(--font-size-sm); }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { min-width: 600px; }
+}
+
+@media (max-width: 480px) {
+    .stats-grid { grid-template-columns: 1fr; }
+    .sf-filters { grid-template-columns: 1fr; }
+    .flex.gap-sm { flex-wrap: wrap; }
+    h1 { font-size: 16px; }
+    h2 { font-size: 14px; }
+    .btn-sm { padding: 4px 8px; font-size: var(--font-size-xs); }
 }
 
 /* ---- PRINT STYLES ---- */

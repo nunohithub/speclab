@@ -398,7 +398,7 @@ $breadcrumbs = [];
                                             $podeEliminar = ((int)($e['criado_por'] ?? 0) === (int)$user['id'])
                                                 || (in_array($user['role'], ['org_admin', 'super_admin']) && ($e['organizacao_id'] ?? null) == $user['org_id']);
                                             if ($podeEliminar): ?>
-                                                <button class="btn btn-ghost btn-sm" title="Eliminar" style="color:#dc2626;" onclick="eliminarEspec(<?= $e['id'] ?>, '<?= sanitize($e['numero']) ?>')">&#128465;</button>
+                                                <button class="btn btn-delete btn-sm" title="Eliminar" onclick="eliminarEspec(<?= $e['id'] ?>, '<?= sanitize($e['numero']) ?>')">&#128465;</button>
                                             <?php endif; ?>
                                         </div>
                                     </td>

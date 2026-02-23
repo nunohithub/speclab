@@ -547,7 +547,7 @@ $breadcrumbs = [
             <div class="alert <?= $msgType === 'error' ? 'alert-error' : 'alert-success' ?>"><?= sanitize($msg) ?></div>
         <?php endif; ?>
         <?php if (!empty($_SESSION['temp_new_password'])): ?>
-            <div class="alert alert-success" style="background:#fef3c7; border-color:#f59e0b; color:#92400e;">
+            <div class="alert bg-warning-light">
                 <strong>Palavra-passe inicial:</strong> <code><?= sanitize($_SESSION['temp_new_password']) ?></code>
                 <br><small>Copie agora. Esta informação não será mostrada novamente.</small>
             </div>
@@ -1418,7 +1418,7 @@ $breadcrumbs = [
                         if (!inativa) {
                             html += '<button class="btn btn-ghost btn-sm" onclick=\'editLeg(' + JSON.stringify(r).replace(/'/g, "&#39;") + ')\'>Editar</button> ';
                         }
-                        html += '<button class="btn btn-ghost btn-sm" style="color:#b42318;" onclick="eliminarLeg(' + r.id + ')">Eliminar</button>';
+                        html += '<button class="btn btn-delete btn-sm" onclick="eliminarLeg(' + r.id + ')">Eliminar</button>';
                         html += '</td></tr>';
                     });
                     tbody.innerHTML = html;
@@ -1819,7 +1819,7 @@ $breadcrumbs = [
                     <div class="modal-footer">
                         <button class="btn btn-secondary" onclick="document.getElementById('tipoModal').style.display='none';">Cancelar</button>
                         <button class="btn btn-primary" onclick="guardarTipo()">Guardar</button>
-                        <button class="btn btn-ghost" id="btnEliminarTipo" style="color:#b42318; display:none;" onclick="eliminarTipo()">Eliminar Tipo</button>
+                        <button class="btn btn-delete" id="btnEliminarTipo" style="display:none;" onclick="eliminarTipo()">Eliminar Tipo</button>
                     </div>
                 </div>
             </div>
