@@ -260,9 +260,9 @@ switch ($action) {
                     $titulo = trim($s['titulo'] ?? '');
                     if ($titulo === '') $titulo = 'Seccao ' . ($i + 1);
                     $tipoRaw = $s['tipo'] ?? 'texto';
-                    $tipo = in_array($tipoRaw, ['ensaios', 'ficheiros', 'parametros', 'parametros_custom']) ? $tipoRaw : 'texto';
+                    $tipo = in_array($tipoRaw, ['ficheiros', 'parametros', 'parametros_custom']) ? $tipoRaw : 'texto';
                     $conteudo = $s['conteudo'] ?? '';
-                    // Para ensaios/parametros, o conteudo e JSON - nao sanitizar como rich text
+                    // Para parametros, o conteudo e JSON - nao sanitizar como rich text
                     if ($tipo === 'texto') {
                         $conteudo = sanitizeRichText($conteudo);
                     }

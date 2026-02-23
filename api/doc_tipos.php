@@ -19,7 +19,7 @@ switch ($action) {
         if (!is_array($seccoes)) $seccoes = [];
 
         // Validar que só contém secções válidas
-        $validas = ['texto', 'parametros', 'legislacao', 'ficheiros', 'ensaios', 'pedido'];
+        $validas = ['texto', 'parametros', 'legislacao', 'ficheiros', 'pedido'];
         $seccoes = array_values(array_intersect($seccoes, $validas));
         $seccoesJson = json_encode($seccoes);
 
@@ -43,7 +43,7 @@ switch ($action) {
         $row = $stmt->fetch();
         if (!$row) {
             // Fallback: tudo permitido
-            echo json_encode(['success' => true, 'seccoes' => ['texto','parametros','legislacao','ficheiros','ensaios']]);
+            echo json_encode(['success' => true, 'seccoes' => ['texto','parametros','legislacao','ficheiros']]);
             exit;
         }
         echo json_encode(['success' => true, 'seccoes' => json_decode($row['seccoes'], true)]);

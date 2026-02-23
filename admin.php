@@ -5,9 +5,8 @@
  */
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
-// Legislacao e Parametros/Ensaios tabs são acessíveis a todos os utilizadores autenticados
+// Legislacao e Parametros tabs são acessíveis a todos os utilizadores autenticados
 $tab = $_GET['tab'] ?? 'utilizadores';
-if ($tab === 'ensaios') $tab = 'parametros'; // backward compat
 if (in_array($tab, ['legislacao', 'parametros'])) {
     requireLogin();
 } else {
@@ -2414,7 +2413,6 @@ $breadcrumbs = [
                 'parametros' => 'Parâmetros',
                 'legislacao' => 'Legislação',
                 'ficheiros' => 'Ficheiros',
-                'ensaios' => 'Ensaios',
                 'pedido' => 'Pedido'
             ];
             ?>

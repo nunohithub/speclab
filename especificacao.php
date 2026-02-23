@@ -54,28 +54,6 @@ if (!$isNew && $especId) {
     $pedidosEspec = $stmtPed->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Carregar legenda de ensaios da org (com fallback para global)
-$ensaiosLegenda = '';
-$ensaiosLegendaTamanho = 9;
-if ($orgId) {
-    $stmtLeg = $db->prepare('SELECT ensaios_legenda, ensaios_legenda_tamanho FROM organizacoes WHERE id = ?');
-    $stmtLeg->execute([$orgId]);
-    $legRow = $stmtLeg->fetch(PDO::FETCH_ASSOC);
-    if ($legRow) {
-        $ensaiosLegenda = $legRow['ensaios_legenda'] ?? '';
-        $ensaiosLegendaTamanho = (int)($legRow['ensaios_legenda_tamanho'] ?? 9);
-    }
-}
-if (empty($ensaiosLegenda)) {
-    $stmtGlob = $db->prepare("SELECT valor FROM configuracoes WHERE chave = 'ensaios_legenda_global'");
-    $stmtGlob->execute();
-    $globRow = $stmtGlob->fetch(PDO::FETCH_ASSOC);
-    if ($globRow) {
-        $gData = json_decode($globRow['valor'], true);
-        $ensaiosLegenda = $gData['legenda'] ?? '';
-        $ensaiosLegendaTamanho = (int)($gData['tamanho'] ?? 9);
-    }
-}
 
 // Determinar se é nova especificação ou edição
 $isNew = isset($_GET['novo']) && $_GET['novo'] == '1';
@@ -613,7 +591,7 @@ $breadcrumbs = [
         .nivel-modal-btns .btn-nivel strong { display: block; font-size: 15px; margin-bottom: 4px; }
         .nivel-modal-btns .btn-nivel span { font-size: 12px; color: var(--color-muted, #6b7280); }
 
-        /* Secção de ensaios inline (tabela editável) */
+        /* Tabela de parâmetros inline (editável) */
         .seccao-ensaios-table {
             width: 100%;
             border-collapse: collapse;
@@ -815,64 +793,6 @@ $breadcrumbs = [
             display: flex;
             gap: var(--spacing-sm);
         }
-
-        /* Modal seletor de ensaios */
-        .ensaios-selector-grid {
-            max-height: 50vh;
-            overflow-y: auto;
-            padding: var(--spacing-sm);
-        }
-        .ensaios-cat-group {
-            margin-bottom: var(--spacing-md);
-        }
-        .ensaios-cat-title {
-            font-weight: 700;
-            font-size: var(--font-size-sm);
-            color: var(--color-primary);
-            padding: var(--spacing-xs) var(--spacing-sm);
-            background: var(--color-primary-lighter);
-            border-radius: var(--border-radius-sm);
-            margin-bottom: var(--spacing-xs);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .ensaios-cat-title button {
-            font-size: 11px;
-            padding: 2px 8px;
-            border: 1px solid var(--color-primary);
-            background: white;
-            color: var(--color-primary);
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .ensaios-cat-title button:hover {
-            background: var(--color-primary);
-            color: white;
-        }
-        .ensaio-check-item {
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-sm);
-            padding: 6px var(--spacing-sm);
-            border-radius: var(--border-radius-sm);
-            font-size: var(--font-size-sm);
-            cursor: pointer;
-            transition: background var(--transition-fast);
-        }
-        .ensaio-check-item:hover {
-            background: var(--color-bg);
-        }
-        .ensaio-check-item input[type="checkbox"] {
-            width: 16px;
-            height: 16px;
-            accent-color: var(--color-primary);
-        }
-        .ensaio-check-item .ensaio-info {
-            flex: 1;
-        }
-        .ensaio-check-item .ensaio-name { font-weight: 500; }
-        .ensaio-check-item .ensaio-detail { font-size: var(--font-size-xs); color: var(--color-muted); }
 
         /* TinyMCE - toolbar compacta e elegante */
         .tox-tinymce { border: none !important; border-radius: 0 !important; }
@@ -1300,90 +1220,6 @@ $breadcrumbs = [
                                         <ul class="file-list fic-file-list" style="margin-top:8px;"></ul>
                                     </div>
                                 </div>
-                                <?php elseif ($secTipo === 'ensaios'): ?>
-                                <?php
-                                    $ensaiosRaw = json_decode($sec['conteudo'] ?? '[]', true);
-                                    if (isset($ensaiosRaw['rows'])) {
-                                        $ensaiosData = $ensaiosRaw['rows'];
-                                        $colWidths = $ensaiosRaw['colWidths'] ?? [20, 22, 18, 13, 13, 10];
-                                        $mergesData = $ensaiosRaw['merges'] ?? [];
-                                    } else {
-                                        $ensaiosData = is_array($ensaiosRaw) ? $ensaiosRaw : [];
-                                        $colWidths = [20, 22, 18, 13, 13, 10];
-                                        $mergesData = [];
-                                    }
-                                    // Converter para formato 6 colunas editor (Ensaio, Espec, Norma, NEI, NQA, Unidade)
-                                    $editorCw = array_slice($colWidths, 0, 6);
-                                    if (count($editorCw) < 6) {
-                                        // Dados antigos com 5 colunas: adicionar Unidade
-                                        if (count($editorCw) < 5) $editorCw = [24, 20, 16, 13, 13];
-                                        $editorCw[] = 10;
-                                    }
-                                    $editorMerges = [];
-                                    foreach ($mergesData as $m) {
-                                        $nc = $m['col'] ?? 0;
-                                        if ($nc >= 0 && $nc <= 5) {
-                                            $editorMerges[] = ['col' => $nc, 'row' => $m['row'], 'span' => $m['span'], 'hAlign' => $m['hAlign'] ?? 'center', 'vAlign' => $m['vAlign'] ?? 'middle'];
-                                        }
-                                    }
-                                    $prevCat = null;
-                                ?>
-                                <div class="seccao-block" data-seccao-idx="<?= $i ?>" data-tipo="ensaios" data-nivel="<?= (int)($sec['nivel'] ?? 1) ?>">
-                                    <div class="seccao-header">
-                                        <span class="seccao-numero"><?= $hierNumbers[$i] ?? ($i + 1) . '.' ?></span>
-                                        <input type="text" class="seccao-titulo" value="<?= sanitize($sec['titulo'] ?? 'Características Técnicas') ?>" placeholder="Título da secção">
-                                        <span class="pill pill-info" style="font-size:10px; padding:2px 8px;">Ensaios</span>
-                                        <div class="seccao-actions">
-                                            <button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, -1)" title="Mover acima">&#9650;</button>
-                                            <button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, 1)" title="Mover abaixo">&#9660;</button>
-                                            <button class="btn btn-ghost btn-sm seccao-remove-btn" onclick="removerSeccao(this)" title="Remover secção">&times;</button>
-                                        </div>
-                                    </div>
-                                    <div class="seccao-ensaios-wrap">
-                                        <table class="seccao-ensaios-table" data-merges="<?= sanitize(json_encode($editorMerges)) ?>">
-                                            <thead>
-                                                <tr>
-                                                    <th style="width:<?= $editorCw[0] ?>%">Ensaio</th>
-                                                    <th style="width:<?= $editorCw[1] ?>%">Especificação</th>
-                                                    <th style="width:<?= $editorCw[2] ?>%">Norma</th>
-                                                    <th style="width:<?= $editorCw[3] ?>%" title="Nível Especial de Inspeção">NEI</th>
-                                                    <th style="width:<?= $editorCw[4] ?>%" title="Nível de Qualidade Aceitável">NQA</th>
-                                                    <th style="width:<?= $editorCw[5] ?>%">Unid.</th>
-                                                    <th style="width:4%"></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="ensaios-tbody">
-                                                <?php foreach ($ensaiosData as $ens):
-                                                    $cat = trim($ens['categoria'] ?? '');
-                                                    if ($cat !== '' && $cat !== $prevCat):
-                                                        $prevCat = $cat;
-                                                ?>
-                                                <tr class="ensaio-cat-row">
-                                                    <td colspan="7"><input type="text" value="<?= sanitize($cat) ?>" data-field="cat-header" class="cat-header-input" placeholder="Categoria"><button class="remove-btn cat-remove-btn" onclick="removerCategoriaEnsaio(this)" title="Remover categoria">&times;</button></td>
-                                                </tr>
-                                                <?php endif; ?>
-                                                <tr>
-                                                    <td><textarea rows="1" data-field="ensaio"><?= sanitize($ens['ensaio'] ?? '') ?></textarea></td>
-                                                    <td><textarea rows="1" data-field="especificacao"><?= sanitize($ens['especificacao'] ?? '') ?></textarea></td>
-                                                    <td><textarea rows="1" data-field="norma"><?= sanitize($ens['norma'] ?? '') ?></textarea></td>
-                                                    <td><textarea rows="1" data-field="nivel_especial"><?= sanitize($ens['nivel_especial'] ?? '') ?></textarea></td>
-                                                    <td><textarea rows="1" data-field="nqa"><?= sanitize($ens['nqa'] ?? '') ?></textarea></td>
-                                                    <td><textarea rows="1" data-field="unidade" placeholder="mm, %, ..."><?= sanitize($ens['unidade'] ?? '') ?></textarea></td>
-                                                    <td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>
-                                                </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                        <?php if (!empty($ensaiosLegenda)): ?>
-                                        <div class="ensaios-legenda" style="font-size:<?= $ensaiosLegendaTamanho ?>px; color:#666; font-style:italic; margin-top:4px; padding:2px 4px;"><?= htmlspecialchars($ensaiosLegenda) ?></div>
-                                        <?php endif; ?>
-                                        <div class="seccao-ensaios-actions">
-                                            <button class="btn btn-secondary btn-sm" onclick="adicionarEnsaioLinhaManual(this)">+ Linha</button>
-                                            <button class="btn btn-secondary btn-sm" onclick="abrirSelectorEnsaiosParaSeccao(this)">+ Do Banco de Ensaios</button>
-                                            <span class="muted" style="font-size:10px; margin-left:auto;">&#8984;/Ctrl+Clique para juntar células</span>
-                                        </div>
-                                    </div>
-                                </div>
                                 <?php elseif ($secTipo === 'parametros' || $secTipo === 'parametros_custom'): ?>
                                 <?php
                                     $pcRaw = json_decode($sec['conteudo'] ?? '{}', true);
@@ -1440,10 +1276,11 @@ $breadcrumbs = [
                                         </div>
                                     </div>
                                     <div class="seccao-ensaios-wrap">
-                                        <table class="seccao-ensaios-table" data-param-tipo-id="<?= (int)$pcTipoId ?>">
+                                        <?php $pcMerges = $pcRaw['merges'] ?? []; ?>
+                                        <table class="seccao-ensaios-table" data-param-tipo-id="<?= (int)$pcTipoId ?>" data-merges="<?= sanitize(json_encode($pcMerges)) ?>">
                                             <thead><tr>
                                                 <?php foreach ($pcColunas as $ci => $pcCol): ?>
-                                                <th style="width:<?= isset($pcColW[$ci]) ? $pcColW[$ci] : 15 ?>%"><?= sanitize($pcCol['nome']) ?></th>
+                                                <th style="width:<?= isset($pcColW[$ci]) ? $pcColW[$ci] : 15 ?>%" data-chave="<?= sanitize($pcCol['chave']) ?>"><?= sanitize($pcCol['nome']) ?></th>
                                                 <?php endforeach; ?>
                                                 <th style="width:4%"></th>
                                             </tr></thead>
@@ -1484,6 +1321,7 @@ $breadcrumbs = [
                                             <button class="btn btn-secondary btn-sm" onclick="adicionarParamCatLinha(this, <?= (int)$pcTipoId ?>)">+ Categoria</button>
                                             <button class="btn btn-secondary btn-sm" onclick="adicionarParamCustomLinha(this, <?= (int)$pcTipoId ?>)">+ Linha</button>
                                             <button class="btn btn-secondary btn-sm" onclick="abrirBancoParamCustom(this, <?= (int)$pcTipoId ?>)">+ Do Banco</button>
+                                            <span class="muted" style="font-size:10px; margin-left:auto;">&#8984;/Ctrl+Clique para juntar células</span>
                                         </div>
                                     </div>
                                 </div>
@@ -2167,42 +2005,6 @@ $breadcrumbs = [
         </div>
     </div>
 
-    <!-- MODAL: SELETOR DE ENSAIOS (para secções de conteúdo) -->
-    <div class="modal-overlay hidden" id="modalSelectorEnsaios">
-        <div class="modal-box modal-box-lg">
-            <div class="modal-header">
-                <h3>Selecionar Ensaios</h3>
-                <button class="modal-close" onclick="fecharSelectorEnsaios()">&times;</button>
-            </div>
-            <p class="muted mb-md">Escolha os ensaios do banco para incluir nesta secção.</p>
-
-            <div class="ensaios-selector-grid" id="ensaiosTemplateGrid">
-                <?php foreach ($categoriasPadrao as $categoria => $params): ?>
-                    <div class="ensaios-cat-group">
-                        <div class="ensaios-cat-title">
-                            <?= sanitize($categoria) ?>
-                            <button onclick="toggleCatEnsaios(this, '<?= sanitize($categoria) ?>')">Todos</button>
-                        </div>
-                        <?php foreach ($params as $p): ?>
-                            <label class="ensaio-check-item">
-                                <input type="checkbox" name="sel_ensaio" data-cat="<?= sanitize($categoria) ?>" data-ensaio="<?= sanitize($p['ensaio']) ?>" data-norma="<?= sanitize($p['metodo']) ?>" data-nivel-especial="<?= sanitize($p['nivel_especial'] ?? '') ?>" data-nqa="<?= sanitize($p['nqa'] ?? '') ?>" data-unidade="<?= sanitize($p['unidade'] ?? '') ?>" data-spec="<?= sanitize($p['exemplo']) ?>">
-                                <div class="ensaio-info">
-                                    <div class="ensaio-name"><?= sanitize($p['ensaio']) ?></div>
-                                    <div class="ensaio-detail"><?= sanitize($p['metodo']) ?> &mdash; <?= sanitize($p['exemplo']) ?></div>
-                                </div>
-                            </label>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="fecharSelectorEnsaios()">Cancelar</button>
-                <button class="btn btn-primary" onclick="confirmarSelectorEnsaios()">Adicionar Selecionados</button>
-            </div>
-        </div>
-    </div>
-
     <!-- MODAL: SELECTOR TIPO DE PARÂMETRO -->
     <div class="modal-overlay hidden" id="modalSelectorTipo">
         <div class="modal-box" style="max-width:400px;">
@@ -2345,7 +2147,7 @@ $breadcrumbs = [
 
     function atualizarSeccoesPermitidas() {
         var tipo = document.getElementById('tipo_doc').value;
-        var permitidas = DOC_TIPOS_CONFIG[tipo] || ['texto','parametros','legislacao','ficheiros','ensaios'];
+        var permitidas = DOC_TIPOS_CONFIG[tipo] || ['texto','parametros','legislacao','ficheiros'];
         document.querySelectorAll('.btn-seccao').forEach(function(btn) {
             var seccao = btn.getAttribute('data-seccao');
             btn.style.display = permitidas.indexOf(seccao) !== -1 ? '' : 'none';
@@ -2495,8 +2297,6 @@ $breadcrumbs = [
     function executarAcaoSeccao(action) {
         if (action === 'texto') {
             adicionarSeccao();
-        } else if (action === 'ensaios') {
-            abrirSelectorEnsaios();
         } else if (action === 'parametros') {
             abrirSelectorTipoParametro();
         } else if (action === 'legislacao') {
@@ -2542,166 +2342,6 @@ $breadcrumbs = [
         return { block: block, editorId: editorId };
     }
 
-    function criarSeccaoEnsaios(titulo, ensaiosArr, idx, nivel) {
-        nivel = nivel || 1;
-        var block = document.createElement('div');
-        block.className = 'seccao-block';
-        block.setAttribute('data-seccao-idx', idx);
-        block.setAttribute('data-tipo', 'ensaios');
-        block.setAttribute('data-nivel', nivel);
-
-        var headerHtml =
-            '<div class="seccao-header">' +
-                '<span class="seccao-numero">' + (idx + 1) + '.</span>' +
-                '<input type="text" class="seccao-titulo" value="' + escapeHtml(titulo || 'Características Técnicas') + '" placeholder="Título da secção">' +
-                '<span class="pill pill-info" style="font-size:10px; padding:2px 8px;">Ensaios</span>' +
-                '<div class="seccao-actions">' +
-                    '<button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, -1)" title="Mover acima">&#9650;</button>' +
-                    '<button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, 1)" title="Mover abaixo">&#9660;</button>' +
-                    '<button class="btn btn-ghost btn-sm seccao-remove-btn" onclick="removerSeccao(this)" title="Remover secção">&times;</button>' +
-                '</div>' +
-            '</div>';
-
-        var tableHtml =
-            '<div class="seccao-ensaios-wrap">' +
-                '<table class="seccao-ensaios-table">' +
-                    '<thead><tr>' +
-                        '<th style="width:24%">Ensaio</th>' +
-                        '<th style="width:20%">Especificação</th>' +
-                        '<th style="width:16%">Norma</th>' +
-                        '<th style="width:13%" title="Nível Especial de Inspeção">NEI</th>' +
-                        '<th style="width:13%" title="Nível de Qualidade Aceitável">NQA</th>' +
-                        '<th style="width:10%">Unid.</th>' +
-                        '<th style="width:4%"></th>' +
-                    '</tr></thead>' +
-                    '<tbody class="ensaios-tbody">';
-
-        if (ensaiosArr && ensaiosArr.length) {
-            var prevCat = null;
-            ensaiosArr.forEach(function(ens) {
-                var cat = (ens.categoria || '').trim();
-                if (cat !== '' && cat !== prevCat) {
-                    tableHtml += criarEnsaioCatRowHtml(cat);
-                    prevCat = cat;
-                }
-                tableHtml += criarEnsaioRowHtml(ens.categoria || '', ens.ensaio || '', ens.especificacao || '', ens.norma || '', ens.nivel_especial || '', ens.nqa || '', ens.unidade || '');
-            });
-        }
-
-        var legendaHtml = '';
-        <?php if (!empty($ensaiosLegenda)): ?>
-        legendaHtml = '<div class="ensaios-legenda" style="font-size:<?= $ensaiosLegendaTamanho ?>px; color:#666; font-style:italic; margin-top:4px; padding:2px 4px;"><?= addslashes(htmlspecialchars($ensaiosLegenda)) ?></div>';
-        <?php endif; ?>
-
-        tableHtml +=
-                    '</tbody>' +
-                '</table>' +
-                legendaHtml +
-                '<div class="seccao-ensaios-actions">' +
-                    '<button class="btn btn-secondary btn-sm" onclick="adicionarEnsaioLinhaManual(this)">+ Linha</button>' +
-                    '<button class="btn btn-secondary btn-sm" onclick="abrirSelectorEnsaiosParaSeccao(this)">+ Do Banco de Ensaios</button>' +
-                '</div>' +
-            '</div>';
-
-        block.innerHTML = headerHtml + tableHtml;
-        block.querySelector('.seccao-titulo').addEventListener('input', marcarAlterado);
-
-        return { block: block };
-    }
-
-    function criarEnsaioCatRowHtml(cat) {
-        return '<tr class="ensaio-cat-row"><td colspan="7"><input type="text" value="' + escapeHtml(cat) + '" data-field="cat-header" class="cat-header-input" placeholder="Categoria"><button class="remove-btn cat-remove-btn" onclick="removerCategoriaEnsaio(this)" title="Remover categoria">&times;</button></td></tr>';
-    }
-
-    function criarEnsaioRowHtml(cat, ensaio, spec, norma, nivelEspecial, nqa, unidade) {
-        return '<tr>' +
-            '<td><textarea rows="1" data-field="ensaio">' + escapeHtml(ensaio) + '</textarea></td>' +
-            '<td><textarea rows="1" data-field="especificacao">' + escapeHtml(spec) + '</textarea></td>' +
-            '<td><textarea rows="1" data-field="norma">' + escapeHtml(norma) + '</textarea></td>' +
-            '<td><textarea rows="1" data-field="nivel_especial">' + escapeHtml(nivelEspecial) + '</textarea></td>' +
-            '<td><textarea rows="1" data-field="nqa">' + escapeHtml(nqa) + '</textarea></td>' +
-            '<td><textarea rows="1" data-field="unidade" placeholder="mm, %, ...">' + escapeHtml(unidade || '') + '</textarea></td>' +
-            '<td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>' +
-        '</tr>';
-    }
-
-    function removerCategoriaEnsaio(btn) {
-        var catRow = btn.closest('.ensaio-cat-row');
-        var tbody = catRow.closest('tbody');
-        var table = tbody.closest('table');
-        // Restaurar DOM primeiro
-        restoreMergesDOM(tbody);
-        // Remover a cat-row e todas as data rows até o próximo cat-row ou fim
-        var next = catRow.nextElementSibling;
-        var removedCount = 0;
-        var dataRows = getDataRows(tbody);
-        var firstDataIdx = -1;
-        while (next && !next.classList.contains('ensaio-cat-row')) {
-            var toRemove = next;
-            if (firstDataIdx < 0) firstDataIdx = dataRows.indexOf(toRemove);
-            next = next.nextElementSibling;
-            toRemove.remove();
-            removedCount++;
-        }
-        catRow.remove();
-        // Ajustar merges
-        if (removedCount > 0 && firstDataIdx >= 0) {
-            var merges = getTableMerges(table);
-            var newMerges = [];
-            merges.forEach(function(m) {
-                var mEnd = m.row + m.span - 1;
-                if (mEnd < firstDataIdx) {
-                    newMerges.push(m);
-                } else if (m.row >= firstDataIdx + removedCount) {
-                    newMerges.push({ col: m.col, row: m.row - removedCount, span: m.span, hAlign: m.hAlign, vAlign: m.vAlign });
-                }
-                // Merges that overlap the removed range are dropped
-            });
-            setTableMerges(table, newMerges);
-        }
-        applyMergesVisual(table);
-        marcarAlterado();
-    }
-
-    // Adicionar ensaios agrupados por categoria a um tbody existente
-    function adicionarEnsaiosComCategorias(tbody, ensaios) {
-        // Encontrar categorias já existentes no tbody
-        var existingCats = {};
-        tbody.querySelectorAll('.ensaio-cat-row input[data-field="cat-header"]').forEach(function(input) {
-            existingCats[input.value.trim()] = input.closest('tr');
-        });
-
-        ensaios.forEach(function(ens) {
-            var cat = (ens.categoria || '').trim();
-            var tempDiv = document.createElement('div');
-
-            if (cat !== '' && existingCats[cat]) {
-                // Categoria já existe - adicionar row após último row desta categoria
-                var catRow = existingCats[cat];
-                var insertAfter = catRow;
-                var next = catRow.nextElementSibling;
-                while (next && !next.classList.contains('ensaio-cat-row')) {
-                    insertAfter = next;
-                    next = next.nextElementSibling;
-                }
-                tempDiv.innerHTML = '<table><tbody>' + criarEnsaioRowHtml(cat, ens.ensaio || '', ens.especificacao || '', ens.norma || '', ens.nivel_especial || '', ens.nqa || '') + '</tbody></table>';
-                var newTr = tempDiv.querySelector('tr');
-                insertAfter.parentNode.insertBefore(newTr, insertAfter.nextSibling);
-            } else {
-                // Nova categoria
-                if (cat !== '') {
-                    tempDiv.innerHTML = '<table><tbody>' + criarEnsaioCatRowHtml(cat) + '</tbody></table>';
-                    var catTr = tempDiv.querySelector('tr');
-                    tbody.appendChild(catTr);
-                    existingCats[cat] = catTr;
-                }
-                tempDiv.innerHTML = '<table><tbody>' + criarEnsaioRowHtml(cat, ens.ensaio || '', ens.especificacao || '', ens.norma || '', ens.nivel_especial || '', ens.nqa || '') + '</tbody></table>';
-                var newTr2 = tempDiv.querySelector('tr');
-                tbody.appendChild(newTr2);
-            }
-        });
-    }
-
     function adicionarSeccao(tipo, titulo, conteudo, nivel) {
         var container = document.getElementById('seccoesContainer');
         var idx = seccaoCounter++;
@@ -2716,29 +2356,6 @@ $breadcrumbs = [
         renumerarSeccoes();
         marcarAlterado();
         result.block.querySelector('.seccao-titulo').focus();
-    }
-
-    function adicionarSeccaoEnsaios(ensaiosArr, titulo, nivel) {
-        var container = document.getElementById('seccoesContainer');
-        var idx = seccaoCounter++;
-
-        var result = criarSeccaoEnsaios(titulo || 'Características Técnicas', ensaiosArr, idx, nivel || _pendingNivel);
-        container.appendChild(result.block);
-
-        var empty = document.getElementById('seccoesEmpty');
-        if (empty) empty.remove();
-
-        // Inicializar handles de redimensionamento e merge
-        var tbl = result.block.querySelector('.seccao-ensaios-table');
-        if (tbl) {
-            initColResize(tbl);
-            initMergeHandlers(tbl);
-            // Auto-grow textareas nas linhas importadas
-            tbl.querySelectorAll('textarea[data-field]').forEach(autoGrowTextarea);
-        }
-
-        renumerarSeccoes();
-        marcarAlterado();
     }
 
     function removerSeccao(btn) {
@@ -2758,7 +2375,7 @@ $breadcrumbs = [
         marcarAlterado();
     }
 
-    // Ensaios table inline functions
+    // Remover linha de tabela (parâmetros)
     function removerEnsaioLinha(btn) {
         var tr = btn.closest('tr');
         var tbody = tr.closest('tbody');
@@ -2797,22 +2414,6 @@ $breadcrumbs = [
         if (removeCatRow && prevSib) prevSib.remove();
 
         applyMergesVisual(table);
-        marcarAlterado();
-    }
-
-    function adicionarEnsaioLinhaManual(btn) {
-        var tbody = btn.closest('.seccao-block').querySelector('.ensaios-tbody');
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-            '<td><textarea rows="1" data-field="ensaio" placeholder="Ensaio"></textarea></td>' +
-            '<td><textarea rows="1" data-field="especificacao" placeholder="Valor"></textarea></td>' +
-            '<td><textarea rows="1" data-field="norma" placeholder="Norma"></textarea></td>' +
-            '<td><textarea rows="1" data-field="nivel_especial" placeholder="NEI"></textarea></td>' +
-            '<td><textarea rows="1" data-field="nqa" placeholder="NQA"></textarea></td>' +
-            '<td><textarea rows="1" data-field="unidade" placeholder="mm, %, ..."></textarea></td>' +
-            '<td><button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button></td>';
-        tbody.appendChild(tr);
-        tr.querySelector('textarea').focus();
         marcarAlterado();
     }
 
@@ -2886,41 +2487,59 @@ $breadcrumbs = [
     // MERGE DE CÉLULAS (juntar células) - com rowspan real
     // ============================================================
 
-    // Mapeamento campo <-> coluna (6 colunas: Ensaio, Espec, Norma, NEI, NQA, Unidade)
-    var fieldToCol = { ensaio: 0, especificacao: 1, norma: 2, nivel_especial: 3, nqa: 4, unidade: 5 };
-    var colToField = ['ensaio', 'especificacao', 'norma', 'nivel_especial', 'nqa', 'unidade'];
-    var colPlaceholders = { ensaio: 'Ensaio', especificacao: 'Valor', norma: 'Norma', nivel_especial: 'NEI', nqa: 'NQA', unidade: 'Unid.' };
-
-    // Obter apenas as data rows (excluir .ensaio-cat-row)
-    function getDataRows(tbody) {
-        return Array.from(tbody.querySelectorAll('tr:not(.ensaio-cat-row)'));
+    // Ler colunas dinâmicas de uma tabela (via data-chave nos th ou data-field nos td)
+    function getTableColumns(table) {
+        var cols = [];
+        var ths = table.querySelectorAll('thead th[data-chave]');
+        ths.forEach(function(th) { cols.push(th.getAttribute('data-chave')); });
+        if (cols.length === 0) {
+            // Fallback: ler do primeiro data row
+            var firstRow = table.querySelector('.ensaios-tbody tr:not([data-cat])');
+            if (firstRow) {
+                firstRow.querySelectorAll('textarea[data-field], input[data-field]').forEach(function(inp) {
+                    var f = inp.getAttribute('data-field');
+                    if (f && f !== 'cat-header') cols.push(f);
+                });
+            }
+        }
+        return cols;
     }
 
-    // Obter índice lógico de coluna de um td (funciona com tds em falta por rowspan)
+    // Obter apenas as data rows (excluir cat-header-row e ensaio-cat-row)
+    function getDataRows(tbody) {
+        return Array.from(tbody.querySelectorAll('tr:not(.ensaio-cat-row):not(.cat-header-row)'));
+    }
+
+    // Obter índice lógico de coluna de um td
     function getTdColumnIndex(td) {
         var input = td.querySelector('input[data-field], textarea[data-field]');
         if (input) {
             var f = input.getAttribute('data-field');
-            if (f === 'cat-header') return -1; // categoria header, ignorar
-            return fieldToCol[f] !== undefined ? fieldToCol[f] : -1;
+            if (f === 'cat-header') return -1;
+            var table = td.closest('table');
+            var cols = getTableColumns(table);
+            return cols.indexOf(f);
         }
-        if (td.querySelector('.remove-btn:not(.cat-remove-btn)')) return 4;
+        if (td.querySelector('.remove-btn:not(.cat-remove-btn)')) {
+            var table = td.closest('table');
+            return getTableColumns(table).length; // coluna de ações
+        }
         return -1;
     }
 
-    // Criar td para uma coluna específica
-    function createCellForColumn(col, value) {
+    // Criar td para uma coluna específica (dinâmico)
+    function createCellForColumn(table, col, value) {
         var td = document.createElement('td');
-        if (col >= 0 && col <= 3) {
-            var field = colToField[col];
-            td.innerHTML = '<input type="text" value="' + escapeHtml(value || '') + '" data-field="' + field + '" placeholder="' + colPlaceholders[field] + '">';
+        var cols = getTableColumns(table);
+        if (col >= 0 && col < cols.length) {
+            td.innerHTML = '<textarea rows="1" data-field="' + cols[col] + '">' + escapeHtml(value || '') + '</textarea>';
         } else {
             td.innerHTML = '<button class="remove-btn" onclick="removerEnsaioLinha(this)" title="Remover">&times;</button>';
         }
         return td;
     }
 
-    // Obter td por coluna lógica numa row (funciona com tds em falta)
+    // Obter td por coluna lógica numa row
     function getTdByColumn(tr, col) {
         var tds = tr.querySelectorAll('td');
         for (var i = 0; i < tds.length; i++) {
@@ -2929,7 +2548,7 @@ $breadcrumbs = [
         return null;
     }
 
-    // Inserir td na posição correta numa row (considerando tds em falta)
+    // Inserir td na posição correta numa row
     function insertTdAtColumn(tr, newTd, col) {
         var tds = Array.from(tr.querySelectorAll('td'));
         for (var i = 0; i < tds.length; i++) {
@@ -2975,7 +2594,8 @@ $breadcrumbs = [
             // Obter coluna lógica (funciona com tds em falta por rowspan)
             var colIdx = getTdColumnIndex(td);
             // Ignorar coluna de ações ou desconhecida
-            if (colIdx >= 4 || colIdx < 0) return;
+            var nCols = getTableColumns(table).length;
+            if (colIdx >= nCols || colIdx < 0) return;
             e.preventDefault();
 
             var dataRows = getDataRows(tbody);
@@ -3086,7 +2706,7 @@ $breadcrumbs = [
         var values = [];
         for (var r = startRow; r <= endRow && r < dataRows.length; r++) {
             var td = getTdByColumn(dataRows[r], col);
-            var input = td ? td.querySelector('input') : null;
+            var input = td ? td.querySelector('textarea, input') : null;
             if (input) values.push(input.value.trim());
         }
         var allSame = values.length > 0 && values.every(function(v) { return v === values[0]; });
@@ -3095,7 +2715,7 @@ $breadcrumbs = [
         // Sincronizar valor em todas as células do merge
         for (var r = startRow; r <= endRow && r < dataRows.length; r++) {
             var td = getTdByColumn(dataRows[r], col);
-            var input = td ? td.querySelector('input') : null;
+            var input = td ? td.querySelector('textarea, input') : null;
             if (input) input.value = mergedValue;
         }
 
@@ -3144,17 +2764,20 @@ $breadcrumbs = [
 
     // Fase 1: RESTAURAR - recriar tds slave que foram removidos pelo rowspan
     function restoreMergesDOM(tbody) {
+        var table = tbody.closest('table');
+        var nCols = getTableColumns(table).length;
+        var actionColIdx = nCols; // coluna de ações é a última
         var dataRows = getDataRows(tbody);
 
         // Recolher valores dos masters antes de resetar
-        var masterValues = {}; // chave: "col-dataRowIdx"
+        var masterValues = {};
         dataRows.forEach(function(tr, rowIdx) {
             tr.querySelectorAll('td[rowspan]').forEach(function(td) {
                 var col = getTdColumnIndex(td);
                 var span = parseInt(td.getAttribute('rowspan')) || 1;
-                if (span > 1 && col >= 0 && col <= 3) {
-                    var input = td.querySelector('input');
-                    var value = input ? input.value : '';
+                if (span > 1 && col >= 0 && col < nCols) {
+                    var inp = td.querySelector('textarea, input');
+                    var value = inp ? inp.value : '';
                     for (var r = rowIdx + 1; r < rowIdx + span && r < dataRows.length; r++) {
                         masterValues[col + '-' + r] = value;
                     }
@@ -3162,36 +2785,36 @@ $breadcrumbs = [
             });
         });
 
-        // Resetar rowspan e limpar classes/tools (só data rows)
+        // Resetar rowspan e limpar classes/tools
         dataRows.forEach(function(tr) {
             tr.querySelectorAll('td').forEach(function(td) {
                 td.classList.remove('merge-master', 'merge-slave', 'merge-slave-last');
                 td.style.position = '';
                 td.style.verticalAlign = '';
                 if (td.hasAttribute('rowspan')) td.removeAttribute('rowspan');
-                var input = td.querySelector('input');
-                if (input) { input.style.visibility = ''; input.style.textAlign = ''; }
+                var inp = td.querySelector('textarea, input');
+                if (inp) { inp.style.visibility = ''; inp.style.textAlign = ''; }
                 var tools = td.querySelector('.merge-tools');
                 if (tools) tools.remove();
             });
         });
 
-        // Recriar tds em falta (slave cells que foram removidos)
+        // Recriar tds em falta
         dataRows.forEach(function(tr, rowIdx) {
             var existingCols = {};
             tr.querySelectorAll('td').forEach(function(td) {
                 var col = getTdColumnIndex(td);
-                if (col >= 0 && col <= 4) existingCols[col] = true;
+                if (col >= 0) existingCols[col] = true;
             });
-            for (var col = 0; col <= 3; col++) {
+            for (var col = 0; col < nCols; col++) {
                 if (!existingCols[col]) {
                     var value = masterValues[col + '-' + rowIdx] || '';
-                    var newTd = createCellForColumn(col, value);
+                    var newTd = createCellForColumn(table, col, value);
                     insertTdAtColumn(tr, newTd, col);
                 }
             }
-            if (!existingCols[4]) {
-                var actionTd = createCellForColumn(4, '');
+            if (!existingCols[actionColIdx]) {
+                var actionTd = createCellForColumn(table, actionColIdx, '');
                 tr.appendChild(actionTd);
             }
         });
@@ -3214,7 +2837,7 @@ $breadcrumbs = [
             masterTd.classList.add('merge-master');
             masterTd.style.position = 'relative';
             masterTd.style.verticalAlign = vAlign;
-            var masterInput = masterTd.querySelector('input');
+            var masterInput = masterTd.querySelector('textarea, input');
             if (masterInput) masterInput.style.textAlign = hAlign;
 
             // Toolbar: [H] [V] [✕]
@@ -3274,11 +2897,8 @@ $breadcrumbs = [
         applyMergesDOM(tbody, merges);
     }
 
-    // Inicializar merge handlers apenas em tabelas de ensaios (não parametros)
+    // Inicializar merge handlers em todas as tabelas
     document.querySelectorAll('.seccao-ensaios-table').forEach(function(table) {
-        var block = table.closest('.seccao-block');
-        var tipo = block ? block.getAttribute('data-tipo') : '';
-        if (tipo === 'parametros' || tipo === 'parametros_custom') return;
         initMergeHandlers(table);
         applyMergesVisual(table);
     });
@@ -3304,73 +2924,6 @@ $breadcrumbs = [
             autoGrowTextarea(ta);
         }
     });
-
-    // Ensaios selector modal
-    var selectorTargetBlock = null;
-    var selectorMode = 'new'; // 'new' = nova secção, 'add' = adicionar a secção existente
-
-    function abrirSelectorEnsaios() {
-        selectorMode = 'new';
-        selectorTargetBlock = null;
-        limparCheckboxesSelector();
-        document.getElementById('modalSelectorEnsaios').classList.remove('hidden');
-    }
-
-    function abrirSelectorEnsaiosParaSeccao(btn) {
-        selectorMode = 'add';
-        selectorTargetBlock = btn.closest('.seccao-block');
-        limparCheckboxesSelector();
-        document.getElementById('modalSelectorEnsaios').classList.remove('hidden');
-    }
-
-    function fecharSelectorEnsaios() {
-        document.getElementById('modalSelectorEnsaios').classList.add('hidden');
-    }
-
-    function limparCheckboxesSelector() {
-        document.querySelectorAll('#modalSelectorEnsaios input[type="checkbox"]').forEach(function(cb) {
-            cb.checked = false;
-        });
-    }
-
-    function toggleCatEnsaios(btn, cat) {
-        var grid = document.getElementById('ensaiosTemplateGrid');
-        var checks = grid.querySelectorAll('input[data-cat="' + cat + '"]');
-        var allChecked = Array.from(checks).every(function(c) { return c.checked; });
-        checks.forEach(function(c) { c.checked = !allChecked; });
-    }
-
-    function confirmarSelectorEnsaios() {
-        var ensaios = [];
-        document.querySelectorAll('#ensaiosTemplateGrid input[name="sel_ensaio"]:checked').forEach(function(cb) {
-            ensaios.push({
-                categoria: cb.getAttribute('data-cat') || '',
-                ensaio: cb.getAttribute('data-ensaio') || '',
-                especificacao: cb.getAttribute('data-spec') || '',
-                norma: cb.getAttribute('data-norma') || '',
-                nivel_especial: cb.getAttribute('data-nivel-especial') || '',
-                nqa: cb.getAttribute('data-nqa') || '',
-                unidade: cb.getAttribute('data-unidade') || ''
-            });
-        });
-
-        if (ensaios.length === 0) {
-            appAlert('Selecione pelo menos um ensaio.');
-            return;
-        }
-
-        if (selectorMode === 'add' && selectorTargetBlock) {
-            // Add rows to existing ensaios section with cat-headers
-            var tbody = selectorTargetBlock.querySelector('.ensaios-tbody');
-            adicionarEnsaiosComCategorias(tbody, ensaios);
-        } else {
-            // Create new ensaios section
-            adicionarSeccaoEnsaios(ensaios);
-        }
-
-        fecharSelectorEnsaios();
-        marcarAlterado();
-    }
 
     // ============================================================
     // TIPO DE PARÂMETRO SELECTOR
@@ -4283,55 +3836,7 @@ $breadcrumbs = [
             var tipo = block.getAttribute('data-tipo') || 'texto';
             var conteudo = '';
 
-            if (tipo === 'ensaios') {
-                // Recolher dados: cat-rows definem a categoria, data rows têm 4 campos
-                var tbl = block.querySelector('.seccao-ensaios-table');
-                var tbody = tbl ? tbl.querySelector('.ensaios-tbody') : null;
-                var merges = tbl ? getTableMerges(tbl) : [];
-                var ensaiosArr = [];
-                var currentCat = '';
-                var dataRowIdx = 0;
-
-                if (tbody) {
-                    var allTrs = tbody.querySelectorAll('tr');
-                    var dataRows = getDataRows(tbody);
-                    allTrs.forEach(function(tr) {
-                        if (tr.classList.contains('ensaio-cat-row')) {
-                            var catInput = tr.querySelector('input[data-field="cat-header"]');
-                            currentCat = catInput ? catInput.value : '';
-                        } else {
-                            var row = { categoria: currentCat, ensaio: '', especificacao: '', norma: '', nivel_especial: '', nqa: '', unidade: '' };
-                            tr.querySelectorAll('input[data-field], textarea[data-field]').forEach(function(input) {
-                                var field = input.getAttribute('data-field');
-                                if (row.hasOwnProperty(field)) row[field] = input.value;
-                            });
-                            // Para colunas merged (slave tds removidos), obter valor do master
-                            merges.forEach(function(m) {
-                                if (dataRowIdx > m.row && dataRowIdx < m.row + m.span) {
-                                    var field = colToField[m.col];
-                                    if (field) {
-                                        var masterTr = dataRows[m.row];
-                                        if (masterTr) {
-                                            var masterInput = masterTr.querySelector('input[data-field="' + field + '"], textarea[data-field="' + field + '"]');
-                                            if (masterInput) row[field] = masterInput.value;
-                                        }
-                                    }
-                                }
-                            });
-                            ensaiosArr.push(row);
-                            dataRowIdx++;
-                        }
-                    });
-                }
-
-                // Ler larguras das colunas (excluindo coluna de ações)
-                var colWidths = [];
-                var ths = block.querySelectorAll('.seccao-ensaios-table thead th');
-                for (var ci = 0; ci < ths.length - 1; ci++) {
-                    colWidths.push(parseFloat(ths[ci].style.width) || 0);
-                }
-                conteudo = JSON.stringify({ colWidths: colWidths, rows: ensaiosArr, merges: merges });
-            } else if (tipo === 'parametros' || tipo === 'parametros_custom') {
+            if (tipo === 'parametros' || tipo === 'parametros_custom') {
                 // Recolher dados de parâmetros (genérico)
                 var pcTbl = block.querySelector('.seccao-ensaios-table');
                 var pcTbody = pcTbl ? pcTbl.querySelector('.ensaios-tbody') : null;
@@ -4363,7 +3868,9 @@ $breadcrumbs = [
                     pcColWidths.push(Math.round(w * 10) / 10);
                 }
                 var pcOrientacao = block.getAttribute('data-orientacao') || 'horizontal';
-                conteudo = JSON.stringify({ tipo_id: pcTipoId, tipo_slug: pcTipoSlug, colWidths: pcColWidths, rows: pcRows, orientacao: pcOrientacao });
+                var pcTable = block.querySelector('.seccao-ensaios-table');
+                var pcMerges = pcTable ? getTableMerges(pcTable) : [];
+                conteudo = JSON.stringify({ tipo_id: pcTipoId, tipo_slug: pcTipoSlug, colWidths: pcColWidths, rows: pcRows, orientacao: pcOrientacao, merges: pcMerges });
             } else if (tipo === 'ficheiros') {
                 var posSelect = block.querySelector('.fic-posicao');
                 var grupo = block.getAttribute('data-grupo') || 'default';
@@ -5037,94 +4544,7 @@ $breadcrumbs = [
             var hWeight = nivel === 2 ? ((configVisual.subtitulos_bold === '1') ? 'bold' : 'normal') : 'bold';
             var hMargin = nivel === 2 ? ' margin-left:12px;' : '';
 
-            if (tipo === 'ensaios') {
-                // Renderizar tabela de ensaios no preview (4 colunas + cat headers)
-                var tbl = block.querySelector('.seccao-ensaios-table');
-                var tbody2 = tbl ? tbl.querySelector('.ensaios-tbody') : null;
-                if (tbody2 && tbl) {
-                    var dataRowsPrev = getDataRows(tbody2);
-                    if (dataRowsPrev.length > 0) {
-                    var ths = tbl.querySelectorAll('thead th');
-                    var cw = [];
-                    for (var ci = 0; ci < ths.length - 1; ci++) { cw.push(parseFloat(ths[ci].style.width) || 20); }
-                    var cwTotal = cw.reduce(function(a,b){return a+b;},0);
-                    var cwPct = cw.map(function(v){ return (v/cwTotal*100).toFixed(1); });
-                    var tblMerges = getTableMerges(tbl);
-                    var hiddenMap = {}, spanMap = {}, alignMap = {}, rowInMergePrev = {};
-                    tblMerges.forEach(function(m) {
-                        var k = m.row + '_' + m.col;
-                        spanMap[k] = m.span;
-                        alignMap[k] = { h: m.hAlign || 'center', v: m.vAlign || 'middle' };
-                        for (var mr = m.row + 1; mr < m.row + m.span; mr++) {
-                            hiddenMap[mr + '_' + m.col] = true;
-                            rowInMergePrev[mr] = true;
-                        }
-                    });
-                    // Recolher categorias por data row
-                    var catForRow = {};
-                    var curCat = '';
-                    tbody2.querySelectorAll('tr').forEach(function(tr2) {
-                        if (tr2.classList.contains('ensaio-cat-row')) {
-                            var ci3 = tr2.querySelector('input[data-field="cat-header"]');
-                            curCat = ci3 ? ci3.value : '';
-                        } else {
-                            var drIdx = dataRowsPrev.indexOf(tr2);
-                            if (drIdx >= 0) catForRow[drIdx] = curCat;
-                        }
-                    });
-                    // Cat headers no preview
-                    var prevCatDisplayed = null;
-                    var catHeadersPrev = {};
-                    for (var ri = 0; ri < dataRowsPrev.length; ri++) {
-                        var rc = catForRow[ri] || '';
-                        if (rc !== '' && rc !== prevCatDisplayed && !rowInMergePrev[ri]) {
-                            catHeadersPrev[ri] = rc;
-                            prevCatDisplayed = rc;
-                        }
-                    }
-                    sectionsHtml += '<h4 style="color:' + hColor + '; font-size:' + hSize + 'pt; font-weight:' + hWeight + ';' + hMargin + '">' + secNum + ' ' + escapeHtml(titulo) + '</h4>';
-                    sectionsHtml += '<table style="width:100%; font-size:9px; border-collapse:collapse; margin-bottom:8px;' + hMargin + '"><thead><tr>';
-                    sectionsHtml += '<th style="width:' + cwPct[0] + '%; padding:3px 4px; text-align:left; font-weight:600; background-color:' + configVisual.cor_titulos + '; color:white;">Ensaio</th>';
-                    sectionsHtml += '<th style="width:' + cwPct[1] + '%; padding:3px 4px; text-align:left; font-weight:600; background-color:' + configVisual.cor_titulos + '; color:white;">Espec.</th>';
-                    sectionsHtml += '<th style="width:' + cwPct[2] + '%; padding:3px 4px; text-align:left; font-weight:600; background-color:' + configVisual.cor_titulos + '; color:white;">Norma</th>';
-                    sectionsHtml += '<th style="padding:3px 4px; text-align:left; font-weight:600; background-color:' + configVisual.cor_titulos + '; color:white;">NEI</th>';
-                    sectionsHtml += '<th style="padding:3px 4px; text-align:left; font-weight:600; background-color:' + configVisual.cor_titulos + '; color:white;">NQA</th>';
-                    sectionsHtml += '</tr></thead><tbody>';
-                    dataRowsPrev.forEach(function(tr, rIdx) {
-                        if (catHeadersPrev[rIdx]) {
-                            sectionsHtml += '<tr><td colspan="5" style="background-color:' + orgCores.light + '; font-weight:600; padding:3px 6px; color:' + orgCores.dark + '; text-align:center;">' + escapeHtml(catHeadersPrev[rIdx]) + '</td></tr>';
-                        }
-                        var vals = { 0: '', 1: '', 2: '', 3: '', 4: '' };
-                        tr.querySelectorAll('input[data-field], textarea[data-field]').forEach(function(input) {
-                            var ci2 = fieldToCol[input.getAttribute('data-field')];
-                            if (ci2 !== undefined) vals[ci2] = input.value;
-                        });
-                        tblMerges.forEach(function(m) {
-                            if (rIdx > m.row && rIdx < m.row + m.span) {
-                                var field = colToField[m.col];
-                                var masterTr = dataRowsPrev[m.row];
-                                if (masterTr && field) {
-                                    var mi = masterTr.querySelector('input[data-field="' + field + '"], textarea[data-field="' + field + '"]');
-                                    if (mi) vals[m.col] = mi.value;
-                                }
-                            }
-                        });
-                        sectionsHtml += '<tr>';
-                        for (var c = 0; c < 5; c++) {
-                            var key = rIdx + '_' + c;
-                            if (hiddenMap[key]) continue;
-                            var rs = spanMap[key] ? ' rowspan="' + spanMap[key] + '"' : '';
-                            var rstyle = alignMap[key] ? 'vertical-align:' + alignMap[key].v + '; text-align:' + alignMap[key].h + ';' : '';
-                            var val = escapeHtml(vals[c]);
-                            var fw = (c === 1) ? ' font-weight:bold;' : '';
-                            sectionsHtml += '<td' + rs + ' style="padding:2px 4px; border-bottom:1px solid #eee;' + fw + rstyle + '">' + val + '</td>';
-                        }
-                        sectionsHtml += '</tr>';
-                    });
-                    sectionsHtml += '</tbody></table>';
-                    }
-                }
-            } else if (tipo === 'ficheiros') {
+            if (tipo === 'ficheiros') {
                 // Mostrar lista de ficheiros no preview
                 var fileList = block.querySelector('.fic-file-list');
                 var fileItems = fileList ? fileList.querySelectorAll('.file-item') : [];
@@ -5623,14 +5043,7 @@ $breadcrumbs = [
                 var container = document.getElementById('seccoesContainer');
                 container.innerHTML = '';
                 d.seccoes.forEach(function(sec) {
-                    if (sec.tipo === 'ensaios') {
-                        var ensaiosData = [];
-                        try { ensaiosData = JSON.parse(sec.conteudo || '[]'); } catch(e) {}
-                        if (ensaiosData.rows) ensaiosData = ensaiosData.rows;
-                        adicionarSeccaoEnsaios(ensaiosData, sec.titulo);
-                    } else {
-                        adicionarSeccao(sec.tipo || 'texto', sec.titulo, sec.conteudo);
-                    }
+                    adicionarSeccao(sec.tipo || 'texto', sec.titulo, sec.conteudo);
                 });
             }
             showToast('Template aplicado!', 'success');
