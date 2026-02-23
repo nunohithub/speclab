@@ -280,7 +280,8 @@ function enviarLinkAceitacao(PDO $db, int $especId, int $tokenId, string $baseUr
         if ($senderEmail && filter_var($senderEmail, FILTER_VALIDATE_EMAIL)) $bcc = $senderEmail;
     }
 
-    $result = enviarEmail($db, $especId, $tk['destinatario_email'], 'Caderno de Encargos para aprovação: ' . $tk['numero'], $corpo, false, $enviadoPor, $bcc);
+    $assunto = gerarAssuntoEmailAceitacao($espec);
+    $result = enviarEmail($db, $especId, $tk['destinatario_email'], $assunto, $corpo, false, $enviadoPor, $bcc);
 
     // Marcar token como enviado
     if ($result['success']) {
@@ -294,6 +295,15 @@ function enviarLinkAceitacao(PDO $db, int $especId, int $tokenId, string $baseUr
  * Gera corpo HTML para email de aceitação
  */
 function gerarCorpoEmailAceitacao(array $espec, string $link, string $nomeDestinatario): string {
+    // Ler texto configurável (com fallbacks)
+    $corpoTexto = getConfiguracao('email_aceitacao_corpo', 'Foi-lhe enviado o seguinte documento para análise e aprovação. Clique no botão abaixo para consultar o documento e registar a sua decisão (aceitar ou rejeitar).');
+    $botaoTexto = getConfiguracao('email_aceitacao_botao', 'Ver e Aprovar Documento');
+
+    // Substituir placeholders
+    $placeholders = ['{nome}' => $nomeDestinatario, '{numero}' => $espec['numero'], '{titulo}' => $espec['titulo'], '{versao}' => $espec['versao'], '{link}' => $link];
+    $corpoTexto = str_replace(array_keys($placeholders), array_values($placeholders), $corpoTexto);
+    $botaoTexto = str_replace(array_keys($placeholders), array_values($placeholders), $botaoTexto);
+
     $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">';
 
     $html .= '<div style="border-bottom: 3px solid #2596be; padding-bottom: 12px; margin-bottom: 20px;">';
@@ -301,17 +311,15 @@ function gerarCorpoEmailAceitacao(array $espec, string $link, string $nomeDestin
     $html .= '</div>';
 
     $html .= '<p>Exmo(a) Sr(a) ' . htmlspecialchars($nomeDestinatario) . ',</p>';
-    $html .= '<p>Foi-lhe enviado o seguinte documento para análise e aprovação:</p>';
+    $html .= '<p>' . nl2br(htmlspecialchars($corpoTexto)) . '</p>';
 
     $html .= '<div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;">';
     $html .= '<strong>' . htmlspecialchars($espec['titulo']) . '</strong><br>';
     $html .= '<span style="color: #667085;">Número: ' . htmlspecialchars($espec['numero']) . ' | Versão: ' . htmlspecialchars($espec['versao']) . '</span>';
     $html .= '</div>';
 
-    $html .= '<p>Clique no botão abaixo para consultar o documento e registar a sua decisão (aceitar ou rejeitar):</p>';
-
     $html .= '<div style="margin: 24px 0; text-align: center;">';
-    $html .= '<a href="' . htmlspecialchars($link) . '" style="display: inline-block; background: #2596be; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Ver e Aprovar Documento</a>';
+    $html .= '<a href="' . htmlspecialchars($link) . '" style="display: inline-block; background: #2596be; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">' . htmlspecialchars($botaoTexto) . '</a>';
     $html .= '</div>';
 
     $html .= '<p style="font-size: 12px; color: #667085;">Se o botão não funcionar, copie este link: <a href="' . htmlspecialchars($link) . '">' . htmlspecialchars($link) . '</a></p>';
@@ -320,6 +328,14 @@ function gerarCorpoEmailAceitacao(array $espec, string $link, string $nomeDestin
 
     $html .= '</body></html>';
     return $html;
+}
+
+/**
+ * Gera assunto do email de aceitação (configurável)
+ */
+function gerarAssuntoEmailAceitacao(array $espec): string {
+    $assunto = getConfiguracao('email_aceitacao_assunto', 'Caderno de Encargos para aprovação: {numero}');
+    return str_replace(['{numero}', '{titulo}', '{versao}'], [$espec['numero'], $espec['titulo'], $espec['versao']], $assunto);
 }
 
 /**

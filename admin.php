@@ -2286,6 +2286,22 @@ $breadcrumbs = [
                     <div class="form-group"><label>Assinatura do Email</label><textarea name="cfg_email_assinatura" rows="2"><?= sanitize(getConfiguracao('email_assinatura', 'SpecLab - Cadernos de Encargos e Especificações Técnicas')) ?></textarea></div>
 
                     <hr style="margin: 18px 0; border: none; border-top: 1px solid #e5e7eb;">
+                    <h3 style="color: #2596be; font-size: 15px; margin-bottom: 12px;">Template Email — Aprovação</h3>
+                    <p style="font-size:11px; color:#667085; margin-bottom:8px;">Placeholders disponíveis: <code>{nome}</code> (destinatário), <code>{numero}</code>, <code>{titulo}</code>, <code>{versao}</code>, <code>{link}</code></p>
+                    <div class="form-group">
+                        <label>Assunto</label>
+                        <input type="text" name="cfg_email_aceitacao_assunto" value="<?= sanitize(getConfiguracao('email_aceitacao_assunto', 'Caderno de Encargos para aprovação: {numero}')) ?>">
+                    </div>
+                    <div class="form-group">
+                        <label>Corpo do email (texto antes do botão)</label>
+                        <textarea name="cfg_email_aceitacao_corpo" rows="4"><?= sanitize(getConfiguracao('email_aceitacao_corpo', 'Foi-lhe enviado o seguinte documento para análise e aprovação. Clique no botão abaixo para consultar o documento e registar a sua decisão (aceitar ou rejeitar).')) ?></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Texto do botão</label>
+                        <input type="text" name="cfg_email_aceitacao_botao" value="<?= sanitize(getConfiguracao('email_aceitacao_botao', 'Ver e Aprovar Documento')) ?>">
+                    </div>
+
+                    <hr style="margin: 18px 0; border: none; border-top: 1px solid #e5e7eb;">
                     <h3 style="color: #2596be; font-size: 15px; margin-bottom: 12px;">Inteligência Artificial (OpenAI)</h3>
                     <div class="form-group">
                         <label>Chave API OpenAI</label>
