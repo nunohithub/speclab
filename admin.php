@@ -1089,7 +1089,7 @@ $breadcrumbs = [
                         <div class="form-group"><label>Morada</label><input type="text" name="morada" id="fn_morada" placeholder="Morada completa"></div>
                         <div class="form-row">
                             <div class="form-group"><label>Telefone</label><input type="tel" name="telefone" id="fn_telefone" pattern="[0-9+\s\-]{9,20}" placeholder="Ex: 912345678"></div>
-                            <div class="form-group"><label>Email</label><input type="email" name="email" id="fn_email" placeholder="email@exemplo.com"></div>
+                            <div class="form-group"><label>Email(s)</label><input type="text" name="email" id="fn_email" placeholder="email@exemplo.com, outro@exemplo.com"></div>
                         </div>
                         <div class="form-row">
                             <div class="form-group"><label>NIF</label><input type="text" name="nif" id="fn_nif" pattern="[0-9]{9}" title="NIF deve ter 9 dígitos" placeholder="123456789"></div>

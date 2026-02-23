@@ -281,14 +281,25 @@ function enviarLinkAceitacao(PDO $db, int $especId, int $tokenId, string $baseUr
     }
 
     $assunto = gerarAssuntoEmailAceitacao($espec);
-    $result = enviarEmail($db, $especId, $tk['destinatario_email'], $assunto, $corpo, false, $enviadoPor, $bcc);
 
-    // Marcar token como enviado
-    if ($result['success']) {
-        $db->prepare('UPDATE especificacao_tokens SET enviado_em = NOW() WHERE id = ?')->execute([$tokenId]);
+    // Suporte a múltiplos emails (separados por vírgula)
+    $emails = array_filter(array_map('trim', explode(',', $tk['destinatario_email'])));
+    $enviados = 0;
+    $erros = [];
+    foreach ($emails as $emailDest) {
+        if (!filter_var($emailDest, FILTER_VALIDATE_EMAIL)) continue;
+        $r = enviarEmail($db, $especId, $emailDest, $assunto, $corpo, false, $enviadoPor, $bcc);
+        if ($r['success']) $enviados++;
+        else $erros[] = $emailDest;
     }
 
-    return $result;
+    // Marcar token como enviado se pelo menos um foi enviado
+    if ($enviados > 0) {
+        $db->prepare('UPDATE especificacao_tokens SET enviado_em = NOW() WHERE id = ?')->execute([$tokenId]);
+        return ['success' => true, 'message' => "Email enviado para $enviados destinatário(s)."];
+    }
+
+    return ['success' => false, 'error' => 'Nenhum email enviado.'];
 }
 
 /**

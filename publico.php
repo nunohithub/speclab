@@ -619,6 +619,16 @@ $L = $labels[$lang] ?? $labels['pt'];
             <div class="doc-section" id="secAceitacao" style="margin-top:var(--spacing-xl); border-top:2px solid <?= $corPrimaria ?>; padding-top:var(--spacing-lg);">
                 <h2 style="color:<?= $corPrimaria ?>;">Aceitação do Documento</h2>
 
+                <?php
+                $emailsToken = array_filter(array_map('trim', explode(',', $tokenData['destinatario_email'] ?? '')));
+                if (count($emailsToken) > 1): ?>
+                <div style="padding:10px 14px; border-radius:8px; background:#fef3c7; margin-bottom:var(--spacing-md); font-size:13px; color:#92400e;">
+                    <strong>Nota:</strong> Este documento foi enviado para:
+                    <?= san(implode(', ', $emailsToken)) ?>.
+                    Apenas a primeira decisão será considerada.
+                </div>
+                <?php endif; ?>
+
                 <?php if ($jaDecidiu): ?>
                     <div style="padding:var(--spacing-md); border-radius:8px; background:<?= $decisaoExistente['tipo_decisao'] === 'aceite' ? '#dcfce7' : '#fee2e2' ?>; text-align:center;">
                         <strong style="font-size:16px;">
