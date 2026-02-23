@@ -71,9 +71,10 @@ while ($pr = $stmtPedResp->fetch(PDO::FETCH_ASSOC)) {
     $pedidoRespostas[$pr['token_id']][] = $pr;
 }
 
-$corPrimaria = $org ? $org['cor_primaria'] : '#2596be';
-$corPrimariaDark = $org ? $org['cor_primaria_dark'] : '#1a7a9e';
-$corPrimariaLight = $org ? $org['cor_primaria_light'] : '#e6f4f9';
+$cores = getOrgColors($org);
+$corPrimaria = $cores['primaria'];
+$corPrimariaDark = $cores['primaria_dark'];
+$corPrimariaLight = $cores['primaria_light'];
 $orgNome = $org ? $org['nome'] : 'SpecLab';
 $orgLogo = '';
 if ($org && $org['logo']) {
@@ -83,12 +84,7 @@ if ($org && $org['logo']) {
 }
 
 // Config visual
-$cvDefaults = ['cor_titulos' => $corPrimaria, 'cor_subtitulos' => $corPrimaria, 'tamanho_titulos' => '14', 'tamanho_subtitulos' => '12', 'subtitulos_bold' => '1'];
-$cv = $cvDefaults;
-if (!empty($data['config_visual'])) {
-    $parsed = is_string($data['config_visual']) ? json_decode($data['config_visual'], true) : $data['config_visual'];
-    if (is_array($parsed)) $cv = array_merge($cvDefaults, $parsed);
-}
+$cv = parseConfigVisual($data['config_visual'] ?? null, $corPrimaria);
 $corTitulos = $cv['cor_titulos'];
 $corSubtitulos = $cv['cor_subtitulos'];
 $tamTitulos = (int)$cv['tamanho_titulos'];

@@ -96,10 +96,11 @@ $stmtOrg->execute([$id]);
 $org = $stmtOrg->fetch();
 $orgNome = $org ? $org['nome'] : getConfiguracao('empresa_nome', 'SpecLab');
 $orgLogo = ($org && $org['logo']) ? (UPLOAD_DIR . 'logos/' . $org['logo']) : null;
-$orgCorPrimaria = sanitizeColor($org ? $org['cor_primaria'] : '#2596be');
+$cores = getOrgColors($org);
+$orgCorPrimaria = sanitizeColor($cores['primaria']);
 $corPrimaria = $orgCorPrimaria;
-$corPrimariaDark = sanitizeColor($org ? ($org['cor_primaria_dark'] ?? '#1a7a9e') : '#1a7a9e', '#1a7a9e');
-$corPrimariaLight = sanitizeColor($org ? ($org['cor_primaria_light'] ?? '#e6f4f9') : '#e6f4f9', '#e6f4f9');
+$corPrimariaDark = sanitizeColor($cores['primaria_dark'], '#1a7a9e');
+$corPrimariaLight = sanitizeColor($cores['primaria_light'], '#e6f4f9');
 $temClientes = $org && !empty($org['tem_clientes']);
 $temFornecedores = $org && !empty($org['tem_fornecedores']);
 $fornecedorDisplay = $data['fornecedor_nome'] ?? '';
@@ -188,12 +189,7 @@ if ($useMpdf) {
     }
 
     // Config visual
-    $cvDefaults = ['cor_titulos' => $orgCorPrimaria, 'cor_subtitulos' => $orgCorPrimaria, 'cor_linhas' => $orgCorPrimaria, 'cor_nome' => $orgCorPrimaria, 'tamanho_titulos' => '14', 'tamanho_subtitulos' => '12', 'subtitulos_bold' => '1', 'tamanho_nome' => '16', 'logo_custom' => ''];
-    $cv = $cvDefaults;
-    if (!empty($data['config_visual'])) {
-        $parsed = is_string($data['config_visual']) ? json_decode($data['config_visual'], true) : $data['config_visual'];
-        if (is_array($parsed)) $cv = array_merge($cvDefaults, $parsed);
-    }
+    $cv = parseConfigVisual($data['config_visual'] ?? null, $orgCorPrimaria);
     $corTitulos = $cv['cor_titulos'];
     $corSubtitulos = $cv['cor_subtitulos'];
     $corLinhas  = $cv['cor_linhas'];
@@ -617,12 +613,7 @@ if ($useMpdf) {
 }
 
 // Fallback: HTML para impressão (sem mPDF)
-$cvDefaults = ['cor_titulos' => $orgCorPrimaria, 'cor_subtitulos' => $orgCorPrimaria, 'cor_linhas' => $orgCorPrimaria, 'cor_nome' => $orgCorPrimaria, 'tamanho_titulos' => '14', 'tamanho_subtitulos' => '12', 'subtitulos_bold' => '1', 'tamanho_nome' => '16', 'logo_custom' => ''];
-$cv = $cvDefaults;
-if (!empty($data['config_visual'])) {
-    $parsed = is_string($data['config_visual']) ? json_decode($data['config_visual'], true) : $data['config_visual'];
-    if (is_array($parsed)) $cv = array_merge($cvDefaults, $parsed);
-}
+$cv = parseConfigVisual($data['config_visual'] ?? null, $orgCorPrimaria);
 $corTitulos = $cv['cor_titulos'];
 $corSubtitulos = $cv['cor_subtitulos'];
 $corLinhas  = $cv['cor_linhas'];

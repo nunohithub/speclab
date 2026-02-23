@@ -313,3 +313,73 @@ function asset(string $path): string {
     $version = file_exists($filePath) ? filemtime($filePath) : time();
     return BASE_PATH . '/' . ltrim($path, '/') . '?v=' . $version;
 }
+
+/**
+ * Obter cores da organização com defaults
+ */
+function getOrgColors(?array $org): array {
+    return [
+        'primaria'       => $org['cor_primaria'] ?? '#2596be',
+        'primaria_dark'  => $org['cor_primaria_dark'] ?? '#1a7a9e',
+        'primaria_light' => $org['cor_primaria_light'] ?? '#e6f4f9',
+    ];
+}
+
+/**
+ * Parsear config_visual com defaults
+ */
+function parseConfigVisual($configVisual, string $corPrimaria = '#2596be'): array {
+    $defaults = [
+        'cor_titulos'       => $corPrimaria,
+        'cor_subtitulos'    => $corPrimaria,
+        'cor_linhas'        => $corPrimaria,
+        'cor_nome'          => $corPrimaria,
+        'cor_header_tab'    => $corPrimaria,
+        'cor_fundo_tab'     => '#f8f9fa',
+        'tamanho_titulos'   => '14',
+        'tamanho_subtitulos'=> '12',
+        'tamanho_nome'      => '16',
+        'tamanho_corpo'     => '11',
+        'subtitulos_bold'   => '1',
+        'fonte_titulos'     => 'Helvetica',
+        'fonte_corpo'       => 'Helvetica',
+        'logo_custom'       => '',
+    ];
+    if (!empty($configVisual)) {
+        $parsed = is_string($configVisual) ? json_decode($configVisual, true) : $configVisual;
+        if (is_array($parsed)) $defaults = array_merge($defaults, $parsed);
+    }
+    return $defaults;
+}
+
+/**
+ * Labels multi-idioma partilhados (ver.php, publico.php, pdf.php)
+ */
+function getMultiLangLabels(): array {
+    return [
+        'pt' => ['titulo' => 'Título', 'versao' => 'Versão', 'data_emissao' => 'Data de Emissão', 'data_validade' => 'Data de Validade', 'cliente' => 'Cliente', 'produto' => 'Produto', 'fornecedor' => 'Fornecedor', 'estado' => 'Estado', 'elaborado_por' => 'Elaborado por', 'aprovado_por' => 'Aprovado por', 'observacoes' => 'Observações', 'parametro' => 'Parâmetro', 'especificacao' => 'Especificação', 'metodo' => 'Método', 'tolerancia' => 'Tolerância', 'unidade' => 'Unidade', 'norma_ref' => 'Norma/Ref.', 'categoria' => 'Categoria', 'legenda' => 'Legenda'],
+        'en' => ['titulo' => 'Title', 'versao' => 'Version', 'data_emissao' => 'Issue Date', 'data_validade' => 'Expiry Date', 'cliente' => 'Client', 'produto' => 'Product', 'fornecedor' => 'Supplier', 'estado' => 'Status', 'elaborado_por' => 'Prepared by', 'aprovado_por' => 'Approved by', 'observacoes' => 'Notes', 'parametro' => 'Parameter', 'especificacao' => 'Specification', 'metodo' => 'Method', 'tolerancia' => 'Tolerance', 'unidade' => 'Unit', 'norma_ref' => 'Standard/Ref.', 'categoria' => 'Category', 'legenda' => 'Legend'],
+        'es' => ['titulo' => 'Título', 'versao' => 'Versión', 'data_emissao' => 'Fecha de Emisión', 'data_validade' => 'Fecha de Caducidad', 'cliente' => 'Cliente', 'produto' => 'Producto', 'fornecedor' => 'Proveedor', 'estado' => 'Estado', 'elaborado_por' => 'Elaborado por', 'aprovado_por' => 'Aprobado por', 'observacoes' => 'Observaciones', 'parametro' => 'Parámetro', 'especificacao' => 'Especificación', 'metodo' => 'Método', 'tolerancia' => 'Tolerancia', 'unidade' => 'Unidad', 'norma_ref' => 'Norma/Ref.', 'categoria' => 'Categoría', 'legenda' => 'Leyenda'],
+        'fr' => ['titulo' => 'Titre', 'versao' => 'Version', 'data_emissao' => "Date d'Émission", 'data_validade' => "Date d'Expiration", 'cliente' => 'Client', 'produto' => 'Produit', 'fornecedor' => 'Fournisseur', 'estado' => 'Statut', 'elaborado_por' => 'Préparé par', 'aprovado_por' => 'Approuvé par', 'observacoes' => 'Remarques', 'parametro' => 'Paramètre', 'especificacao' => 'Spécification', 'metodo' => 'Méthode', 'tolerancia' => 'Tolérance', 'unidade' => 'Unité', 'norma_ref' => 'Norme/Réf.', 'categoria' => 'Catégorie', 'legenda' => 'Légende'],
+        'de' => ['titulo' => 'Titel', 'versao' => 'Version', 'data_emissao' => 'Ausstellungsdatum', 'data_validade' => 'Ablaufdatum', 'cliente' => 'Kunde', 'produto' => 'Produkt', 'fornecedor' => 'Lieferant', 'estado' => 'Status', 'elaborado_por' => 'Erstellt von', 'aprovado_por' => 'Genehmigt von', 'observacoes' => 'Anmerkungen', 'parametro' => 'Parameter', 'especificacao' => 'Spezifikation', 'metodo' => 'Methode', 'tolerancia' => 'Toleranz', 'unidade' => 'Einheit', 'norma_ref' => 'Norm/Ref.', 'categoria' => 'Kategorie', 'legenda' => 'Legende'],
+        'it' => ['titulo' => 'Titolo', 'versao' => 'Versione', 'data_emissao' => 'Data di Emissione', 'data_validade' => 'Data di Scadenza', 'cliente' => 'Cliente', 'produto' => 'Prodotto', 'fornecedor' => 'Fornitore', 'estado' => 'Stato', 'elaborado_por' => 'Preparato da', 'aprovado_por' => 'Approvato da', 'observacoes' => 'Osservazioni', 'parametro' => 'Parametro', 'especificacao' => 'Specifica', 'metodo' => 'Metodo', 'tolerancia' => 'Tolleranza', 'unidade' => 'Unità', 'norma_ref' => 'Norma/Rif.', 'categoria' => 'Categoria', 'legenda' => 'Legenda'],
+    ];
+}
+
+/**
+ * Secções fixas legadas (para especificações sem secções dinâmicas)
+ */
+function getLegacySections(): array {
+    return [
+        'objetivo'            => 'Objetivo e Âmbito de Aplicação',
+        'ambito'              => 'Introdução',
+        'definicao_material'  => 'Definição do Material',
+        'regulamentacao'      => 'Regulamentação',
+        'processos'           => 'Processos',
+        'embalagem'           => 'Embalagem',
+        'aceitacao'           => 'Aceitação',
+        'arquivo_texto'       => 'Arquivo',
+        'indemnizacao'        => 'Indemnização',
+        'observacoes'         => 'Observações',
+    ];
+}
