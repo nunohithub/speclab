@@ -46,6 +46,14 @@ while ($dtRow = $stmtDt->fetch(PDO::FETCH_ASSOC)) {
     $docTiposConfig[$dtRow['slug']] = json_decode($dtRow['seccoes'], true) ?: [];
 }
 
+// Carregar pedidos da especificação
+$pedidosEspec = [];
+if (!$isNew && $especId) {
+    $stmtPed = $db->prepare('SELECT * FROM especificacao_pedidos WHERE especificacao_id = ? ORDER BY ordem');
+    $stmtPed->execute([$especId]);
+    $pedidosEspec = $stmtPed->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // Carregar legenda de ensaios da org (com fallback para global)
 $ensaiosLegenda = '';
 $ensaiosLegendaTamanho = 9;
@@ -1489,12 +1497,39 @@ $breadcrumbs = [
                             </div>
                         <?php endif; ?>
 
+                        <!-- Pedidos ao fornecedor -->
+                        <?php if (!empty($pedidosEspec)): ?>
+                        <div id="pedidos-container" style="margin-top:16px;">
+                            <h4 style="font-size:13px; color:#667085; margin-bottom:8px;">Pedidos ao Fornecedor</h4>
+                            <?php foreach ($pedidosEspec as $ped): ?>
+                            <div class="card pedido-block" data-pedido-id="<?= $ped['id'] ?>" style="padding:12px; margin-bottom:8px; border-left:3px solid #f59e0b;">
+                                <div style="display:flex; justify-content:space-between; align-items:start; gap:8px;">
+                                    <div style="flex:1;">
+                                        <input type="text" class="pedido-titulo" value="<?= sanitize($ped['titulo']) ?>" placeholder="Título do pedido" style="font-weight:600; width:100%; border:1px solid #e5e7eb; border-radius:4px; padding:4px 8px; font-size:13px;">
+                                        <textarea class="pedido-descricao" placeholder="Descrição (o que pedir ao fornecedor)" rows="2" style="width:100%; margin-top:4px; border:1px solid #e5e7eb; border-radius:4px; padding:4px 8px; font-size:12px; resize:vertical;"><?= sanitize($ped['descricao']) ?></textarea>
+                                        <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#667085; margin-top:4px;">
+                                            <input type="checkbox" class="pedido-obrigatorio" <?= $ped['obrigatorio'] ? 'checked' : '' ?>> Obrigatório para aceitar
+                                        </label>
+                                    </div>
+                                    <div style="display:flex; flex-direction:column; gap:4px;">
+                                        <button class="btn btn-ghost btn-sm" onclick="guardarPedido(<?= $ped['id'] ?>, this)" title="Guardar">&#128190;</button>
+                                        <button class="btn btn-ghost btn-sm" onclick="removerPedido(<?= $ped['id'] ?>, this)" title="Remover" style="color:#ef4444;">&#128465;</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php else: ?>
+                        <div id="pedidos-container" style="margin-top:16px;"></div>
+                        <?php endif; ?>
+
                         <!-- Barra fixa de ações -->
                         <div class="content-actions-bar" id="seccoesBar">
                             <button class="btn btn-primary btn-sm btn-seccao" data-seccao="texto" onclick="pedirNivelSeccao('texto')">&#128196; + Texto</button>
                             <button class="btn btn-secondary btn-sm btn-seccao" data-seccao="parametros" onclick="pedirNivelSeccao('parametros')">&#9881; + Parâmetros</button>
                             <button class="btn btn-secondary btn-sm btn-seccao" data-seccao="legislacao" onclick="pedirNivelSeccao('legislacao')">&#9878; + Legislação</button>
                             <button class="btn btn-secondary btn-sm btn-seccao" data-seccao="ficheiros" onclick="pedirNivelSeccao('ficheiros')">&#128206; + Ficheiros</button>
+                            <button class="btn btn-secondary btn-sm btn-seccao" data-seccao="pedido" onclick="adicionarPedido()" style="border-color:#f59e0b; color:#92400e;">&#128230; + Pedido</button>
                         </div>
                     </div>
                 </div>
@@ -5746,6 +5781,65 @@ $breadcrumbs = [
         document.querySelectorAll('.remove-btn, .add-btn, [onclick*="adicionar"], [onclick*="remover"]').forEach(function(btn) {
             if (!saOutraOrg && btn.closest('#panel-partilha')) return;
             btn.style.display = 'none';
+        });
+    }
+
+    // === Pedidos ao fornecedor ===
+    function adicionarPedido() {
+        if (!especId) { showToast('Guarde a especificação primeiro.', 'warning'); return; }
+        apiPost({ action: 'save_pedido', especificacao_id: especId, titulo: 'Novo pedido', descricao: '', obrigatorio: 1 })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                var container = document.getElementById('pedidos-container');
+                if (!container.querySelector('h4')) {
+                    container.innerHTML = '<h4 style="font-size:13px; color:#667085; margin-bottom:8px;">Pedidos ao Fornecedor</h4>';
+                }
+                var div = document.createElement('div');
+                div.className = 'card pedido-block';
+                div.setAttribute('data-pedido-id', data.id);
+                div.style.cssText = 'padding:12px; margin-bottom:8px; border-left:3px solid #f59e0b;';
+                div.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:start; gap:8px;">' +
+                    '<div style="flex:1;">' +
+                    '<input type="text" class="pedido-titulo" value="Novo pedido" placeholder="Título do pedido" style="font-weight:600; width:100%; border:1px solid #e5e7eb; border-radius:4px; padding:4px 8px; font-size:13px;">' +
+                    '<textarea class="pedido-descricao" placeholder="Descrição (o que pedir ao fornecedor)" rows="2" style="width:100%; margin-top:4px; border:1px solid #e5e7eb; border-radius:4px; padding:4px 8px; font-size:12px; resize:vertical;"></textarea>' +
+                    '<label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#667085; margin-top:4px;"><input type="checkbox" class="pedido-obrigatorio" checked> Obrigatório para aceitar</label>' +
+                    '</div>' +
+                    '<div style="display:flex; flex-direction:column; gap:4px;">' +
+                    '<button class="btn btn-ghost btn-sm" onclick="guardarPedido(' + data.id + ', this)" title="Guardar">&#128190;</button>' +
+                    '<button class="btn btn-ghost btn-sm" onclick="removerPedido(' + data.id + ', this)" title="Remover" style="color:#ef4444;">&#128465;</button>' +
+                    '</div></div>';
+                container.appendChild(div);
+                div.querySelector('.pedido-titulo').focus();
+                div.querySelector('.pedido-titulo').select();
+            } else { showToast(data.error || 'Erro.', 'error'); }
+        });
+    }
+
+    function guardarPedido(id, btn) {
+        var block = btn.closest('.pedido-block');
+        var titulo = block.querySelector('.pedido-titulo').value.trim();
+        var descricao = block.querySelector('.pedido-descricao').value.trim();
+        var obrigatorio = block.querySelector('.pedido-obrigatorio').checked ? 1 : 0;
+        if (!titulo) { showToast('Título é obrigatório.', 'warning'); return; }
+        apiPost({ action: 'save_pedido', id: id, especificacao_id: especId, titulo: titulo, descricao: descricao, obrigatorio: obrigatorio })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) showToast('Pedido guardado.', 'success');
+            else showToast(data.error || 'Erro.', 'error');
+        });
+    }
+
+    function removerPedido(id, btn) {
+        appConfirm('Remover este pedido?', function() {
+            apiPost({ action: 'delete_pedido', id: id })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    btn.closest('.pedido-block').remove();
+                    showToast('Pedido removido.', 'success');
+                } else showToast(data.error || 'Erro.', 'error');
+            });
         });
     }
 

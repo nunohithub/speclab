@@ -118,6 +118,44 @@ if ($authenticated && $tokenData && $_SERVER['REQUEST_METHOD'] === 'POST' && iss
             move_uploaded_file($_FILES['aceitar_assinatura']['tmp_name'], $upDir . $assinaturaFile);
         }
     }
+    // Processar uploads de pedidos
+    if ($decisao === 'aceite' && !empty($_FILES)) {
+        foreach ($_FILES as $key => $file) {
+            if (strpos($key, 'pedido_file_') === 0 && $file['error'] === UPLOAD_ERR_OK) {
+                $pedId = (int)str_replace('pedido_file_', '', $key);
+                if ($pedId > 0) {
+                    $_POST['pedido_id'] = $pedId;
+                    $_POST['token_id'] = $tokenData['id'];
+                    $_FILES['ficheiro'] = $file;
+                    // Upload inline
+                    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                    $allowedExts = ['pdf','doc','docx','xls','xlsx','jpg','jpeg','png'];
+                    if (in_array($ext, $allowedExts) && $file['size'] <= 10*1024*1024) {
+                        $finfo = new finfo(FILEINFO_MIME_TYPE);
+                        $mimeType = $finfo->file($file['tmp_name']);
+                        $stmt = $db->prepare('SELECT e.organizacao_id FROM especificacao_pedidos p INNER JOIN especificacoes e ON e.id = p.especificacao_id WHERE p.id = ?');
+                        $stmt->execute([$pedId]);
+                        $pInfo = $stmt->fetch();
+                        if ($pInfo) {
+                            $oId = (int)$pInfo['organizacao_id'];
+                            $upDir = __DIR__ . '/uploads/pedidos/' . $oId . '/' . $pedId . '/';
+                            if (!is_dir($upDir)) mkdir($upDir, 0755, true);
+                            $uuid = bin2hex(random_bytes(8));
+                            $fn = $tokenData['id'] . '_' . $uuid . '.' . $ext;
+                            $relPath = 'uploads/pedidos/' . $oId . '/' . $pedId . '/' . $fn;
+                            if (move_uploaded_file($file['tmp_name'], $upDir . $fn)) {
+                                // Remover anterior
+                                $db->prepare('DELETE FROM especificacao_pedido_respostas WHERE pedido_id = ? AND token_id = ?')->execute([$pedId, $tokenData['id']]);
+                                $db->prepare('INSERT INTO especificacao_pedido_respostas (pedido_id, token_id, nome_ficheiro, path_ficheiro, mime_type, tamanho) VALUES (?, ?, ?, ?, ?, ?)')
+                                   ->execute([$pedId, $tokenData['id'], basename($file['name']), $relPath, $mimeType, $file['size']]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if ($nome && registarDecisao($db, $espec['id'], $tokenData['id'], $decisao, $nome, $cargo ?: null, $comentario ?: null, $assinaturaFile)) {
         $aceitacaoMsg = $decisao === 'aceite' ? 'Documento aceite com sucesso!' : 'Documento rejeitado.';
         // Enviar email de confirmação com link permanente
@@ -149,6 +187,21 @@ if ($authenticated) {
         $stmtAprov->execute([$espec['id']]);
     }
     $aprovacoes = $stmtAprov->fetchAll();
+
+    // Carregar pedidos da especificação
+    $stmtPed = $db->prepare('SELECT * FROM especificacao_pedidos WHERE especificacao_id = ? ORDER BY ordem');
+    $stmtPed->execute([$espec['id']]);
+    $pedidosPublico = $stmtPed->fetchAll(PDO::FETCH_ASSOC);
+
+    // Carregar respostas já enviadas por este token
+    $respostasPedido = [];
+    if ($tokenData) {
+        $stmtResp = $db->prepare('SELECT r.* FROM especificacao_pedido_respostas r INNER JOIN especificacao_pedidos p ON p.id = r.pedido_id WHERE p.especificacao_id = ? AND r.token_id = ?');
+        $stmtResp->execute([$espec['id'], $tokenData['id']]);
+        while ($rr = $stmtResp->fetch(PDO::FETCH_ASSOC)) {
+            $respostasPedido[$rr['pedido_id']] = $rr;
+        }
+    }
 }
 
 // Traduções dos rótulos conforme idioma
@@ -605,8 +658,27 @@ $L = $labels[$lang] ?? $labels['pt'];
                             <label style="display:block; font-weight:600; margin-bottom:4px;">Comentário (opcional)</label>
                             <textarea name="aceitar_comentario" rows="2" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;" placeholder="Observações..."></textarea>
                         </div>
+                        <?php if (!empty($pedidosPublico)): ?>
+                        <div style="margin-bottom:16px; padding:12px; background:#fffbeb; border:1px solid #fbbf24; border-radius:8px;">
+                            <h3 style="font-size:14px; color:#92400e; margin:0 0 8px;">Documentos Solicitados</h3>
+                            <?php foreach ($pedidosPublico as $ped):
+                                $jaRespondeu = isset($respostasPedido[$ped['id']]);
+                            ?>
+                            <div style="margin-bottom:10px; padding:8px; background:#fff; border-radius:6px; border:1px solid #e5e7eb;">
+                                <strong style="font-size:13px;"><?= sanitize($ped['titulo']) ?></strong>
+                                <?php if ($ped['obrigatorio']): ?><span style="color:#ef4444; font-size:11px;"> (obrigatório para aceitar)</span><?php endif; ?>
+                                <?php if ($ped['descricao']): ?><p style="font-size:12px; color:#667085; margin:4px 0;"><?= sanitize($ped['descricao']) ?></p><?php endif; ?>
+                                <?php if ($jaRespondeu): ?>
+                                    <p style="font-size:12px; color:#16a34a; margin:4px 0;">&#10003; Ficheiro enviado: <?= sanitize($respostasPedido[$ped['id']]['nome_ficheiro']) ?></p>
+                                <?php endif; ?>
+                                <input type="file" name="pedido_file_<?= $ped['id'] ?>" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" style="margin-top:4px; width:100%; padding:4px; border:1px solid #ddd; border-radius:4px; font-size:12px;">
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+
                         <div style="display:flex; gap:12px;">
-                            <button type="submit" name="decisao" value="aceite" style="flex:1; padding:12px; background:#16a34a; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Aceitar Documento</button>
+                            <button type="submit" name="decisao" value="aceite" id="btnAceitar" style="flex:1; padding:12px; background:#16a34a; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Aceitar Documento</button>
                             <button type="submit" name="decisao" value="rejeitado" style="flex:1; padding:12px; background:#dc2626; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Rejeitar</button>
                         </div>
                     </form>
@@ -639,6 +711,30 @@ $L = $labels[$lang] ?? $labels['pt'];
 
 <?php endif; ?>
 
+<script>
+// Bloquear "Aceitar" se faltam uploads obrigatórios
+(function() {
+    var btnAceitar = document.getElementById('btnAceitar');
+    if (!btnAceitar) return;
+    var obrigatorios = <?= json_encode(array_values(array_filter(array_map(function($p) { return $p['obrigatorio'] ? $p['id'] : null; }, $pedidosPublico ?? [])))) ?>;
+    if (obrigatorios.length === 0) return;
+
+    function verificarUploads() {
+        var ok = true;
+        obrigatorios.forEach(function(pedId) {
+            var input = document.querySelector('input[name="pedido_file_' + pedId + '"]');
+            if (input && !input.files.length) ok = false;
+        });
+        btnAceitar.disabled = !ok;
+        btnAceitar.style.opacity = ok ? '1' : '0.5';
+        btnAceitar.title = ok ? '' : 'Envie todos os documentos obrigatórios antes de aceitar';
+    }
+    verificarUploads();
+    document.querySelectorAll('input[type="file"][name^="pedido_file_"]').forEach(function(input) {
+        input.addEventListener('change', verificarUploads);
+    });
+})();
+</script>
 <?php include __DIR__ . '/includes/footer.php'; ?>
 </body>
 </html>

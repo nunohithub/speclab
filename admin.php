@@ -2398,7 +2398,8 @@ $breadcrumbs = [
                 'parametros' => 'Parâmetros',
                 'legislacao' => 'Legislação',
                 'ficheiros' => 'Ficheiros',
-                'ensaios' => 'Ensaios'
+                'ensaios' => 'Ensaios',
+                'pedido' => 'Pedido'
             ];
             ?>
             <div class="flex-between mb-md">

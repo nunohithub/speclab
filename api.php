@@ -242,6 +242,11 @@ $handlers = [
     'save_doc_tipo'           => 'doc_tipos',
     'get_doc_tipo_seccoes'    => 'doc_tipos',
 
+    // Pedidos (documentos solicitados ao fornecedor)
+    'save_pedido'             => 'pedidos',
+    'delete_pedido'           => 'pedidos',
+    'download_pedido_resposta' => 'pedidos',
+
     // Fluxo de aprovacao
     'submeter_revisao'        => 'aprovacao',
     'aprovar_especificacao'   => 'aprovacao',

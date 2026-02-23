@@ -54,13 +54,21 @@ if (strpos($fornecedorDisplay, ',') !== false || empty($fornecedorDisplay)) {
     $fornecedorDisplay = 'Todos';
 }
 // Carregar aprovações (tokens com decisão)
-$stmtAprov = $db->prepare('SELECT a.tipo_decisao, a.nome_signatario, a.cargo_signatario, a.created_at, t.destinatario_nome, t.tipo_destinatario
+$stmtAprov = $db->prepare('SELECT a.tipo_decisao, a.nome_signatario, a.cargo_signatario, a.created_at, a.token_id, t.destinatario_nome, t.tipo_destinatario
     FROM especificacao_aceitacoes a
     INNER JOIN especificacao_tokens t ON t.id = a.token_id
     WHERE a.especificacao_id = ?
     ORDER BY a.created_at DESC');
 $stmtAprov->execute([$id]);
 $aprovacoes = $stmtAprov->fetchAll();
+
+// Carregar respostas de pedidos (ficheiros enviados por fornecedores)
+$pedidoRespostas = [];
+$stmtPedResp = $db->prepare('SELECT r.*, p.titulo as pedido_titulo FROM especificacao_pedido_respostas r INNER JOIN especificacao_pedidos p ON p.id = r.pedido_id WHERE p.especificacao_id = ? ORDER BY r.created_at');
+$stmtPedResp->execute([$id]);
+while ($pr = $stmtPedResp->fetch(PDO::FETCH_ASSOC)) {
+    $pedidoRespostas[$pr['token_id']][] = $pr;
+}
 
 $corPrimaria = $org ? $org['cor_primaria'] : '#2596be';
 $corPrimariaDark = $org ? $org['cor_primaria_dark'] : '#1a7a9e';
@@ -291,6 +299,13 @@ if (!empty($data['seccoes'])) {
                     — <?= san($aprov['nome_signatario']) ?>
                     <?= $aprov['cargo_signatario'] ? '(' . san($aprov['cargo_signatario']) . ')' : '' ?>
                     <span style="color:#888; font-size:11px;"><?= date('d/m/Y', strtotime($aprov['created_at'])) ?></span>
+                    <?php if (!empty($pedidoRespostas[$aprov['token_id']])): ?>
+                        <?php foreach ($pedidoRespostas[$aprov['token_id']] as $pResp): ?>
+                        <a href="<?= BASE_PATH ?>/api.php?action=download_pedido_resposta&id=<?= $pResp['id'] ?>" target="_blank" style="margin-left:8px; font-size:11px; color:#2596be; text-decoration:underline;" title="<?= sanitize($pResp['pedido_titulo']) ?>">
+                            &#128206; <?= sanitize($pResp['nome_ficheiro']) ?>
+                        </a>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
                 <?php endif; ?>

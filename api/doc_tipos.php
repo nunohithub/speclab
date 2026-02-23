@@ -19,7 +19,7 @@ switch ($action) {
         if (!is_array($seccoes)) $seccoes = [];
 
         // Validar que só contém secções válidas
-        $validas = ['texto', 'parametros', 'legislacao', 'ficheiros', 'ensaios'];
+        $validas = ['texto', 'parametros', 'legislacao', 'ficheiros', 'ensaios', 'pedido'];
         $seccoes = array_values(array_intersect($seccoes, $validas));
         $seccoesJson = json_encode($seccoes);
 
