@@ -277,7 +277,7 @@ function enviarLinkAceitacao(PDO $db, int $especId, int $tokenId, string $baseUr
         $stmtUser = $db->prepare('SELECT username FROM utilizadores WHERE id = ?');
         $stmtUser->execute([$enviadoPor]);
         $senderEmail = $stmtUser->fetchColumn();
-        if ($senderEmail) $bcc = $senderEmail;
+        if ($senderEmail && filter_var($senderEmail, FILTER_VALIDATE_EMAIL)) $bcc = $senderEmail;
     }
 
     $result = enviarEmail($db, $especId, $tk['destinatario_email'], 'Caderno de Encargos para aprovação: ' . $tk['numero'], $corpo, false, $enviadoPor, $bcc);
