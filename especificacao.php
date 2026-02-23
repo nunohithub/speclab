@@ -2109,6 +2109,23 @@ $breadcrumbs = [
         <button class="btn btn-ghost btn-sm" onclick="cancelarMergeSelection()" style="padding:2px 6px;">&times;</button>
     </div>
 
+    <!-- MODAL: ALTERAÇÕES POR GUARDAR -->
+    <div class="modal-overlay hidden" id="unsavedModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+        <div class="modal-box" style="max-width:420px;">
+            <div class="modal-header">
+                <h3>Alterações não guardadas</h3>
+                <button class="modal-close" onclick="fecharUnsavedModal()">&times;</button>
+            </div>
+            <div style="padding:var(--spacing-lg);">
+                <p style="margin:0;">Tem alterações por guardar. Se sair agora, as alterações serão perdidas.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="fecharUnsavedModal()">Ficar na página</button>
+                <button class="btn btn-danger" onclick="confirmarSairSemGuardar()">Sair sem guardar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: CONFIRMAR PUBLICAÇÃO -->
     <div class="modal-overlay hidden" id="publicarModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
         <div class="modal-box" style="max-width:460px;">
@@ -5288,11 +5305,61 @@ $breadcrumbs = [
     <?php endif; ?>
 
     // Avisar antes de sair se houver alterações pendentes
+    // Fallback: beforeunload para fechar separador/browser (modal nativo inevitável)
     window.addEventListener('beforeunload', function(e) {
         if (isDirty && !versaoBloqueada) {
             e.preventDefault();
-            e.returnValue = 'Tem alterações por guardar. Deseja sair?';
-            return e.returnValue;
+            e.returnValue = '';
+        }
+    });
+
+    // Modal personalizado para navegação interna
+    var _unsavedPendingUrl = null;
+
+    function fecharUnsavedModal() {
+        var m = document.getElementById('unsavedModal');
+        m.style.display = 'none';
+        m.classList.add('hidden');
+        _unsavedPendingUrl = null;
+    }
+
+    function confirmarSairSemGuardar() {
+        isDirty = false;
+        var m = document.getElementById('unsavedModal');
+        m.style.display = 'none';
+        m.classList.add('hidden');
+        if (_unsavedPendingUrl) {
+            window.location.href = _unsavedPendingUrl;
+        } else {
+            history.back();
+        }
+    }
+
+    function mostrarUnsavedModal(url) {
+        _unsavedPendingUrl = url || null;
+        var m = document.getElementById('unsavedModal');
+        m.classList.remove('hidden');
+        m.style.display = 'flex';
+    }
+
+    // Interceptar links internos
+    document.addEventListener('click', function(e) {
+        if (versaoBloqueada || !isDirty) return;
+        var link = e.target.closest('a[href]');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+        if (link.target === '_blank') return;
+        e.preventDefault();
+        mostrarUnsavedModal(href);
+    });
+
+    // Interceptar botão voltar do browser
+    history.pushState(null, '', location.href);
+    window.addEventListener('popstate', function(e) {
+        if (isDirty && !versaoBloqueada) {
+            history.pushState(null, '', location.href);
+            mostrarUnsavedModal(null);
         }
     });
 
