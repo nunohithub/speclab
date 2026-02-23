@@ -5,6 +5,9 @@ node_modules/
 # Configuração local (contém credenciais)
 config/database.php
 .env
+.env-*
+.env.*
+!.env.example
 
 # Uploads de utilizadores
 uploads/*

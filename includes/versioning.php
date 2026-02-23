@@ -111,11 +111,15 @@ function criarNovaVersao(PDO $db, int $especId, int $userId): int|false {
  * Helper: obter lista de colunas de uma tabela excluindo certas
  */
 function getColumnList(PDO $db, string $table, array $exclude): string {
-    $stmt = $db->query("SHOW COLUMNS FROM $table");
+    $allowed = ['especificacao_parametros', 'especificacao_seccoes', 'especificacoes'];
+    if (!in_array($table, $allowed, true)) {
+        throw new \InvalidArgumentException("Table not allowed: $table");
+    }
+    $stmt = $db->query("SHOW COLUMNS FROM `" . $table . "`");
     $cols = [];
     while ($row = $stmt->fetch()) {
         if (!in_array($row['Field'], $exclude)) {
-            $cols[] = $row['Field'];
+            $cols[] = '`' . $row['Field'] . '`';
         }
     }
     return implode(', ', $cols);

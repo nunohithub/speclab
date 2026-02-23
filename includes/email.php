@@ -102,10 +102,13 @@ function enviarEmail(PDO $db, int $especificacaoId, string $destinatario, string
         $mail->SMTPSecure = $smtpPort == 465 ? PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS : PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port = $smtpPort;
         $mail->CharSet = 'UTF-8';
-        // SSL: desativar verificação estrita (hosting partilhado usa CN diferente)
-        $mail->SMTPOptions = [
-            'ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]
-        ];
+        // SSL: verificação ativa por defeito; desativar via SMTP_VERIFY_SSL=false no .env
+        $verifySSL = ($_ENV['SMTP_VERIFY_SSL'] ?? getenv('SMTP_VERIFY_SSL') ?: 'true') !== 'false';
+        if (!$verifySSL) {
+            $mail->SMTPOptions = [
+                'ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]
+            ];
+        }
 
         $mail->setFrom($smtpFrom ?: $smtpUser, $smtpFromName);
         $mail->addAddress($destinatario);
