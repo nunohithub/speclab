@@ -2992,12 +2992,15 @@ $breadcrumbs = [
                 '<span class="seccao-numero">' + (idx + 1) + '.</span>' +
                 '<input type="text" class="seccao-titulo" value="' + escapeHtml(tipo.nome) + '" placeholder="Título da secção">' +
                 '<span class="pill pill-info" style="font-size:10px; padding:2px 8px;">' + escapeHtml(tipo.nome) + '</span>' +
+                '<button class="btn btn-ghost btn-sm param-orientacao-btn" onclick="toggleOrientacao(this)" title="Alternar orientação" style="font-size:11px; padding:2px 8px;">&#8596; Horizontal</button>' +
                 '<div class="seccao-actions">' +
                     '<button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, -1)" title="Mover acima">&#9650;</button>' +
                     '<button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, 1)" title="Mover abaixo">&#9660;</button>' +
                     '<button class="btn btn-ghost btn-sm seccao-remove-btn" onclick="removerSeccao(this)" title="Remover secção">&times;</button>' +
                 '</div>' +
             '</div>';
+
+        block.setAttribute('data-orientacao', 'horizontal');
 
         var colWidth = Math.floor(90 / (cols.length || 1));
         var tableHtml =
