@@ -46,6 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $isNewUser = ($uid === 0);
         $nome = trim($_POST['nome'] ?? '');
         $username = trim($_POST['username'] ?? '');
+        $userEmail = trim($_POST['email'] ?? '');
         $role = $_POST['role'] ?? 'user';
         $ativo = isset($_POST['ativo']) ? 1 : 0;
         $password = $_POST['password'] ?? '';
@@ -83,8 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     exit;
                 }
             }
-            $sql = 'UPDATE utilizadores SET nome = ?, username = ?, role = ?, ativo = ?, organizacao_id = ? WHERE id = ?';
-            $params = [$nome, $username, $role, $ativo, $userOrgId, $uid];
+            $sql = 'UPDATE utilizadores SET nome = ?, username = ?, email = ?, role = ?, ativo = ?, organizacao_id = ? WHERE id = ?';
+            $params = [$nome, $username, $userEmail ?: null, $role, $ativo, $userOrgId, $uid];
             $db->prepare($sql)->execute($params);
             if ($password) {
                 $hash = password_hash($password, PASSWORD_DEFAULT);
@@ -93,8 +94,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             if (empty($password)) $password = bin2hex(random_bytes(8));
             $hash = password_hash($password, PASSWORD_DEFAULT);
-            $db->prepare('INSERT INTO utilizadores (nome, username, password, role, ativo, organizacao_id) VALUES (?, ?, ?, ?, ?, ?)')
-                ->execute([$nome, $username, $hash, $role, $ativo, $userOrgId]);
+            $db->prepare('INSERT INTO utilizadores (nome, username, email, password, role, ativo, organizacao_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
+                ->execute([$nome, $username, $userEmail ?: null, $hash, $role, $ativo, $userOrgId]);
             $uid = (int)$db->lastInsertId();
         }
 
@@ -851,6 +852,10 @@ $breadcrumbs = [
                         <div class="form-group">
                             <label>Username *</label>
                             <input type="text" name="username" id="user_username" required minlength="3" placeholder="Nome de utilizador">
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" name="email" id="user_email" placeholder="email@exemplo.com">
                         </div>
                         <div class="form-group">
                             <label id="user_password_label">Palavra-passe <span class="muted">(deixe vazio para gerar automaticamente)</span></label>
@@ -2652,6 +2657,7 @@ $breadcrumbs = [
         document.getElementById('user_id').value = '0';
         document.getElementById('user_nome').value = '';
         document.getElementById('user_username').value = '';
+        document.getElementById('user_email').value = '';
         document.getElementById('user_password').value = '';
         document.getElementById('user_password_label').innerHTML = 'Palavra-passe <span class="muted">(deixe vazio para gerar automaticamente)</span>';
         document.getElementById('user_role').value = 'user';
@@ -2677,6 +2683,7 @@ $breadcrumbs = [
         document.getElementById('user_id').value = u.id;
         document.getElementById('user_nome').value = u.nome;
         document.getElementById('user_username').value = u.username;
+        document.getElementById('user_email').value = u.email || '';
         document.getElementById('user_password').value = '';
         document.getElementById('user_password_label').innerHTML = 'Palavra-passe <span class="muted">(deixe vazio para manter)</span>';
         document.getElementById('user_role').value = u.role;
