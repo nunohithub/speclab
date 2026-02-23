@@ -371,7 +371,7 @@ if (!empty($data['seccoes'])) {
                         <<?= $secNivel === 2 ? 'h3' : 'h2' ?>><?= $secNum . ' ' . san($sec['titulo']) ?></<?= $secNivel === 2 ? 'h3' : 'h2' ?>>
                         <?php if ($secTipo === 'parametros' || $secTipo === 'parametros_custom'): ?>
                             <?php
-                            $pc = parseParametrosSeccao($db, $sec, $espec);
+                            $pc = parseParametrosSeccao($db, $sec, $data);
                             $pcRaw = $pc['raw']; $pcRows = $pc['rows']; $pcColunas = $pc['colunas'];
                             $pcColWidths = $pc['colWidths']; $pcLegenda = $pc['legenda']; $pcLegTam = $pc['legenda_tamanho'];
                             $pcCw = count($pcColWidths) ? $pcColWidths : array_fill(0, count($pcColunas), floor(100 / max(1, count($pcColunas))));

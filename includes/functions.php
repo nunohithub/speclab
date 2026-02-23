@@ -388,7 +388,8 @@ function getLegacySections(): array {
  * Parsear secção de parâmetros (duplicado em especificacao, pdf, ver, publico).
  * Devolve array com: raw, rows, tipo_id, tipo_slug, tipo_nome, colunas, colWidths, legenda, legenda_tamanho, orientacao
  */
-function parseParametrosSeccao(PDO $db, array $sec, array $espec = []): array {
+function parseParametrosSeccao(PDO $db, array $sec, ?array $espec = []): array {
+    $espec = $espec ?? [];
     $raw = json_decode($sec['conteudo'] ?? '{}', true);
     $rows = $raw['rows'] ?? [];
     $tipoId = $raw['tipo_id'] ?? '';

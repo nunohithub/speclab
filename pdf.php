@@ -392,7 +392,7 @@ if ($useMpdf) {
             if ($secTipo === 'parametros' || $secTipo === 'parametros_custom') {
                 // Parâmetros genéricos (dinâmicos)
                 $html .= '<div class="section"' . $subStyle . '>';
-                $pc = parseParametrosSeccao($db, $sec, $espec);
+                $pc = parseParametrosSeccao($db, $sec, $data);
                 $pcRaw = $pc['raw']; $pcRows = $pc['rows']; $pcColunas = $pc['colunas'];
                 $pcColWidths = $pc['colWidths']; $pcLegenda = $pc['legenda']; $pcLegTam = $pc['legenda_tamanho'];
                 $nCols = count($pcColunas);
