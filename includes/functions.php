@@ -383,3 +383,51 @@ function getLegacySections(): array {
         'observacoes'         => 'Observações',
     ];
 }
+
+/**
+ * Parsear secção de parâmetros (duplicado em especificacao, pdf, ver, publico).
+ * Devolve array com: raw, rows, tipo_id, tipo_slug, tipo_nome, colunas, colWidths, legenda, legenda_tamanho, orientacao
+ */
+function parseParametrosSeccao(PDO $db, array $sec, array $espec = []): array {
+    $raw = json_decode($sec['conteudo'] ?? '{}', true);
+    $rows = $raw['rows'] ?? [];
+    $tipoId = $raw['tipo_id'] ?? '';
+    $tipoSlug = $raw['tipo_slug'] ?? '';
+    $colWidths = $raw['colWidths'] ?? [];
+    $colunas = [];
+    $tipoNome = $sec['titulo'] ?? 'Parâmetros';
+    $legenda = '';
+    $legendaTam = 9;
+    $orientacao = $raw['orientacao'] ?? 'horizontal';
+
+    if ($tipoId) {
+        $stmt = $db->prepare('SELECT nome, colunas, legenda, legenda_tamanho FROM parametros_tipos WHERE id = ?');
+        $stmt->execute([(int)$tipoId]);
+        $ptRow = $stmt->fetch();
+        if ($ptRow) {
+            $colunas = json_decode($ptRow['colunas'], true) ?: [];
+            $tipoNome = $ptRow['nome'];
+            $legenda = $ptRow['legenda'] ?? '';
+            $legendaTam = (int)($ptRow['legenda_tamanho'] ?? 9);
+        }
+    }
+
+    if (!empty($espec['legenda_parametros'])) { $legenda = $espec['legenda_parametros']; }
+    if (!empty($espec['legenda_parametros_tamanho'])) { $legendaTam = (int)$espec['legenda_parametros_tamanho']; }
+
+    if (empty($colunas) && !empty($rows)) {
+        $firstDataRow = null;
+        foreach ($rows as $pr) { if (!isset($pr['_cat'])) { $firstDataRow = $pr; break; } }
+        if ($firstDataRow) {
+            foreach (array_keys($firstDataRow) as $k) {
+                if ($k !== '_cat') $colunas[] = ['nome' => ucfirst($k), 'chave' => $k];
+            }
+        }
+    }
+
+    return [
+        'raw' => $raw, 'rows' => $rows, 'tipo_id' => $tipoId, 'tipo_slug' => $tipoSlug,
+        'tipo_nome' => $tipoNome, 'colunas' => $colunas, 'colWidths' => $colWidths,
+        'legenda' => $legenda, 'legenda_tamanho' => $legendaTam, 'orientacao' => $orientacao,
+    ];
+}

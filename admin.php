@@ -552,7 +552,7 @@ $breadcrumbs = [
         <?php if ($tab === 'organizacoes' && $isSuperAdminUser): ?>
             <div class="flex-between mb-md">
                 <h2>Organizações</h2>
-                <button class="btn btn-primary" onclick="document.getElementById('orgModal').style.display='flex'; resetOrgForm();">+ Nova Organização</button>
+                <button class="btn btn-primary" onclick="document.getElementById('orgModal').classList.remove('hidden'); resetOrgForm();">+ Nova Organização</button>
             </div>
             <div class="card">
                 <table>
@@ -604,11 +604,11 @@ $breadcrumbs = [
             </div>
 
             <!-- Organização Modal -->
-            <div id="orgModal" class="modal-overlay" style="display:none;">
+            <div id="orgModal" class="modal-overlay hidden">
                 <div class="modal-box modal-box-lg">
                     <div class="modal-header">
                         <h3 id="orgModalTitle">Nova Organização</h3>
-                        <button class="modal-close" onclick="document.getElementById('orgModal').style.display='none'">&times;</button>
+                        <button class="modal-close" onclick="document.getElementById('orgModal').classList.add('hidden')">&times;</button>
                     </div>
                     <form method="POST" enctype="multipart/form-data">
                         <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
@@ -765,7 +765,7 @@ $breadcrumbs = [
                         </div>
 
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('orgModal').style.display='none'">Cancelar</button>
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('orgModal').classList.add('hidden')">Cancelar</button>
                             <button type="submit" class="btn btn-primary">Guardar</button>
                         </div>
                     </form>
@@ -789,7 +789,7 @@ $breadcrumbs = [
                         </form>
                     <?php endif; ?>
                 </div>
-                <button class="btn btn-primary" onclick="document.getElementById('userModal').style.display='flex'; resetUserForm();">+ Novo Utilizador</button>
+                <button class="btn btn-primary" onclick="document.getElementById('userModal').classList.remove('hidden'); resetUserForm();">+ Novo Utilizador</button>
             </div>
             <div class="card">
                 <table>
@@ -834,11 +834,11 @@ $breadcrumbs = [
             </div>
 
             <!-- User Modal -->
-            <div id="userModal" class="modal-overlay" style="display:none;">
+            <div id="userModal" class="modal-overlay hidden">
                 <div class="modal-box">
                     <div class="modal-header">
                         <h3 id="userModalTitle">Novo Utilizador</h3>
-                        <button class="modal-close" onclick="document.getElementById('userModal').style.display='none'">&times;</button>
+                        <button class="modal-close" onclick="document.getElementById('userModal').classList.add('hidden')">&times;</button>
                     </div>
                     <form method="POST" enctype="multipart/form-data">
                         <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
@@ -903,7 +903,7 @@ $breadcrumbs = [
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('userModal').style.display='none'">Cancelar</button>
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('userModal').classList.add('hidden')">Cancelar</button>
                             <button type="submit" class="btn btn-primary">Guardar</button>
                         </div>
                     </form>
@@ -927,7 +927,7 @@ $breadcrumbs = [
                         </form>
                     <?php endif; ?>
                 </div>
-                <button class="btn btn-primary" onclick="document.getElementById('clienteModal').style.display='flex'; resetClienteForm();">+ Novo Cliente</button>
+                <button class="btn btn-primary" onclick="document.getElementById('clienteModal').classList.remove('hidden'); resetClienteForm();">+ Novo Cliente</button>
             </div>
             <div class="card">
                 <table>
@@ -966,11 +966,11 @@ $breadcrumbs = [
             </div>
 
             <!-- Cliente Modal -->
-            <div id="clienteModal" class="modal-overlay" style="display:none;">
+            <div id="clienteModal" class="modal-overlay hidden">
                 <div class="modal-box modal-box-lg">
                     <div class="modal-header">
                         <h3 id="clienteModalTitle">Novo Cliente</h3>
-                        <button class="modal-close" onclick="document.getElementById('clienteModal').style.display='none'">&times;</button>
+                        <button class="modal-close" onclick="document.getElementById('clienteModal').classList.add('hidden')">&times;</button>
                     </div>
                     <form method="POST">
                         <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
@@ -997,7 +997,7 @@ $breadcrumbs = [
                             <div class="form-group"><label>Contacto</label><input type="text" name="contacto" id="cl_contacto" placeholder="Pessoa de contacto"></div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('clienteModal').style.display='none'">Cancelar</button>
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('clienteModal').classList.add('hidden')">Cancelar</button>
                             <button type="submit" class="btn btn-primary">Guardar</button>
                         </div>
                     </form>
@@ -1021,7 +1021,7 @@ $breadcrumbs = [
                         </form>
                     <?php endif; ?>
                 </div>
-                <button class="btn btn-primary" onclick="document.getElementById('fornecedorModal').style.display='flex'; resetFornecedorForm();">+ Novo Fornecedor</button>
+                <button class="btn btn-primary" onclick="document.getElementById('fornecedorModal').classList.remove('hidden'); resetFornecedorForm();">+ Novo Fornecedor</button>
             </div>
             <div class="card">
                 <?php if (empty($fornecedores_list)): ?>
@@ -1064,11 +1064,11 @@ $breadcrumbs = [
             </div>
 
             <!-- Fornecedor Modal -->
-            <div id="fornecedorModal" class="modal-overlay" style="display:none;">
+            <div id="fornecedorModal" class="modal-overlay hidden">
                 <div class="modal-box modal-box-lg">
                     <div class="modal-header">
                         <h3 id="fornecedorModalTitle">Novo Fornecedor</h3>
-                        <button class="modal-close" onclick="document.getElementById('fornecedorModal').style.display='none'">&times;</button>
+                        <button class="modal-close" onclick="document.getElementById('fornecedorModal').classList.add('hidden')">&times;</button>
                     </div>
                     <form method="POST">
                         <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
@@ -1097,7 +1097,7 @@ $breadcrumbs = [
                         <div class="form-group"><label>Certificações</label><input type="text" name="certificacoes" id="fn_certificacoes" placeholder="Ex: ISO 9001, FSSC 22000, FSC..."></div>
                         <div class="form-group"><label>Notas</label><textarea name="notas" id="fn_notas" rows="2" placeholder="Observações internas sobre o fornecedor..."></textarea></div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('fornecedorModal').style.display='none'">Cancelar</button>
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('fornecedorModal').classList.add('hidden')">Cancelar</button>
                             <button type="submit" class="btn btn-primary">Guardar</button>
                         </div>
                     </form>
@@ -1105,11 +1105,11 @@ $breadcrumbs = [
             </div>
 
             <!-- Histórico Fornecedor Modal -->
-            <div id="historicoFornModal" class="modal-overlay" style="display:none;">
+            <div id="historicoFornModal" class="modal-overlay hidden">
                 <div class="modal-box modal-box-lg">
                     <div class="modal-header">
                         <h3>Histórico: <span id="histFornNome"></span></h3>
-                        <button class="modal-close" onclick="document.getElementById('historicoFornModal').style.display='none'">&times;</button>
+                        <button class="modal-close" onclick="document.getElementById('historicoFornModal').classList.add('hidden')">&times;</button>
                     </div>
                     <div style="max-height:400px; overflow-y:auto;">
                         <table style="font-size:13px;">
@@ -1118,7 +1118,7 @@ $breadcrumbs = [
                         </table>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('historicoFornModal').style.display='none'">Fechar</button>
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('historicoFornModal').classList.add('hidden')">Fechar</button>
                     </div>
                 </div>
             </div>
@@ -1140,7 +1140,7 @@ $breadcrumbs = [
                         </form>
                     <?php endif; ?>
                 </div>
-                <button class="btn btn-primary" onclick="document.getElementById('produtoModal').style.display='flex'; resetProdutoForm();">+ Novo Produto</button>
+                <button class="btn btn-primary" onclick="document.getElementById('produtoModal').classList.remove('hidden'); resetProdutoForm();">+ Novo Produto</button>
             </div>
             <div class="card">
                 <table>
@@ -1182,11 +1182,11 @@ $breadcrumbs = [
             </div>
 
             <!-- Produto Modal -->
-            <div id="produtoModal" class="modal-overlay" style="display:none;">
+            <div id="produtoModal" class="modal-overlay hidden">
                 <div class="modal-box">
                     <div class="modal-header">
                         <h3 id="produtoModalTitle">Novo Produto</h3>
-                        <button class="modal-close" onclick="document.getElementById('produtoModal').style.display='none'">&times;</button>
+                        <button class="modal-close" onclick="document.getElementById('produtoModal').classList.add('hidden')">&times;</button>
                     </div>
                     <form method="POST">
                         <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
@@ -1211,7 +1211,7 @@ $breadcrumbs = [
                         <?php endif; ?>
 
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('produtoModal').style.display='none'">Cancelar</button>
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('produtoModal').classList.add('hidden')">Cancelar</button>
                             <button type="submit" class="btn btn-primary">Guardar</button>
                         </div>
                     </form>
@@ -1219,11 +1219,11 @@ $breadcrumbs = [
             </div>
 
             <!-- Product Parameter Templates Modal -->
-            <div id="templateModal" class="modal-overlay" style="display:none;">
+            <div id="templateModal" class="modal-overlay hidden">
                 <div class="modal-box modal-box-lg">
                     <div class="modal-header">
                         <h3>Templates de Parâmetros: <span id="tmpl_produto_nome"></span></h3>
-                        <button class="modal-close" onclick="document.getElementById('templateModal').style.display='none'">&times;</button>
+                        <button class="modal-close" onclick="document.getElementById('templateModal').classList.add('hidden')">&times;</button>
                     </div>
                     <input type="hidden" id="tmpl_produto_id" value="0">
                     <div id="tmpl_rows" style="max-height: 400px; overflow-y: auto; margin-bottom: 16px;">
@@ -1246,7 +1246,7 @@ $breadcrumbs = [
                         <button class="btn btn-primary btn-sm" onclick="adicionarTemplate()">+</button>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('templateModal').style.display='none'">Fechar</button>
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('templateModal').classList.add('hidden')">Fechar</button>
                     </div>
                 </div>
             </div>
@@ -1258,7 +1258,7 @@ $breadcrumbs = [
                 <div style="display:flex; gap:8px;">
                     <button class="btn btn-secondary" id="btnVerificarIA" onclick="verificarLegIA()">&#9878; Verificar com IA</button>
                     <button class="btn btn-secondary" onclick="toggleHistorico()">&#128196; Histórico</button>
-                    <button class="btn btn-primary" onclick="document.getElementById('legModal').style.display='flex'; resetLegForm();">+ Nova Legislação</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('legModal').classList.remove('hidden'); resetLegForm();">+ Nova Legislação</button>
                 </div>
             </div>
 
@@ -1315,11 +1315,11 @@ $breadcrumbs = [
             </div>
 
             <!-- Legislação Modal -->
-            <div id="legModal" class="modal-overlay" style="display:none;">
+            <div id="legModal" class="modal-overlay hidden">
                 <div class="modal-box modal-box-lg">
                     <div class="modal-header">
                         <h3 id="legModalTitle">Nova Legislação</h3>
-                        <button class="modal-close" onclick="document.getElementById('legModal').style.display='none';">&times;</button>
+                        <button class="modal-close" onclick="document.getElementById('legModal').classList.add('hidden');">&times;</button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" id="leg_id" value="0">
@@ -1331,13 +1331,13 @@ $breadcrumbs = [
                     </div>
                     <div class="modal-footer">
                         <button class="btn btn-primary" onclick="guardarLeg()">Guardar</button>
-                        <button class="btn btn-secondary" onclick="document.getElementById('legModal').style.display='none';">Cancelar</button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('legModal').classList.add('hidden');">Cancelar</button>
                     </div>
                 </div>
             </div>
 
             <!-- Modal Visualização Documento Legislação -->
-            <div id="legDocModal" class="modal-overlay" style="display:none;">
+            <div id="legDocModal" class="modal-overlay hidden">
                 <div class="modal-box" style="width:90%; max-width:1100px; height:85vh; display:flex; flex-direction:column;">
                     <div class="modal-header">
                         <h3 id="legDocTitle" style="flex:1; margin-right:12px;"></h3>
@@ -1375,10 +1375,10 @@ $breadcrumbs = [
                     iframe.src = '';
                     fallback.style.display = 'block';
                 }
-                document.getElementById('legDocModal').style.display = 'flex';
+                document.getElementById('legDocModal').classList.remove('hidden');
             }
             function fecharLegDoc() {
-                document.getElementById('legDocModal').style.display = 'none';
+                document.getElementById('legDocModal').classList.add('hidden');
                 document.getElementById('legDocIframe').src = '';
             }
             </script>
@@ -1438,7 +1438,7 @@ $breadcrumbs = [
                 document.getElementById('leg_resumo').value = r.resumo || '';
                 document.getElementById('leg_link_url').value = r.link_url || '';
                 document.getElementById('leg_ativo').checked = r.ativo != 0;
-                document.getElementById('legModal').style.display = 'flex';
+                document.getElementById('legModal').classList.remove('hidden');
             }
             function guardarLeg() {
                 var fd = new FormData();
@@ -1453,7 +1453,7 @@ $breadcrumbs = [
                 fetch('<?= BASE_PATH ?>/api.php', { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(data => {
-                    if (data.success) { document.getElementById('legModal').style.display = 'none'; carregarLeg(); }
+                    if (data.success) { document.getElementById('legModal').classList.add('hidden'); carregarLeg(); }
                     else appAlert(data.error || 'Erro ao guardar.');
                 });
             }
@@ -1646,7 +1646,7 @@ $breadcrumbs = [
             </div>
 
             <!-- Modal Visualização Documento -->
-            <div id="legDocModal" class="modal-overlay" style="display:none;">
+            <div id="legDocModal" class="modal-overlay hidden">
                 <div class="modal-box" style="width:90%; max-width:1100px; height:85vh; display:flex; flex-direction:column;">
                     <div class="modal-header">
                         <h3 id="legDocTitle" style="flex:1; margin-right:12px;"></h3>
@@ -1680,10 +1680,10 @@ $breadcrumbs = [
                 } else {
                     iframe.style.display = 'none'; iframe.src = ''; fallback.style.display = 'block';
                 }
-                document.getElementById('legDocModal').style.display = 'flex';
+                document.getElementById('legDocModal').classList.remove('hidden');
             }
             function fecharLegDoc() {
-                document.getElementById('legDocModal').style.display = 'none';
+                document.getElementById('legDocModal').classList.add('hidden');
                 document.getElementById('legDocIframe').src = '';
             }
             function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -1765,11 +1765,11 @@ $breadcrumbs = [
             </div>
 
             <!-- Modal novo/editar tipo -->
-            <div id="tipoModal" class="modal-overlay" style="display:none;">
+            <div id="tipoModal" class="modal-overlay hidden">
                 <div class="modal-box" style="max-width:650px;">
                     <div class="modal-header">
                         <h3 id="tipoModalTitle">Novo Tipo de Parâmetro</h3>
-                        <button class="modal-close" onclick="document.getElementById('tipoModal').style.display='none';">&times;</button>
+                        <button class="modal-close" onclick="document.getElementById('tipoModal').classList.add('hidden');">&times;</button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" id="tipo_id" value="0">
@@ -1811,7 +1811,7 @@ $breadcrumbs = [
                         <div id="tipoCategorias"></div>
                     </div>
                     <div class="modal-footer">
-                        <button class="btn btn-secondary" onclick="document.getElementById('tipoModal').style.display='none';">Cancelar</button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('tipoModal').classList.add('hidden');">Cancelar</button>
                         <button class="btn btn-primary" onclick="guardarTipo()">Guardar</button>
                         <button class="btn btn-delete" id="btnEliminarTipo" style="display:none;" onclick="eliminarTipo()">Eliminar Tipo</button>
                     </div>
@@ -1961,7 +1961,7 @@ $breadcrumbs = [
                 renderTipoColunas([{ nome: '', chave: '' }]);
                 renderTipoCategorias([]);
                 document.getElementById('btnEliminarTipo').style.display = 'none';
-                document.getElementById('tipoModal').style.display = 'flex';
+                document.getElementById('tipoModal').classList.remove('hidden');
             }
 
             function editarTipoAtual() {
@@ -1985,7 +1985,7 @@ $breadcrumbs = [
                 try { cats = typeof t.categorias === 'string' ? JSON.parse(t.categorias) : (t.categorias || []); } catch(e) {}
                 renderTipoCategorias(cats || []);
                 document.getElementById('btnEliminarTipo').style.display = 'inline-block';
-                document.getElementById('tipoModal').style.display = 'flex';
+                document.getElementById('tipoModal').classList.remove('hidden');
             }
 
             function renderTipoColunas(cols) {
@@ -2069,7 +2069,7 @@ $breadcrumbs = [
                     })
                 }).then(function(r){return r.json();}).then(function(data) {
                     if (data.success) {
-                        document.getElementById('tipoModal').style.display = 'none';
+                        document.getElementById('tipoModal').classList.add('hidden');
                         var editId = parseInt(document.getElementById('tipo_id').value);
                         tipoAtual = null;
                         carregarTipos();
@@ -2091,7 +2091,7 @@ $breadcrumbs = [
                         body: JSON.stringify({ action: 'delete_parametro_tipo', id: tipoAtual.id })
                     }).then(function(r){return r.json();}).then(function(data) {
                         if (data.success) {
-                            document.getElementById('tipoModal').style.display = 'none';
+                            document.getElementById('tipoModal').classList.add('hidden');
                             tipoAtual = null;
                             carregarTipos();
                         } else appAlert(data.error || 'Erro.');
@@ -2502,11 +2502,11 @@ $breadcrumbs = [
             </div>
 
             <!-- Plano Modal -->
-            <div id="planoModal" class="modal-overlay" style="display:none;">
+            <div id="planoModal" class="modal-overlay hidden">
                 <div class="modal-box">
                     <div class="modal-header">
                         <h3 id="planoModalTitle">Editar Plano</h3>
-                        <button class="modal-close" onclick="document.getElementById('planoModal').style.display='none'">&times;</button>
+                        <button class="modal-close" onclick="document.getElementById('planoModal').classList.add('hidden')">&times;</button>
                     </div>
                     <form method="POST">
                         <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
@@ -2559,7 +2559,7 @@ $breadcrumbs = [
                         </div>
 
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('planoModal').style.display='none'">Cancelar</button>
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('planoModal').classList.add('hidden')">Cancelar</button>
                             <button type="submit" class="btn btn-primary">Guardar</button>
                         </div>
                     </form>
@@ -2608,7 +2608,7 @@ $breadcrumbs = [
     }
 
     function editOrg(o) {
-        document.getElementById('orgModal').style.display = 'flex';
+        document.getElementById('orgModal').classList.remove('hidden');
         document.getElementById('orgModalTitle').textContent = 'Editar Organização';
         document.getElementById('org_id').value = o.id;
         document.getElementById('org_nome').value = o.nome || '';
@@ -2749,7 +2749,7 @@ $breadcrumbs = [
     }
 
     function editUser(u) {
-        document.getElementById('userModal').style.display = 'flex';
+        document.getElementById('userModal').classList.remove('hidden');
         document.getElementById('userModalTitle').textContent = 'Editar Utilizador';
         document.getElementById('user_id').value = u.id;
         document.getElementById('user_nome').value = u.nome;
@@ -2793,7 +2793,7 @@ $breadcrumbs = [
     }
 
     function editCliente(c) {
-        document.getElementById('clienteModal').style.display = 'flex';
+        document.getElementById('clienteModal').classList.remove('hidden');
         document.getElementById('clienteModalTitle').textContent = 'Editar Cliente';
         document.getElementById('cliente_id').value = c.id;
         ['nome','sigla','morada','telefone','email','nif','contacto'].forEach(function(f) {
@@ -2824,7 +2824,7 @@ $breadcrumbs = [
     }
 
     function editFornecedor(f) {
-        document.getElementById('fornecedorModal').style.display = 'flex';
+        document.getElementById('fornecedorModal').classList.remove('hidden');
         document.getElementById('fornecedorModalTitle').textContent = 'Editar Fornecedor';
         document.getElementById('fornecedor_id').value = f.id;
         ['nome','sigla','morada','telefone','email','nif','contacto','certificacoes','notas'].forEach(function(field) {
@@ -2840,7 +2840,7 @@ $breadcrumbs = [
     function verHistoricoFornecedor(fornecedorId, nome) {
         document.getElementById('histFornNome').textContent = nome;
         document.getElementById('histFornBody').innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center;">A carregar...</td></tr>';
-        document.getElementById('historicoFornModal').style.display = 'flex';
+        document.getElementById('historicoFornModal').classList.remove('hidden');
         fetch('<?= BASE_PATH ?>/api.php?action=get_fornecedor_log&fornecedor_id=' + fornecedorId, {
             headers: {'X-CSRF-TOKEN': '<?= getCsrfToken() ?>'}
         })
@@ -2888,7 +2888,7 @@ $breadcrumbs = [
     }
 
     function editProduto(p) {
-        document.getElementById('produtoModal').style.display = 'flex';
+        document.getElementById('produtoModal').classList.remove('hidden');
         document.getElementById('produtoModalTitle').textContent = 'Editar Produto';
         document.getElementById('produto_id').value = p.id;
         document.getElementById('pr_nome').value = p.nome;
@@ -2922,7 +2922,7 @@ $breadcrumbs = [
     function gerirTemplates(produtoId, produtoNome) {
         document.getElementById('tmpl_produto_id').value = produtoId;
         document.getElementById('tmpl_produto_nome').textContent = produtoNome;
-        document.getElementById('templateModal').style.display = 'flex';
+        document.getElementById('templateModal').classList.remove('hidden');
         carregarTemplates(produtoId);
     }
 
@@ -3012,7 +3012,7 @@ $breadcrumbs = [
     var planosConfig = <?= json_encode($planos ?: []) ?>;
 
     function editPlano(p) {
-        document.getElementById('planoModal').style.display = 'flex';
+        document.getElementById('planoModal').classList.remove('hidden');
         document.getElementById('planoModalTitle').textContent = 'Editar Plano: ' + p.nome;
         document.getElementById('pl_id').value = p.id;
         document.getElementById('pl_nome').value = p.nome || '';
@@ -3044,12 +3044,12 @@ $breadcrumbs = [
     // GLOBAL: Close modal on overlay click or Escape key
     // ===================================
     document.querySelectorAll('.modal-overlay').forEach(function(m) {
-        m.addEventListener('click', function(e) { if (e.target === m) m.style.display = 'none'; });
+        m.addEventListener('click', function(e) { if (e.target === m) m.classList.add('hidden'); });
     });
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             document.querySelectorAll('.modal-overlay').forEach(function(m) {
-                if (m.style.display !== 'none') m.style.display = 'none';
+                if (!m.classList.contains('hidden')) m.classList.add('hidden');
             });
         }
     });

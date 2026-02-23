@@ -539,11 +539,11 @@ $breadcrumbs = [];
         var modal = document.getElementById('previewModal');
         var iframe = document.getElementById('previewIframe');
         iframe.src = '<?= BASE_PATH ?>/ver.php?id=' + id + '&embed=1';
-        modal.style.display = 'flex';
+        modal.classList.remove('hidden');
     }
     function fecharPreview() {
         var modal = document.getElementById('previewModal');
-        modal.style.display = 'none';
+        modal.classList.add('hidden');
         document.getElementById('previewIframe').src = '';
     }
 
@@ -554,7 +554,7 @@ $breadcrumbs = [];
     </script>
 
     <!-- Modal Pré-visualização -->
-    <div id="previewModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)fecharPreview();">
+    <div id="previewModal" class="modal-overlay hidden" onclick="if(event.target===this)fecharPreview();">
         <div class="modal" style="width:90%; max-width:900px; height:85vh; display:flex; flex-direction:column;">
             <div class="modal-header">
                 <h3>Pré-visualização</h3>

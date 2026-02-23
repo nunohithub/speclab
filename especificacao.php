@@ -178,24 +178,7 @@ if (!$isNew) {
 $categoriasPadrao = getCategoriasPadrao($orgId);
 // Config visual (JSON -> array com defaults, usando cores da org)
 $orgCor = $user['org_cor'] ?? '#2596be';
-$configVisualDefaults = [
-    'cor_titulos' => $orgCor,
-    'cor_subtitulos' => $orgCor,
-    'cor_linhas' => $orgCor,
-    'cor_nome' => $orgCor,
-    'tamanho_titulos' => '14',
-    'tamanho_subtitulos' => '12',
-    'subtitulos_bold' => '1',
-    'tamanho_nome' => '16',
-    'logo_custom' => '',
-];
-$configVisual = $configVisualDefaults;
-if (!empty($espec['config_visual'])) {
-    $cv = is_string($espec['config_visual']) ? json_decode($espec['config_visual'], true) : $espec['config_visual'];
-    if (is_array($cv)) {
-        $configVisual = array_merge($configVisualDefaults, $cv);
-    }
-}
+$configVisual = parseConfigVisual($espec['config_visual'] ?? '', $orgCor);
 
 $pageTitle = $isNew ? 'Nova Especificação' : 'Editar: ' . sanitize($espec['numero']);
 $pageSubtitle = 'Editor de Especificação';
@@ -1223,35 +1206,11 @@ $breadcrumbs = [
                                 </div>
                                 <?php elseif ($secTipo === 'parametros' || $secTipo === 'parametros_custom'): ?>
                                 <?php
-                                    $pcRaw = json_decode($sec['conteudo'] ?? '{}', true);
-                                    $pcRows = $pcRaw['rows'] ?? [];
-                                    $pcTipoId = $pcRaw['tipo_id'] ?? '';
-                                    $pcTipoSlug = $pcRaw['tipo_slug'] ?? '';
-                                    $pcColWidths = $pcRaw['colWidths'] ?? [];
-                                    $pcColunas = [];
-                                    $pcTipoNome = $sec['titulo'] ?? 'Parâmetros';
-                                    $pcLegenda = '';
-                                    $pcLegTam = 9;
-                                    if ($pcTipoId) {
-                                        $stmtPt = $db->prepare('SELECT nome, colunas, legenda, legenda_tamanho FROM parametros_tipos WHERE id = ?');
-                                        $stmtPt->execute([(int)$pcTipoId]);
-                                        $ptRow = $stmtPt->fetch();
-                                        if ($ptRow) {
-                                            $pcColunas = json_decode($ptRow['colunas'], true) ?: [];
-                                            $pcTipoNome = $ptRow['nome'];
-                                            $pcLegenda = $ptRow['legenda'] ?? '';
-                                            $pcLegTam = (int)($ptRow['legenda_tamanho'] ?? 9);
-                                        }
-                                    }
-                                    if (empty($pcColunas) && !empty($pcRows)) {
-                                        $firstDataRow = null;
-                                        foreach ($pcRows as $pr) { if (!isset($pr['_cat'])) { $firstDataRow = $pr; break; } }
-                                        if ($firstDataRow) {
-                                            foreach (array_keys($firstDataRow) as $k) {
-                                                if ($k !== '_cat') $pcColunas[] = ['nome' => $k, 'chave' => $k];
-                                            }
-                                        }
-                                    }
+                                    $pc = parseParametrosSeccao($db, $sec, $espec);
+                                    $pcRaw = $pc['raw']; $pcRows = $pc['rows']; $pcColunas = $pc['colunas'];
+                                    $pcTipoId = $pc['tipo_id']; $pcTipoSlug = $pc['tipo_slug'];
+                                    $pcTipoNome = $pc['tipo_nome']; $pcColWidths = $pc['colWidths'];
+                                    $pcLegenda = $pc['legenda']; $pcLegTam = $pc['legenda_tamanho'];
                                     // Se colWidths não corresponde ao nº de colunas, usar largura do tipo ou recalcular
                                     if (count($pcColWidths) === count($pcColunas)) {
                                         $pcColW = $pcColWidths;
@@ -1981,7 +1940,7 @@ $breadcrumbs = [
         <div class="modal-box" style="max-width:460px;">
             <div class="modal-header">
                 <h3>Publicar Versão</h3>
-                <button class="modal-close" onclick="var m=document.getElementById('publicarModal');m.style.display='none';m.classList.add('hidden')">&times;</button>
+                <button class="modal-close" onclick="document.getElementById('publicarModal').classList.add('hidden')">&times;</button>
             </div>
             <div style="padding:var(--spacing-lg);">
                 <div class="alert alert-warning" style="margin-bottom:var(--spacing-md);">
@@ -1993,24 +1952,24 @@ $breadcrumbs = [
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="var m=document.getElementById('publicarModal');m.style.display='none';m.classList.add('hidden')">Cancelar</button>
+                <button class="btn btn-secondary" onclick="document.getElementById('publicarModal').classList.add('hidden')">Cancelar</button>
                 <button class="btn btn-primary" onclick="confirmarPublicar()">Confirmar Publicação</button>
             </div>
         </div>
     </div>
 
     <!-- MODAL: COMPARAÇÃO DE VERSÕES -->
-    <div class="modal-overlay hidden" id="diffModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div class="modal-overlay hidden" id="diffModal">
         <div class="modal-box" style="max-width:800px; max-height:80vh; overflow-y:auto;">
             <div class="modal-header">
                 <h3 id="diffModalTitle">Comparação de Versões</h3>
-                <button class="modal-close" onclick="document.getElementById('diffModal').style.display='none'">&times;</button>
+                <button class="modal-close" onclick="document.getElementById('diffModal').classList.add('hidden')">&times;</button>
             </div>
             <div class="modal-body" id="diffModalBody" style="padding:var(--spacing-md);">
                 <p class="muted">A carregar...</p>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="document.getElementById('diffModal').style.display='none'">Fechar</button>
+                <button class="btn btn-secondary" onclick="document.getElementById('diffModal').classList.add('hidden')">Fechar</button>
             </div>
         </div>
     </div>
@@ -2288,7 +2247,6 @@ $breadcrumbs = [
         _pendingAction = action;
         var m = document.getElementById('nivelModal');
         m.classList.remove('hidden');
-        m.style.display = 'flex';
     }
 
     function confirmarNivel(nivel) {
@@ -2302,7 +2260,6 @@ $breadcrumbs = [
 
     function fecharNivelModal() {
         var m = document.getElementById('nivelModal');
-        m.style.display = 'none';
         m.classList.add('hidden');
         _pendingAction = null;
     }
@@ -4845,13 +4802,11 @@ $breadcrumbs = [
         _unsavedPendingUrl = url || null;
         var m = document.getElementById('unsavedModal');
         m.classList.remove('hidden');
-        m.style.display = 'flex';
         return false;
     }
 
     function fecharUnsavedModal() {
         var m = document.getElementById('unsavedModal');
-        m.style.display = 'none';
         m.classList.add('hidden');
         _unsavedPendingUrl = null;
     }
@@ -4859,7 +4814,6 @@ $breadcrumbs = [
     function confirmarSairSemGuardar() {
         isDirty = false;
         var m = document.getElementById('unsavedModal');
-        m.style.display = 'none';
         m.classList.add('hidden');
         if (_unsavedPendingUrl) {
             window.location.href = _unsavedPendingUrl;
@@ -4909,14 +4863,12 @@ $breadcrumbs = [
         if (isDirty) { showToast('Guarde as alterações antes de publicar.', 'warning'); return; }
         var m = document.getElementById('publicarModal');
         m.classList.remove('hidden');
-        m.style.display = 'flex';
         document.getElementById('publicarNotas').value = '';
         document.getElementById('publicarNotas').focus();
     }
     function confirmarPublicar() {
         var notas = document.getElementById('publicarNotas').value;
         var m = document.getElementById('publicarModal');
-        m.style.display = 'none';
         m.classList.add('hidden');
         fetch(BASE_PATH + '/api.php', {
             method: 'POST',
@@ -4961,7 +4913,7 @@ $breadcrumbs = [
 
     function compararVersoes(outroId, outraVersao) {
         var m = document.getElementById('diffModal');
-        m.style.display = 'flex';
+        m.classList.remove('hidden');
         document.getElementById('diffModalTitle').textContent = 'Comparar: v' + '<?= sanitize($espec['versao']) ?>' + ' vs v' + outraVersao;
         document.getElementById('diffModalBody').innerHTML = '<p class="muted">A carregar diferenças...</p>';
 

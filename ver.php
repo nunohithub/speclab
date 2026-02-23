@@ -371,24 +371,9 @@ if (!empty($data['seccoes'])) {
                         <<?= $secNivel === 2 ? 'h3' : 'h2' ?>><?= $secNum . ' ' . san($sec['titulo']) ?></<?= $secNivel === 2 ? 'h3' : 'h2' ?>>
                         <?php if ($secTipo === 'parametros' || $secTipo === 'parametros_custom'): ?>
                             <?php
-                            $pcRaw = json_decode($sec['conteudo'] ?? '{}', true);
-                            $pcRows = $pcRaw['rows'] ?? [];
-                            $pcTipoId = $pcRaw['tipo_id'] ?? '';
-                            $pcColWidths = $pcRaw['colWidths'] ?? [];
-                            $pcColunas = []; $pcLegenda = ''; $pcLegTam = 9;
-                            if ($pcTipoId) {
-                                $stmtPt = $db->prepare('SELECT colunas, legenda, legenda_tamanho FROM parametros_tipos WHERE id = ?');
-                                $stmtPt->execute([(int)$pcTipoId]);
-                                $ptRow = $stmtPt->fetch();
-                                if ($ptRow) { $pcColunas = json_decode($ptRow['colunas'], true) ?: []; $pcLegenda = $ptRow['legenda'] ?? ''; $pcLegTam = (int)($ptRow['legenda_tamanho'] ?? 9); }
-                            }
-                            // Override por especificação
-                            if (!empty($espec['legenda_parametros'])) { $pcLegenda = $espec['legenda_parametros']; }
-                            if (!empty($espec['legenda_parametros_tamanho'])) { $pcLegTam = (int)$espec['legenda_parametros_tamanho']; }
-                            if (empty($pcColunas) && !empty($pcRows)) {
-                                $firstDataRow = null; foreach ($pcRows as $pr) { if (!isset($pr['_cat'])) { $firstDataRow = $pr; break; } }
-                                if ($firstDataRow) { foreach (array_keys($firstDataRow) as $k) { if ($k !== '_cat') $pcColunas[] = ['nome' => $k, 'chave' => $k]; } }
-                            }
+                            $pc = parseParametrosSeccao($db, $sec, $espec);
+                            $pcRaw = $pc['raw']; $pcRows = $pc['rows']; $pcColunas = $pc['colunas'];
+                            $pcColWidths = $pc['colWidths']; $pcLegenda = $pc['legenda']; $pcLegTam = $pc['legenda_tamanho'];
                             $pcCw = count($pcColWidths) ? $pcColWidths : array_fill(0, count($pcColunas), floor(100 / max(1, count($pcColunas))));
                             ?>
                             <?php if (!empty($pcRows)):

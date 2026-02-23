@@ -392,29 +392,9 @@ if ($useMpdf) {
             if ($secTipo === 'parametros' || $secTipo === 'parametros_custom') {
                 // Parâmetros genéricos (dinâmicos)
                 $html .= '<div class="section"' . $subStyle . '>';
-                $pcRaw = json_decode($sec['conteudo'] ?? '{}', true);
-                $pcRows = $pcRaw['rows'] ?? [];
-                $pcTipoId = $pcRaw['tipo_id'] ?? '';
-                $pcColWidths = $pcRaw['colWidths'] ?? [];
-                $pcColunas = []; $pcLegenda = ''; $pcLegTam = 9;
-                if ($pcTipoId) {
-                    $stmtPt = $db->prepare('SELECT colunas, legenda, legenda_tamanho FROM parametros_tipos WHERE id = ?');
-                    $stmtPt->execute([(int)$pcTipoId]);
-                    $ptRow = $stmtPt->fetch();
-                    if ($ptRow) {
-                        $pcColunas = json_decode($ptRow['colunas'], true) ?: [];
-                        $pcLegenda = $ptRow['legenda'] ?? '';
-                        $pcLegTam = (int)($ptRow['legenda_tamanho'] ?? 9);
-                    }
-                }
-                // Override por especificação
-                if (!empty($espec['legenda_parametros'])) { $pcLegenda = $espec['legenda_parametros']; }
-                if (!empty($espec['legenda_parametros_tamanho'])) { $pcLegTam = (int)$espec['legenda_parametros_tamanho']; }
-                if (empty($pcColunas) && !empty($pcRows)) {
-                    $firstRow = null;
-                    foreach ($pcRows as $pr) { if (!isset($pr['_cat'])) { $firstRow = $pr; break; } }
-                    if ($firstRow) { foreach (array_keys($firstRow) as $k) { if ($k !== '_cat') $pcColunas[] = ['nome' => ucfirst($k), 'chave' => $k]; } }
-                }
+                $pc = parseParametrosSeccao($db, $sec, $espec);
+                $pcRaw = $pc['raw']; $pcRows = $pc['rows']; $pcColunas = $pc['colunas'];
+                $pcColWidths = $pc['colWidths']; $pcLegenda = $pc['legenda']; $pcLegTam = $pc['legenda_tamanho'];
                 $nCols = count($pcColunas);
                 if ($nCols > 0 && count($pcColWidths) === $nCols) {
                     $cwSum = array_sum($pcColWidths) ?: 1;

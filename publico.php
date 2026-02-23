@@ -377,23 +377,9 @@ $L = $labels[$lang] ?? $labels['pt'];
                         <<?= $secNivel === 2 ? 'h3' : 'h2' ?>><?= $secNum . ' ' . san($sec['titulo']) ?></<?= $secNivel === 2 ? 'h3' : 'h2' ?>>
                         <?php if ($secTipo === 'parametros' || $secTipo === 'parametros_custom'): ?>
                             <?php
-                            $pcRaw = json_decode($sec['conteudo'] ?? '{}', true);
-                            $pcRows = $pcRaw['rows'] ?? [];
-                            $pcTipoId = $pcRaw['tipo_id'] ?? '';
-                            $pcColunas = []; $pcLegenda = ''; $pcLegTam = 9;
-                            if ($pcTipoId) {
-                                $stmtPt = $db->prepare('SELECT colunas, legenda, legenda_tamanho FROM parametros_tipos WHERE id = ?');
-                                $stmtPt->execute([(int)$pcTipoId]);
-                                $ptRow = $stmtPt->fetch();
-                                if ($ptRow) { $pcColunas = json_decode($ptRow['colunas'], true) ?: []; $pcLegenda = $ptRow['legenda'] ?? ''; $pcLegTam = (int)($ptRow['legenda_tamanho'] ?? 9); }
-                            }
-                            // Override por especificação
-                            if (!empty($espec['legenda_parametros'])) { $pcLegenda = $espec['legenda_parametros']; }
-                            if (!empty($espec['legenda_parametros_tamanho'])) { $pcLegTam = (int)$espec['legenda_parametros_tamanho']; }
-                            if (empty($pcColunas) && !empty($pcRows)) {
-                                $firstDataRow = null; foreach ($pcRows as $pr) { if (!isset($pr['_cat'])) { $firstDataRow = $pr; break; } }
-                                if ($firstDataRow) { foreach (array_keys($firstDataRow) as $k) { if ($k !== '_cat') $pcColunas[] = ['nome' => $k, 'chave' => $k]; } }
-                            }
+                            $pc = parseParametrosSeccao($db, $sec, $espec);
+                            $pcRaw = $pc['raw']; $pcRows = $pc['rows']; $pcColunas = $pc['colunas'];
+                            $pcLegenda = $pc['legenda']; $pcLegTam = $pc['legenda_tamanho'];
                             ?>
                             <?php if (!empty($pcRows)): ?>
                             <table class="doc-table">
@@ -632,7 +618,7 @@ $L = $labels[$lang] ?? $labels['pt'];
     </div>
 
     <!-- Photo Lightbox -->
-    <div id="lightbox" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; cursor:pointer; align-items:center; justify-content:center;" onclick="this.style.display='none'">
+    <div id="lightbox" class="hidden" style="display:flex; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; cursor:pointer; align-items:center; justify-content:center;" onclick="this.classList.add('hidden')">
         <img id="lightboxImg" style="max-width:90%; max-height:90%; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.5);">
         <button style="position:absolute; top:20px; right:20px; background:none; border:none; color:white; font-size:28px; cursor:pointer;">&times;</button>
     </div>
@@ -640,7 +626,7 @@ $L = $labels[$lang] ?? $labels['pt'];
     <script>
     function abrirFoto(src) {
         document.getElementById('lightboxImg').src = src;
-        document.getElementById('lightbox').style.display = 'flex';
+        document.getElementById('lightbox').classList.remove('hidden');
     }
     </script>
 
