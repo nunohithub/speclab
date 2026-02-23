@@ -2222,7 +2222,10 @@ $breadcrumbs = [
             branding: false,
             promotion: false,
             statusbar: false,
-            init_instance_callback: function(editor) { editor.setDirty(false); },
+            init_instance_callback: function(editor) {
+                editor.setDirty(false);
+                editor.on('dirty', function() { editor.setDirty(false); });
+            },
             plugins: 'lists link table code wordcount paste lineheight',
             toolbar: 'fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright | lineheight bullist numlist | table link',
             toolbar_mode: 'floating',
