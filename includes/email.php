@@ -277,7 +277,7 @@ function enviarLinkAceitacao(PDO $db, int $especId, int $tokenId, string $baseUr
     $bcc = null;
     $smtp = getSmtpConfig($db, $especId);
     if (!isset($smtp['error']) && stripos($smtp['from'] ?? '', '@speclab.pt') !== false && $enviadoPor) {
-        $stmtUser = $db->prepare('SELECT email FROM utilizadores WHERE id = ?');
+        $stmtUser = $db->prepare('SELECT username FROM utilizadores WHERE id = ?');
         $stmtUser->execute([$enviadoPor]);
         $senderEmail = $stmtUser->fetchColumn();
         if ($senderEmail) $bcc = $senderEmail;
