@@ -33,12 +33,12 @@ if ($isSuperAdminUser) {
 }
 
 // Processar formulários
+$action = $_POST['action'] ?? '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validateCsrf()) {
         header('Location: ' . BASE_PATH . '/admin.php?msg=' . urlencode('Erro de segurança. Recarregue a página.') . '&msg_type=error');
         exit;
     }
-    $action = $_POST['action'] ?? '';
 
     if ($action === 'save_user') {
         $uid = (int)($_POST['user_id'] ?? 0);
@@ -537,12 +537,6 @@ $breadcrumbs = [
     <?php include __DIR__ . '/includes/header.php'; ?>
 
     <div class="container">
-        <nav class="breadcrumbs" aria-label="Navegação">
-            <a href="<?= BASE_PATH ?>/dashboard.php" class="breadcrumb-link">Dashboard</a>
-            <span class="breadcrumb-sep">/</span>
-            <span class="breadcrumb-current"><?= sanitize($tabLabels[$tab] ?? 'Administração') ?></span>
-        </nav>
-
         <?php if ($msg): ?>
             <div class="alert <?= $msgType === 'error' ? 'alert-error' : 'alert-success' ?>"><?= sanitize($msg) ?></div>
         <?php endif; ?>
