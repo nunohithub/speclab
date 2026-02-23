@@ -112,9 +112,7 @@ if ($isNew) {
         'parametros' => [],
         'config_visual' => null,
         'motivo_devolucao' => null,
-        'seccoes' => [
-            ['titulo' => 'Objetivo', 'conteudo' => '', 'tipo' => 'texto', 'ordem' => 0],
-        ],
+        'seccoes' => [],
         'ficheiros' => [],
     ];
 } elseif ($especId > 0) {
