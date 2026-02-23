@@ -450,11 +450,10 @@ function enviarNotificacaoPublicacao(PDO $db, int $especId, string $baseUrl, int
     if (!$espec) return ['success' => false, 'error' => 'Especificação não encontrada.'];
 
     $stmtForn = $db->prepare('
-        SELECT DISTINCT f.nome, fe.email
+        SELECT DISTINCT f.nome, f.email
         FROM especificacao_fornecedores ef
         INNER JOIN fornecedores f ON ef.fornecedor_id = f.id
-        LEFT JOIN fornecedor_emails fe ON fe.fornecedor_id = f.id
-        WHERE ef.especificacao_id = ? AND fe.email IS NOT NULL AND fe.email != ""
+        WHERE ef.especificacao_id = ? AND f.email IS NOT NULL AND f.email != ""
     ');
     $stmtForn->execute([$especId]);
     $fornecedores = $stmtForn->fetchAll();
