@@ -46,6 +46,10 @@ while ($dtRow = $stmtDt->fetch(PDO::FETCH_ASSOC)) {
     $docTiposConfig[$dtRow['slug']] = json_decode($dtRow['seccoes'], true) ?: [];
 }
 
+// Determinar se é nova especificação ou edição
+$isNew = isset($_GET['novo']) && $_GET['novo'] == '1';
+$especId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
 // Carregar pedidos da especificação
 $pedidosEspec = [];
 if (!$isNew && $especId) {
@@ -53,11 +57,6 @@ if (!$isNew && $especId) {
     $stmtPed->execute([$especId]);
     $pedidosEspec = $stmtPed->fetchAll(PDO::FETCH_ASSOC);
 }
-
-
-// Determinar se é nova especificação ou edição
-$isNew = isset($_GET['novo']) && $_GET['novo'] == '1';
-$especId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 if ($isNew) {
     // Nova especificação - gerar número e defaults
@@ -1175,6 +1174,7 @@ $breadcrumbs = [
                                             <span class="ai-disclaimer" title="Conteúdo gerado por IA deve ser revisto antes de usar">IA</span>
                                         </div>
                                         <div class="seccao-actions">
+                                            <button class="btn btn-ghost btn-sm seccao-collapse-btn" onclick="toggleCollapse(this)" title="Colapsar/Expandir">&#9660;</button>
                                             <button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, -1)" title="Mover acima">&#9650;</button>
                                             <button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, 1)" title="Mover abaixo">&#9660;</button>
                                             <button class="btn btn-ghost btn-sm seccao-remove-btn" onclick="removerSeccao(this)" title="Remover secção">&times;</button>
@@ -1194,6 +1194,7 @@ $breadcrumbs = [
                                         <input type="text" class="seccao-titulo" value="<?= sanitize($sec['titulo'] ?? 'Ficheiros Anexos') ?>" placeholder="Título">
                                         <span class="pill pill-info" style="font-size:10px; padding:2px 8px;">Ficheiros</span>
                                         <div class="seccao-actions">
+                                            <button class="btn btn-ghost btn-sm seccao-collapse-btn" onclick="toggleCollapse(this)" title="Colapsar/Expandir">&#9660;</button>
                                             <button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, -1)" title="Mover acima">&#9650;</button>
                                             <button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, 1)" title="Mover abaixo">&#9660;</button>
                                             <button class="btn btn-ghost btn-sm seccao-remove-btn" onclick="removerSeccao(this)" title="Remover secção">&times;</button>
@@ -1278,6 +1279,7 @@ $breadcrumbs = [
                                         <input type="text" class="seccao-titulo" value="<?= sanitize($sec['titulo'] ?? $pcTipoNome) ?>" placeholder="Título da secção">
                                         <span class="pill pill-info" style="font-size:10px; padding:2px 8px;"><?= sanitize($pcTipoNome) ?></span>
                                         <div class="seccao-actions">
+                                            <button class="btn btn-ghost btn-sm seccao-collapse-btn" onclick="toggleCollapse(this)" title="Colapsar/Expandir">&#9660;</button>
                                             <button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, -1)" title="Mover acima">&#9650;</button>
                                             <button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, 1)" title="Mover abaixo">&#9660;</button>
                                             <button class="btn btn-ghost btn-sm seccao-remove-btn" onclick="removerSeccao(this)" title="Remover secção">&times;</button>
@@ -2337,6 +2339,7 @@ $breadcrumbs = [
                     '<button class="btn-ai" onclick="abrirAI(this, \'melhorar\')" title="Melhorar conteúdo com IA"><span class="ai-icon">&#9998;</span> Melhorar</button>' +
                 '</div>' +
                 '<div class="seccao-actions">' +
+                    '<button class="btn btn-ghost btn-sm seccao-collapse-btn" onclick="toggleCollapse(this)" title="Colapsar/Expandir">&#9660;</button>' +
                     '<button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, -1)" title="Mover acima">&#9650;</button>' +
                     '<button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, 1)" title="Mover abaixo">&#9660;</button>' +
                     '<button class="btn btn-ghost btn-sm seccao-remove-btn" onclick="removerSeccao(this)" title="Remover secção">&times;</button>' +
@@ -3001,6 +3004,7 @@ $breadcrumbs = [
                 '<input type="text" class="seccao-titulo" value="' + escapeHtml(tipo.nome) + '" placeholder="Título da secção">' +
                 '<span class="pill pill-info" style="font-size:10px; padding:2px 8px;">' + escapeHtml(tipo.nome) + '</span>' +
                 '<div class="seccao-actions">' +
+                    '<button class="btn btn-ghost btn-sm seccao-collapse-btn" onclick="toggleCollapse(this)" title="Colapsar/Expandir">&#9660;</button>' +
                     '<button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, -1)" title="Mover acima">&#9650;</button>' +
                     '<button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, 1)" title="Mover abaixo">&#9660;</button>' +
                     '<button class="btn btn-ghost btn-sm seccao-remove-btn" onclick="removerSeccao(this)" title="Remover secção">&times;</button>' +
@@ -3213,6 +3217,11 @@ $breadcrumbs = [
                 document.getElementById('bancoPicker').remove();
             });
         });
+    }
+
+    function toggleCollapse(btn) {
+        var block = btn.closest('.seccao-block');
+        block.classList.toggle('collapsed');
     }
 
     function moverSeccao(btn, direction) {
@@ -4235,6 +4244,7 @@ $breadcrumbs = [
                 '<input type="text" class="seccao-titulo" value="Ficheiros Anexos" placeholder="Título">' +
                 '<span class="pill pill-info" style="font-size:10px; padding:2px 8px;">Ficheiros</span>' +
                 '<div class="seccao-actions">' +
+                    '<button class="btn btn-ghost btn-sm seccao-collapse-btn" onclick="toggleCollapse(this)" title="Colapsar/Expandir">&#9660;</button>' +
                     '<button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, -1)" title="Mover acima">&#9650;</button>' +
                     '<button class="btn btn-ghost btn-sm" onclick="moverSeccao(this, 1)" title="Mover abaixo">&#9660;</button>' +
                     '<button class="btn btn-ghost btn-sm seccao-remove-btn" onclick="removerSeccao(this)" title="Remover secção">&times;</button>' +

@@ -859,6 +859,23 @@ tr:hover { background: var(--color-primary-lighter); }
 .seccao-block.dragging { opacity: 0.4; }
 .seccao-block.drag-over { border-top: 3px solid var(--color-primary); }
 
+/* ---- COLLAPSE SECTIONS ---- */
+.seccao-collapse-btn {
+    font-size: 12px;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: transform 0.2s ease, background 0.15s;
+}
+.seccao-collapse-btn:hover { background: var(--color-border-light, #e5e7eb); }
+.seccao-block.collapsed .seccao-collapse-btn { transform: rotate(-90deg); }
+.seccao-block.collapsed > *:not(.seccao-header) { display: none; }
+.seccao-block.collapsed { margin-bottom: 4px; }
+.seccao-block.collapsed .seccao-header { border-bottom: none; }
+
 /* ---- SECTION EDITOR ---- */
 .section-block {
     background: var(--color-bg);
