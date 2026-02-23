@@ -53,6 +53,7 @@ switch ($action) {
         $colunas = $jsonBody['colunas'] ?? [];
         $legenda = trim($jsonBody['legenda'] ?? '');
         $legendaTamanho = (int)($jsonBody['legenda_tamanho'] ?? 9);
+        $orientacao = in_array($jsonBody['orientacao'] ?? '', ['horizontal', 'vertical']) ? $jsonBody['orientacao'] : 'horizontal';
         $ativo = (int)($jsonBody['ativo'] ?? 1);
         $todasOrgs = (int)($jsonBody['todas_orgs'] ?? 1);
         $orgIds = $jsonBody['org_ids'] ?? [];
@@ -88,13 +89,13 @@ switch ($action) {
         if ($legendaTamanho > 14) $legendaTamanho = 14;
 
         if ($id > 0) {
-            $stmt = $db->prepare('UPDATE parametros_tipos SET nome = ?, slug = ?, colunas = ?, legenda = ?, legenda_tamanho = ?, ativo = ?, todas_orgs = ?, categorias = ? WHERE id = ?');
-            $stmt->execute([$nome, $slug, $colunasJson, $legenda, $legendaTamanho, $ativo, $todasOrgs, $categoriasJson, $id]);
+            $stmt = $db->prepare('UPDATE parametros_tipos SET nome = ?, slug = ?, colunas = ?, legenda = ?, legenda_tamanho = ?, orientacao = ?, ativo = ?, todas_orgs = ?, categorias = ? WHERE id = ?');
+            $stmt->execute([$nome, $slug, $colunasJson, $legenda, $legendaTamanho, $orientacao, $ativo, $todasOrgs, $categoriasJson, $id]);
         } else {
             $stmtMax = $db->query('SELECT COALESCE(MAX(ordem),0)+1 FROM parametros_tipos');
             $maxOrdem = $stmtMax->fetchColumn();
-            $stmt = $db->prepare('INSERT INTO parametros_tipos (nome, slug, colunas, legenda, legenda_tamanho, ativo, todas_orgs, categorias, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
-            $stmt->execute([$nome, $slug, $colunasJson, $legenda, $legendaTamanho, $ativo, $todasOrgs, $categoriasJson, $maxOrdem]);
+            $stmt = $db->prepare('INSERT INTO parametros_tipos (nome, slug, colunas, legenda, legenda_tamanho, orientacao, ativo, todas_orgs, categorias, ordem) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+            $stmt->execute([$nome, $slug, $colunasJson, $legenda, $legendaTamanho, $orientacao, $ativo, $todasOrgs, $categoriasJson, $maxOrdem]);
             $id = (int)$db->lastInsertId();
         }
 

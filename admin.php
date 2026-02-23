@@ -1781,6 +1781,14 @@ $breadcrumbs = [
                             <div class="form-group"><label><input type="checkbox" id="tipo_ativo" checked> Ativo</label></div>
                             <div class="form-group"><label><input type="checkbox" id="tipo_todas_orgs" checked onchange="document.getElementById('tipoOrgsSelect').style.display=this.checked?'none':'block';"> Todas as organizações</label></div>
                         </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Orientação da tabela</label>
+                                <select id="tipo_orientacao" class="form-control">
+                                    <option value="horizontal">↔ Horizontal (colunas no topo)</option>
+                                    <option value="vertical">↕ Vertical (colunas na esquerda)</option>
+                                </select>
+                            </div>
+                        </div>
                         <div id="tipoOrgsSelect" style="display:none; margin-bottom:12px;">
                             <label style="font-size:13px;">Organizações com acesso:</label>
                             <?php
@@ -1946,6 +1954,7 @@ $breadcrumbs = [
                 document.getElementById('tipo_nome').value = '';
                 document.getElementById('tipo_slug').value = '';
                 document.getElementById('tipo_ativo').checked = true;
+                document.getElementById('tipo_orientacao').value = 'horizontal';
                 document.getElementById('tipo_todas_orgs').checked = true;
                 document.getElementById('tipoOrgsSelect').style.display = 'none';
                 document.querySelectorAll('.tipo_org_chk').forEach(function(cb){ cb.checked = false; });
@@ -1963,6 +1972,7 @@ $breadcrumbs = [
                 document.getElementById('tipo_nome').value = t.nome;
                 document.getElementById('tipo_slug').value = t.slug;
                 document.getElementById('tipo_ativo').checked = t.ativo == 1;
+                document.getElementById('tipo_orientacao').value = t.orientacao || 'horizontal';
                 document.getElementById('tipo_todas_orgs').checked = t.todas_orgs == 1;
                 document.getElementById('tipoOrgsSelect').style.display = t.todas_orgs == 1 ? 'none' : 'block';
                 var orgIds = t.org_ids ? t.org_ids.split(',') : [];
@@ -2052,6 +2062,7 @@ $breadcrumbs = [
                         slug: document.getElementById('tipo_slug').value,
                         colunas: colunas,
                         categorias: categorias,
+                        orientacao: document.getElementById('tipo_orientacao').value,
                         ativo: document.getElementById('tipo_ativo').checked ? 1 : 0,
                         todas_orgs: document.getElementById('tipo_todas_orgs').checked ? 1 : 0,
                         org_ids: orgIds
