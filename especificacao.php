@@ -31,6 +31,14 @@ if (isSuperAdmin()) {
     $fornecedores = $stmt->fetchAll();
 }
 
+// Carregar admins da org para notificação de revisão
+$orgAdmins = [];
+if ($orgId) {
+    $stmtAdm = $db->prepare("SELECT id, nome, email FROM utilizadores WHERE organizacao_id = ? AND role IN ('org_admin','super_admin') AND ativo = 1 ORDER BY nome");
+    $stmtAdm->execute([$orgId]);
+    $orgAdmins = $stmtAdm->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // Carregar legenda de ensaios da org (com fallback para global)
 $ensaiosLegenda = '';
 $ensaiosLegendaTamanho = 9;
@@ -2199,6 +2207,38 @@ $breadcrumbs = [
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="fecharModalAlert()" id="alertCancelBtn" style="display:none;">Cancelar</button>
                 <button class="btn btn-primary" onclick="fecharModalAlert()" id="alertOkBtn">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: SELECIONAR ADMINS PARA REVISAO -->
+    <div class="modal-overlay hidden" id="modalRevisao">
+        <div class="modal-box" style="max-width:420px;">
+            <div class="modal-header">
+                <h3>Submeter para Revisão</h3>
+                <button class="modal-close" onclick="document.getElementById('modalRevisao').classList.add('hidden')">&times;</button>
+            </div>
+            <p style="margin:0 0 12px; font-size:13px; color:#667085;">Selecione os administradores a notificar por email:</p>
+            <div id="revisaoAdminList" style="margin-bottom:16px;">
+                <?php if (empty($orgAdmins)): ?>
+                    <p style="color:#ef4444; font-size:13px;">Não há administradores com email na organização.</p>
+                <?php else: ?>
+                    <?php foreach ($orgAdmins as $adm): ?>
+                    <label style="display:flex; align-items:center; gap:8px; padding:6px 0; cursor:pointer; font-size:14px;">
+                        <input type="checkbox" class="revisao-admin-cb" value="<?= $adm['id'] ?>" <?= $adm['email'] ? 'checked' : 'disabled' ?>>
+                        <?= sanitize($adm['nome']) ?>
+                        <?php if ($adm['email']): ?>
+                            <span style="color:#667085; font-size:11px;">(<?= sanitize($adm['email']) ?>)</span>
+                        <?php else: ?>
+                            <span style="color:#ef4444; font-size:11px;">(sem email)</span>
+                        <?php endif; ?>
+                    </label>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="document.getElementById('modalRevisao').classList.add('hidden')">Cancelar</button>
+                <button class="btn btn-info" onclick="confirmarSubmissaoRevisao()" <?= empty($orgAdmins) ? 'disabled' : '' ?>>Submeter</button>
             </div>
         </div>
     </div>
@@ -4377,23 +4417,32 @@ $breadcrumbs = [
     function submeterRevisao() {
         if (!especId) { showToast('Guarde a especificação primeiro.', 'warning'); return; }
         if (isDirty) { showToast('Guarde as alterações antes de submeter.', 'warning'); return; }
-        appConfirm('Submeter esta especificação para revisão?<br>Um administrador irá analisar e aprovar ou devolver.', function() {
-            fetch(BASE_PATH + '/api.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
-                body: JSON.stringify({ action: 'submeter_revisao', id: especId })
-            })
-            .then(function(r) { return checkSession(r); })
-            .then(function(data) {
-                if (data.success) {
-                    showToast('Especificação submetida para revisão.', 'success');
-                    setTimeout(function() { location.reload(); }, 800);
-                } else {
-                    showValidationErrors(data);
-                }
-            })
-            .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de ligação.', 'error'); });
+        // Abrir modal de seleção de admins
+        document.getElementById('modalRevisao').classList.remove('hidden');
+    }
+
+    function confirmarSubmissaoRevisao() {
+        var adminIds = [];
+        document.querySelectorAll('.revisao-admin-cb:checked').forEach(function(cb) {
+            adminIds.push(parseInt(cb.value));
         });
+        document.getElementById('modalRevisao').classList.add('hidden');
+        var baseUrl = window.location.origin + BASE_PATH;
+        fetch(BASE_PATH + '/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'submeter_revisao', id: especId, admin_ids: adminIds, base_url: baseUrl })
+        })
+        .then(function(r) { return checkSession(r); })
+        .then(function(data) {
+            if (data.success) {
+                showToast(data.message || 'Submetida para revisão.', 'success');
+                setTimeout(function() { location.reload(); }, 800);
+            } else {
+                showValidationErrors(data);
+            }
+        })
+        .catch(function(err) { if (err.message !== 'SESSION_EXPIRED') showToast('Erro de ligação.', 'error'); });
     }
 
     function showValidationErrors(data) {

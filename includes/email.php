@@ -359,3 +359,53 @@ function enviarEmailConfirmacaoDecisao(PDO $db, int $especId, int $tokenId, stri
     $assunto = 'Confirmação: Documento ' . $textoDecisao . ' — ' . $tk['numero'];
     return enviarEmail($db, $especId, $tk['destinatario_email'], $assunto, $html);
 }
+
+/**
+ * Envia notificação de revisão aos admins selecionados
+ */
+function enviarNotificacaoRevisao(PDO $db, int $especId, array $adminIds, string $baseUrl, int $submetidoPor): array {
+    $stmt = $db->prepare('SELECT titulo, numero, versao FROM especificacoes WHERE id = ?');
+    $stmt->execute([$especId]);
+    $espec = $stmt->fetch();
+    if (!$espec) return ['success' => false, 'error' => 'Especificação não encontrada.'];
+
+    $stmtAutor = $db->prepare('SELECT nome FROM utilizadores WHERE id = ?');
+    $stmtAutor->execute([$submetidoPor]);
+    $nomeAutor = $stmtAutor->fetchColumn() ?: 'Utilizador';
+
+    $link = rtrim($baseUrl, '/') . '/ver.php?id=' . $especId;
+    $enviados = 0;
+    $erros = [];
+
+    foreach ($adminIds as $adminId) {
+        $stmtAdmin = $db->prepare('SELECT nome, email FROM utilizadores WHERE id = ? AND role IN (?, ?)');
+        $stmtAdmin->execute([$adminId, 'org_admin', 'super_admin']);
+        $admin = $stmtAdmin->fetch();
+        if (!$admin || !$admin['email'] || !filter_var($admin['email'], FILTER_VALIDATE_EMAIL)) continue;
+
+        $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">';
+        $html .= '<div style="border-bottom: 3px solid #2596be; padding-bottom: 12px; margin-bottom: 20px;">';
+        $html .= '<h2 style="color: #2596be; margin: 0;">Documento para Revisão</h2></div>';
+        $html .= '<p>Olá ' . htmlspecialchars($admin['nome']) . ',</p>';
+        $html .= '<p><strong>' . htmlspecialchars($nomeAutor) . '</strong> submeteu um documento para a sua revisão e aprovação:</p>';
+        $html .= '<div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;">';
+        $html .= '<strong>' . htmlspecialchars($espec['titulo']) . '</strong><br>';
+        $html .= '<span style="color: #667085;">Número: ' . htmlspecialchars($espec['numero']) . ' | Versão: ' . htmlspecialchars($espec['versao']) . '</span></div>';
+        $html .= '<div style="margin: 24px 0; text-align: center;">';
+        $html .= '<a href="' . htmlspecialchars($link) . '" style="display: inline-block; background: #2596be; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Rever e Aprovar</a></div>';
+        $html .= '<p style="font-size: 12px; color: #667085;">Necessita de ter sessão iniciada para aceder ao documento.</p>';
+        $html .= '<div style="margin-top: 30px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #999;">Powered by <strong>SpecLab</strong> &copy;' . date('Y') . '</div>';
+        $html .= '</body></html>';
+
+        $result = enviarEmail($db, $especId, $admin['email'], 'Revisão pendente: ' . $espec['numero'], $html, false, $submetidoPor);
+
+        // Registar notificação
+        $db->prepare('INSERT INTO revisao_notificacoes (especificacao_id, admin_id) VALUES (?, ?)')->execute([$especId, $adminId]);
+
+        if ($result['success']) $enviados++;
+        else $erros[] = $admin['nome'];
+    }
+
+    if ($enviados === 0 && !empty($erros)) return ['success' => false, 'error' => 'Não foi possível notificar nenhum admin.'];
+    return ['success' => true, 'message' => "Submetida para revisão. $enviados admin(s) notificado(s)."];
+}

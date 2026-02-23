@@ -27,7 +27,18 @@ switch ($action) {
             exit;
         }
         $db->prepare('UPDATE especificacoes SET estado = ? WHERE id = ?')->execute(['em_revisao', $id]);
-        jsonSuccess('Submetida para revisao.');
+
+        // Notificar admins selecionados por email
+        $adminIds = $jsonBody['admin_ids'] ?? [];
+        if (!empty($adminIds) && is_array($adminIds)) {
+            require_once __DIR__ . '/../includes/email.php';
+            $baseUrl = rtrim($jsonBody['base_url'] ?? '', '/');
+            if (!$baseUrl) $baseUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_PATH;
+            $emailResult = enviarNotificacaoRevisao($db, $id, array_map('intval', $adminIds), $baseUrl, $user['id']);
+            jsonSuccess($emailResult['message'] ?? 'Submetida para revisão.');
+        } else {
+            jsonSuccess('Submetida para revisão.');
+        }
         break;
 
     // ===================================================================
