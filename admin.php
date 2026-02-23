@@ -518,7 +518,7 @@ $pageTitle = 'Cadernos de Encargos';
 $pageSubtitle = 'Sistema de Especificações Técnicas';
 $showNav = true;
 $activeNav = $tab;
-$tabLabels = ['produtos' => 'Produtos', 'clientes' => 'Clientes', 'fornecedores' => 'Fornecedores', 'utilizadores' => 'Utilizadores', 'organizacoes' => 'Organizações', 'legislacao' => 'Legislação', 'parametros' => 'Parâmetros', 'configuracoes' => 'Configurações', 'planos' => 'Planos'];
+$tabLabels = ['produtos' => 'Produtos', 'clientes' => 'Clientes', 'fornecedores' => 'Fornecedores', 'utilizadores' => 'Utilizadores', 'organizacoes' => 'Organizações', 'legislacao' => 'Legislação', 'parametros' => 'Parâmetros', 'configuracoes' => 'Configurações', 'doc_tipos' => 'Tipos de Documento', 'planos' => 'Planos'];
 $breadcrumbs = [
     ['label' => 'Dashboard', 'url' => BASE_PATH . '/dashboard.php'],
     ['label' => $tabLabels[$tab] ?? ucfirst($tab)]
@@ -2389,6 +2389,51 @@ $breadcrumbs = [
                 </form>
             </div>
             <?php endif; ?>
+        <!-- TIPOS DE DOCUMENTO (super_admin only) -->
+        <?php elseif ($tab === 'doc_tipos' && $isSuperAdminUser): ?>
+            <?php
+            $docTipos = $db->query('SELECT * FROM doc_tipos ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
+            $seccoesDisponiveis = [
+                'texto' => 'Texto',
+                'parametros' => 'Parâmetros',
+                'legislacao' => 'Legislação',
+                'ficheiros' => 'Ficheiros',
+                'ensaios' => 'Ensaios'
+            ];
+            ?>
+            <div class="flex-between mb-md">
+                <h2>Tipos de Documento</h2>
+                <button class="btn btn-primary" onclick="novoDocTipo()">+ Novo Tipo</button>
+            </div>
+
+            <?php foreach ($docTipos as $dt):
+                $secAtivas = json_decode($dt['seccoes'], true) ?: [];
+            ?>
+            <div class="card" style="margin-bottom:16px; padding:20px;" id="docTipo_<?= $dt['id'] ?>">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                    <input type="text" value="<?= sanitize($dt['nome']) ?>" class="dt-nome" data-id="<?= $dt['id'] ?>" style="font-size:16px; font-weight:600; border:1px solid #e5e7eb; border-radius:6px; padding:6px 12px; width:300px;">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label style="font-size:12px; color:#667085; display:flex; align-items:center; gap:4px;">
+                            <input type="checkbox" class="dt-ativo" data-id="<?= $dt['id'] ?>" <?= $dt['ativo'] ? 'checked' : '' ?>> Ativo
+                        </label>
+                        <button class="btn btn-primary btn-sm" onclick="guardarDocTipo(<?= $dt['id'] ?>)">Guardar</button>
+                    </div>
+                </div>
+                <div style="display:flex; gap:20px; flex-wrap:wrap;">
+                    <?php foreach ($seccoesDisponiveis as $slug => $label): ?>
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:14px;">
+                        <input type="checkbox" class="dt-seccao" data-id="<?= $dt['id'] ?>" value="<?= $slug ?>" <?= in_array($slug, $secAtivas) ? 'checked' : '' ?>>
+                        <?= $label ?>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endforeach; ?>
+
+            <?php if (empty($docTipos)): ?>
+                <div class="card" style="padding:40px; text-align:center; color:#667085;">Nenhum tipo de documento configurado.</div>
+            <?php endif; ?>
+
         <!-- PLANOS (super_admin only) -->
         <?php elseif ($tab === 'planos' && $isSuperAdminUser): ?>
             <div class="flex-between mb-md">
@@ -2982,6 +3027,40 @@ $breadcrumbs = [
             });
         }
     });
+
+    // === Tipos de Documento ===
+    function guardarDocTipo(id) {
+        var card = document.getElementById('docTipo_' + id);
+        var nome = card.querySelector('.dt-nome').value.trim();
+        var ativo = card.querySelector('.dt-ativo').checked ? 1 : 0;
+        var seccoes = [];
+        card.querySelectorAll('.dt-seccao:checked').forEach(function(cb) { seccoes.push(cb.value); });
+        fetch('<?= BASE_PATH ?>/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'save_doc_tipo', id: id, nome: nome, ativo: ativo, seccoes: seccoes })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) location.reload();
+            else alert(data.error || 'Erro ao guardar.');
+        });
+    }
+
+    function novoDocTipo() {
+        var nome = prompt('Nome do novo tipo de documento:');
+        if (!nome || !nome.trim()) return;
+        fetch('<?= BASE_PATH ?>/api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+            body: JSON.stringify({ action: 'save_doc_tipo', id: 0, nome: nome.trim(), ativo: 1, seccoes: ['texto','parametros','ficheiros'] })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) location.reload();
+            else alert(data.error || 'Erro ao criar.');
+        });
+    }
     </script>
     <?php include __DIR__ . '/includes/modals.php'; ?>
     <?php include __DIR__ . '/includes/footer.php'; ?>

@@ -238,6 +238,10 @@ $handlers = [
     'ai_assist'               => 'ai',
     'traduzir_especificacao'  => 'ai',
 
+    // Tipos de documento
+    'save_doc_tipo'           => 'doc_tipos',
+    'get_doc_tipo_seccoes'    => 'doc_tipos',
+
     // Fluxo de aprovacao
     'submeter_revisao'        => 'aprovacao',
     'aprovar_especificacao'   => 'aprovacao',

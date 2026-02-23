@@ -39,6 +39,13 @@ if ($orgId) {
     $orgAdmins = $stmtAdm->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Carregar secções permitidas por tipo de documento
+$docTiposConfig = [];
+$stmtDt = $db->query('SELECT slug, seccoes FROM doc_tipos WHERE ativo = 1');
+while ($dtRow = $stmtDt->fetch(PDO::FETCH_ASSOC)) {
+    $docTiposConfig[$dtRow['slug']] = json_decode($dtRow['seccoes'], true) ?: [];
+}
+
 // Carregar legenda de ensaios da org (com fallback para global)
 $ensaiosLegenda = '';
 $ensaiosLegendaTamanho = 9;
@@ -1057,9 +1064,13 @@ $breadcrumbs = [
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="tipo_doc">Tipo de Documento</label>
-                                <select id="tipo_doc" name="tipo_doc">
-                                    <option value="caderno" <?= ($espec['tipo_doc'] ?? 'caderno') === 'caderno' ? 'selected' : '' ?>>Caderno de Encargos (Completo)</option>
-                                    <option value="ficha_tecnica" <?= ($espec['tipo_doc'] ?? '') === 'ficha_tecnica' ? 'selected' : '' ?>>Ficha Técnica</option>
+                                <select id="tipo_doc" name="tipo_doc" onchange="atualizarSeccoesPermitidas()">
+                                    <?php
+                                    $stmtDtSel = $db->query('SELECT slug, nome FROM doc_tipos WHERE ativo = 1 ORDER BY id');
+                                    while ($dtOpt = $stmtDtSel->fetch(PDO::FETCH_ASSOC)):
+                                    ?>
+                                    <option value="<?= sanitize($dtOpt['slug']) ?>" <?= ($espec['tipo_doc'] ?? 'caderno') === $dtOpt['slug'] ? 'selected' : '' ?>><?= sanitize($dtOpt['nome']) ?></option>
+                                    <?php endwhile; ?>
                                 </select>
                             </div>
                             <div class="form-group">
@@ -1481,11 +1492,11 @@ $breadcrumbs = [
                         <?php endif; ?>
 
                         <!-- Barra fixa de ações -->
-                        <div class="content-actions-bar">
-                            <button class="btn btn-primary btn-sm" onclick="pedirNivelSeccao('texto')">&#128196; + Texto</button>
-                            <button class="btn btn-secondary btn-sm" onclick="pedirNivelSeccao('parametros')">&#9881; + Parâmetros</button>
-                            <button class="btn btn-secondary btn-sm" onclick="pedirNivelSeccao('legislacao')">&#9878; + Legislação</button>
-                            <button class="btn btn-secondary btn-sm" onclick="pedirNivelSeccao('ficheiros')">&#128206; + Ficheiros</button>
+                        <div class="content-actions-bar" id="seccoesBar">
+                            <button class="btn btn-primary btn-sm btn-seccao" data-seccao="texto" onclick="pedirNivelSeccao('texto')">&#128196; + Texto</button>
+                            <button class="btn btn-secondary btn-sm btn-seccao" data-seccao="parametros" onclick="pedirNivelSeccao('parametros')">&#9881; + Parâmetros</button>
+                            <button class="btn btn-secondary btn-sm btn-seccao" data-seccao="legislacao" onclick="pedirNivelSeccao('legislacao')">&#9878; + Legislação</button>
+                            <button class="btn btn-secondary btn-sm btn-seccao" data-seccao="ficheiros" onclick="pedirNivelSeccao('ficheiros')">&#128206; + Ficheiros</button>
                         </div>
                     </div>
                 </div>
@@ -2276,6 +2287,18 @@ $breadcrumbs = [
     let autoSaveTimer = null;
     let isDirty = false;
     let isSaving = false;
+
+    // Secções permitidas por tipo de documento
+    const DOC_TIPOS_CONFIG = <?= json_encode($docTiposConfig) ?>;
+
+    function atualizarSeccoesPermitidas() {
+        var tipo = document.getElementById('tipo_doc').value;
+        var permitidas = DOC_TIPOS_CONFIG[tipo] || ['texto','parametros','legislacao','ficheiros','ensaios'];
+        document.querySelectorAll('.btn-seccao').forEach(function(btn) {
+            var seccao = btn.getAttribute('data-seccao');
+            btn.style.display = permitidas.indexOf(seccao) !== -1 ? '' : 'none';
+        });
+    }
 
     // Helper para fetch POST com CSRF automático
     function apiPost(data) {
@@ -5727,6 +5750,9 @@ $breadcrumbs = [
             btn.style.display = 'none';
         });
     }
+
+    // Aplicar secções permitidas ao carregar
+    atualizarSeccoesPermitidas();
     </script>
     <?php include __DIR__ . '/includes/modals.php'; ?>
     <?php include __DIR__ . '/includes/footer.php'; ?>
