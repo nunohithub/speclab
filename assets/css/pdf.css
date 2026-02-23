@@ -120,7 +120,7 @@ table.params tr.cat td {
     background-color: {{COR_PRIMARIA_LIGHT}};
     font-weight: 600;
     color: {{COR_PRIMARIA_DARK}};
-    text-align: center;
+    text-align: left;
 }
 
 /* thead repete em cada página quando a tabela quebra */
@@ -309,7 +309,7 @@ img {
     font-weight: 600;
     padding: 5px 8px;
     color: {{COR_PRIMARIA_DARK}};
-    text-align: center;
+    text-align: left;
     border-bottom: 1px solid #d1d5db;
 }
 

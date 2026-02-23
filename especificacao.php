@@ -1919,7 +1919,7 @@ $breadcrumbs = [
     </div>
 
     <!-- MODAL: ALTERAÇÕES POR GUARDAR -->
-    <div class="modal-overlay hidden" id="unsavedModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div class="modal-overlay hidden" id="unsavedModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
         <div class="modal-box" style="max-width:420px;">
             <div class="modal-header">
                 <h3>Alterações não guardadas</h3>
@@ -1936,7 +1936,7 @@ $breadcrumbs = [
     </div>
 
     <!-- MODAL: CONFIRMAR PUBLICAÇÃO -->
-    <div class="modal-overlay hidden" id="publicarModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div class="modal-overlay hidden" id="publicarModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
         <div class="modal-box" style="max-width:460px;">
             <div class="modal-header">
                 <h3>Publicar Versão</h3>
@@ -2007,7 +2007,7 @@ $breadcrumbs = [
     </div>
 
     <!-- MODAL: NIVEL DA SECÇÃO -->
-    <div class="modal-overlay hidden" id="nivelModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div class="modal-overlay hidden" id="nivelModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
         <div class="modal-box" style="max-width:400px;">
             <div class="modal-header">
                 <h3>Tipo de Secção</h3>
