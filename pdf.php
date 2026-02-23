@@ -80,12 +80,12 @@ if (!$code && isset($_SESSION['user_id'])) {
 // Traduções dos rótulos do PDF conforme idioma da spec
 $lang = $data['idioma'] ?? 'pt';
 $labels = [
-    'pt' => ['produto'=>'Produto','cliente'=>'Cliente','fornecedor'=>'Fornecedor','emissao'=>'Data de Emissão','revisao'=>'Revisão','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovacao'=>'Aprovação','pendente'=>'Pendente','aguarda'=>'Aguarda validação','pagina'=>'Página','de'=>'de','assinatura'=>'Assinatura / Aprovação','versao'=>'Versão','ensaio'=>'Ensaio / Controlo','especificacao'=>'Especificação','norma'=>'Norma','nei'=>'NEI','nqa'=>'NQA','rascunho'=>'RASCUNHO','ficheiros'=>'Ficheiros Anexos'],
-    'en' => ['produto'=>'Product','cliente'=>'Client','fornecedor'=>'Supplier','emissao'=>'Issue Date','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Prepared by','aprovacao'=>'Approval','pendente'=>'Pending','aguarda'=>'Awaiting validation','pagina'=>'Page','de'=>'of','assinatura'=>'Signature / Approval','versao'=>'Version','ensaio'=>'Test / Control','especificacao'=>'Specification','norma'=>'Standard','nei'=>'SIL','nqa'=>'AQL','rascunho'=>'DRAFT','ficheiros'=>'Attached Files'],
-    'es' => ['produto'=>'Producto','cliente'=>'Cliente','fornecedor'=>'Proveedor','emissao'=>'Fecha de Emisión','revisao'=>'Revisión','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovacao'=>'Aprobación','pendente'=>'Pendiente','aguarda'=>'Pendiente de validación','pagina'=>'Página','de'=>'de','assinatura'=>'Firma / Aprobación','versao'=>'Versión','ensaio'=>'Ensayo / Control','especificacao'=>'Especificación','norma'=>'Norma','nei'=>'NEI','nqa'=>'NCA','rascunho'=>'BORRADOR','ficheiros'=>'Archivos Adjuntos'],
-    'fr' => ['produto'=>'Produit','cliente'=>'Client','fornecedor'=>'Fournisseur','emissao'=>'Date d\'émission','revisao'=>'Révision','estado'=>'Statut','elaborado_por'=>'Préparé par','aprovacao'=>'Approbation','pendente'=>'En attente','aguarda'=>'En attente de validation','pagina'=>'Page','de'=>'de','assinatura'=>'Signature / Approbation','versao'=>'Version','ensaio'=>'Essai / Contrôle','especificacao'=>'Spécification','norma'=>'Norme','nei'=>'NEI','nqa'=>'NQA','rascunho'=>'BROUILLON','ficheiros'=>'Fichiers Joints'],
-    'de' => ['produto'=>'Produkt','cliente'=>'Kunde','fornecedor'=>'Lieferant','emissao'=>'Ausgabedatum','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Erstellt von','aprovacao'=>'Genehmigung','pendente'=>'Ausstehend','aguarda'=>'Warten auf Validierung','pagina'=>'Seite','de'=>'von','assinatura'=>'Unterschrift / Genehmigung','versao'=>'Version','ensaio'=>'Prüfung / Kontrolle','especificacao'=>'Spezifikation','norma'=>'Norm','nei'=>'NEI','nqa'=>'AQL','rascunho'=>'ENTWURF','ficheiros'=>'Angehängte Dateien'],
-    'it' => ['produto'=>'Prodotto','cliente'=>'Cliente','fornecedor'=>'Fornitore','emissao'=>'Data di Emissione','revisao'=>'Revisione','estado'=>'Stato','elaborado_por'=>'Preparato da','aprovacao'=>'Approvazione','pendente'=>'In sospeso','aguarda'=>'In attesa di validazione','pagina'=>'Pagina','de'=>'di','assinatura'=>'Firma / Approvazione','versao'=>'Versione','ensaio'=>'Prova / Controllo','especificacao'=>'Specifica','norma'=>'Norma','nei'=>'NEI','nqa'=>'NQA','rascunho'=>'BOZZA','ficheiros'=>'File Allegati'],
+    'pt' => ['produto'=>'Produto','cliente'=>'Cliente','fornecedor'=>'Fornecedor','emissao'=>'Data de Emissão','revisao'=>'Revisão','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovado_por'=>'Aprovado por','aprovacao'=>'Aprovação','aprovacoes'=>'Aprovações','aprovacao_interna'=>'Aprovação Interna','aceitacao'=>'Aceitação','pendente'=>'Pendente','aguarda'=>'Aguarda validação','pagina'=>'Página','de'=>'de','assinatura'=>'Assinatura / Aprovação','versao'=>'Versão','ensaio'=>'Ensaio / Controlo','especificacao'=>'Especificação','norma'=>'Norma','nei'=>'NEI','nqa'=>'NQA','rascunho'=>'RASCUNHO','ficheiros'=>'Ficheiros Anexos'],
+    'en' => ['produto'=>'Product','cliente'=>'Client','fornecedor'=>'Supplier','emissao'=>'Issue Date','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Prepared by','aprovado_por'=>'Approved by','aprovacao'=>'Approval','aprovacoes'=>'Approvals','aprovacao_interna'=>'Internal Approval','aceitacao'=>'Acceptance','pendente'=>'Pending','aguarda'=>'Awaiting validation','pagina'=>'Page','de'=>'of','assinatura'=>'Signature / Approval','versao'=>'Version','ensaio'=>'Test / Control','especificacao'=>'Specification','norma'=>'Standard','nei'=>'SIL','nqa'=>'AQL','rascunho'=>'DRAFT','ficheiros'=>'Attached Files'],
+    'es' => ['produto'=>'Producto','cliente'=>'Cliente','fornecedor'=>'Proveedor','emissao'=>'Fecha de Emisión','revisao'=>'Revisión','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovado_por'=>'Aprobado por','aprovacao'=>'Aprobación','aprovacoes'=>'Aprobaciones','aprovacao_interna'=>'Aprobación Interna','aceitacao'=>'Aceptación','pendente'=>'Pendiente','aguarda'=>'Pendiente de validación','pagina'=>'Página','de'=>'de','assinatura'=>'Firma / Aprobación','versao'=>'Versión','ensaio'=>'Ensayo / Control','especificacao'=>'Especificación','norma'=>'Norma','nei'=>'NEI','nqa'=>'NCA','rascunho'=>'BORRADOR','ficheiros'=>'Archivos Adjuntos'],
+    'fr' => ['produto'=>'Produit','cliente'=>'Client','fornecedor'=>'Fournisseur','emissao'=>'Date d\'émission','revisao'=>'Révision','estado'=>'Statut','elaborado_por'=>'Préparé par','aprovado_por'=>'Approuvé par','aprovacao'=>'Approbation','aprovacoes'=>'Approbations','aprovacao_interna'=>'Approbation Interne','aceitacao'=>'Acceptation','pendente'=>'En attente','aguarda'=>'En attente de validation','pagina'=>'Page','de'=>'de','assinatura'=>'Signature / Approbation','versao'=>'Version','ensaio'=>'Essai / Contrôle','especificacao'=>'Spécification','norma'=>'Norme','nei'=>'NEI','nqa'=>'NQA','rascunho'=>'BROUILLON','ficheiros'=>'Fichiers Joints'],
+    'de' => ['produto'=>'Produkt','cliente'=>'Kunde','fornecedor'=>'Lieferant','emissao'=>'Ausgabedatum','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Erstellt von','aprovado_por'=>'Genehmigt von','aprovacao'=>'Genehmigung','aprovacoes'=>'Freigaben','aprovacao_interna'=>'Interne Freigabe','aceitacao'=>'Annahme','pendente'=>'Ausstehend','aguarda'=>'Warten auf Validierung','pagina'=>'Seite','de'=>'von','assinatura'=>'Unterschrift / Genehmigung','versao'=>'Version','ensaio'=>'Prüfung / Kontrolle','especificacao'=>'Spezifikation','norma'=>'Norm','nei'=>'NEI','nqa'=>'AQL','rascunho'=>'ENTWURF','ficheiros'=>'Angehängte Dateien'],
+    'it' => ['produto'=>'Prodotto','cliente'=>'Cliente','fornecedor'=>'Fornitore','emissao'=>'Data di Emissione','revisao'=>'Revisione','estado'=>'Stato','elaborado_por'=>'Preparato da','aprovado_por'=>'Approvato da','aprovacao'=>'Approvazione','aprovacoes'=>'Approvazioni','aprovacao_interna'=>'Approvazione Interna','aceitacao'=>'Accettazione','pendente'=>'In sospeso','aguarda'=>'In attesa di validazione','pagina'=>'Pagina','de'=>'di','assinatura'=>'Firma / Approvazione','versao'=>'Versione','ensaio'=>'Prova / Controllo','especificacao'=>'Specifica','norma'=>'Norma','nei'=>'NEI','nqa'=>'NQA','rascunho'=>'BOZZA','ficheiros'=>'File Allegati'],
 ];
 $L = $labels[$lang] ?? $labels['pt'];
 
@@ -124,6 +124,18 @@ if (!empty($data['publicado_por'])) {
         $elaboradoNome = $elab['nome'];
         $elaboradoAssinatura = $elab['assinatura'] ?? '';
         $elaboradoData = !empty($data['publicado_em']) ? date('d/m/Y H:i', strtotime($data['publicado_em'])) : '';
+    }
+}
+// Aprovação interna
+$aprovadoNome = ''; $aprovadoData = ''; $aprovadoAssinatura = '';
+if (!empty($data['aprovado_por'])) {
+    $stmtAprovInt = $db->prepare('SELECT nome, assinatura FROM utilizadores WHERE id = ?');
+    $stmtAprovInt->execute([$data['aprovado_por']]);
+    $apInt = $stmtAprovInt->fetch();
+    if ($apInt) {
+        $aprovadoNome = $apInt['nome'];
+        $aprovadoAssinatura = $apInt['assinatura'] ?? '';
+        $aprovadoData = !empty($data['aprovado_em']) ? date('d/m/Y H:i', strtotime($data['aprovado_em'])) : '';
     }
 }
 // Se acesso via token, mostrar apenas a decisão deste token; senão, todas
@@ -239,35 +251,53 @@ if ($useMpdf) {
     $html = '<style>' . $pdfCssRaw . '</style>';
 
     // Meta — full-width rows for Produto/Cliente/Fornecedor, 2-column grid for the rest
+    // Meta — produto destaque, cliente+fornecedor paired, dados paired
     $metaFull = [];
-    $metaFull[] = [$L['produto'], san($data['produto_nome'] ?? '-')];
-    if ($temClientes) $metaFull[] = [$L['cliente'], san($data['cliente_nome'] ?? 'Geral')];
-    if ($temFornecedores) $metaFull[] = [$L['fornecedor'], san($fornecedorDisplay)];
+    $metaFull[] = [$L['produto'], '<span style="font-size:11pt;">' . san($data['produto_nome'] ?? '-') . '</span>'];
     $metaPaired = [];
+    if ($temClientes && $temFornecedores) {
+        $metaPaired[] = [$L['cliente'], san($data['cliente_nome'] ?? 'Geral')];
+        $metaPaired[] = [$L['fornecedor'], san($fornecedorDisplay)];
+    } elseif ($temClientes) {
+        $metaFull[] = [$L['cliente'], san($data['cliente_nome'] ?? 'Geral')];
+    } elseif ($temFornecedores) {
+        $metaFull[] = [$L['fornecedor'], san($fornecedorDisplay)];
+    }
     $metaPaired[] = [$L['emissao'], formatDate($data['data_emissao'])];
     $metaPaired[] = [$L['revisao'], $data['data_revisao'] ? formatDate($data['data_revisao']) : '-'];
     $metaPaired[] = [$L['estado'], ucfirst($data['estado'])];
-    $metaPaired[] = [$L['elaborado_por'], san($data['criado_por_nome'] ?? '-')];
-    // Aprovação no cabeçalho
-    if ($aceite) {
-        $corDec = $aceite['tipo_decisao'] === 'aceite' ? '#16a34a' : '#dc2626';
-        $txtDec = $aceite['tipo_decisao'] === 'aceite' ? 'Aceite' : 'Rejeitado';
-        $metaPaired[] = [$L['aprovacao'], '<span style="color:' . $corDec . '; font-weight:bold;">' . $txtDec . '</span> — ' . san($aceite['nome_signatario']) . ' ' . date('d/m/Y', strtotime($aceite['created_at']))];
-    }
+    $metaPaired[] = [$L['elaborado_por'], san($elaboradoNome ?: ($data['criado_por_nome'] ?? '-'))];
     $html .= '<div class="meta-box"><table class="meta-grid">';
     foreach ($metaFull as $item) {
         $html .= '<tr><td colspan="2"><span class="meta-label">' . $item[0] . ':</span> <span class="meta-value">' . $item[1] . '</span></td></tr>';
     }
     for ($mi = 0; $mi < count($metaPaired); $mi += 2) {
-        $html .= '<tr><td width="50%"><span class="meta-label">' . $metaPaired[$mi][0] . ':</span> <span class="meta-value">' . $metaPaired[$mi][1] . '</span></td>';
-        if (isset($metaPaired[$mi + 1])) {
-            $html .= '<td width="50%"><span class="meta-label">' . $metaPaired[$mi + 1][0] . ':</span> <span class="meta-value">' . $metaPaired[$mi + 1][1] . '</span></td>';
-        } else {
-            $html .= '<td></td>';
-        }
+        $left = $metaPaired[$mi];
+        $right = isset($metaPaired[$mi + 1]) ? $metaPaired[$mi + 1] : null;
+        $html .= '<tr>';
+        $html .= '<td width="50%"><span class="meta-label">' . $left[0] . ':</span> <span class="meta-value">' . $left[1] . '</span></td>';
+        $html .= '<td width="50%">' . ($right ? '<span class="meta-label">' . $right[0] . ':</span> <span class="meta-value">' . $right[1] . '</span>' : '') . '</td>';
         $html .= '</tr>';
     }
     $html .= '</table></div>';
+    // Bloco de aprovações separado
+    if ($aprovadoNome || $aceite) {
+        $html .= '<div style="border:0.5pt solid #e5e7eb; border-left:2pt solid ' . $corPrimaria . '; border-radius:1.5mm; padding:2mm 3mm; margin-bottom:4mm; font-size:9pt;">';
+        $html .= '<p style="font-size:7pt; text-transform:uppercase; color:#667085; letter-spacing:0.3pt; margin:0 0 1.5mm; font-weight:600;">' . $L['aprovacoes'] . '</p>';
+        $html .= '<table style="width:100%;">';
+        if ($aprovadoNome) {
+            $html .= '<tr><td><span class="meta-label">' . $L['aprovacao_interna'] . ':</span> <span class="meta-value">' . san($aprovadoNome) . '</span></td>';
+            $html .= '<td style="text-align:right; color:#888; font-size:8pt;">' . $aprovadoData . '</td></tr>';
+        }
+        if ($aceite) {
+            $lblAprov = $L['aceitacao'] . ' ' . $tipoDestinatario;
+            $corDec = $aceite['tipo_decisao'] === 'aceite' ? '#16a34a' : '#dc2626';
+            $txtDec = $aceite['tipo_decisao'] === 'aceite' ? 'Aceite' : 'Rejeitado';
+            $html .= '<tr><td><span class="meta-label">' . $lblAprov . ':</span> <span style="color:' . $corDec . '; font-weight:bold;">' . $txtDec . '</span> — ' . san($aceite['nome_signatario']) . '</td>';
+            $html .= '<td style="text-align:right; color:#888; font-size:8pt;">' . date('d/m/Y H:i', strtotime($aceite['created_at'])) . '</td></tr>';
+        }
+        $html .= '</table></div>';
+    }
 
     // Preparar lista de ficheiros válidos (antes do loop de secções)
     $validFiles = [];
@@ -522,9 +552,21 @@ if ($useMpdf) {
         $html .= '<p class="sig-pending">' . $L['pendente'] . '</p>';
     }
     $html .= '</td>';
-    // Aprovação fornecedor/cliente
+    // Aprovado por (aprovação interna)
+    if ($aprovadoNome) {
+        $html .= '<td class="sig-cell">';
+        $html .= '<p class="sig-title">' . $L['aprovado_por'] . '</p>';
+        if ($aprovadoAssinatura && file_exists(__DIR__ . '/uploads/assinaturas/' . $aprovadoAssinatura)) {
+            $html .= '<img src="' . __DIR__ . '/uploads/assinaturas/' . $aprovadoAssinatura . '" class="sig-img"><br>';
+        }
+        $html .= '<p class="sig-name">' . san($aprovadoNome) . '</p>';
+        $html .= '<p class="sig-date">' . $aprovadoData . '</p>';
+        $html .= '<p class="sig-validated">&#10003; Validado</p>';
+        $html .= '</td>';
+    }
+    // Aceitação fornecedor/cliente
     $html .= '<td class="sig-cell">';
-    $html .= '<p class="sig-title">' . $L['aprovacao'] . ' ' . $tipoDestinatario . '</p>';
+    $html .= '<p class="sig-title">' . $L['aceitacao'] . ' ' . $tipoDestinatario . '</p>';
     if ($aceite) {
         if (!empty($aceite['assinatura_signatario']) && file_exists(__DIR__ . '/uploads/assinaturas/' . $aceite['assinatura_signatario'])) {
             $html .= '<img src="' . __DIR__ . '/uploads/assinaturas/' . $aceite['assinatura_signatario'] . '" class="sig-img"><br>';

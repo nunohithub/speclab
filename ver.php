@@ -38,12 +38,12 @@ if (!isSuperAdmin() && ($data['organizacao_id'] ?? null) != $user['org_id']) {
 // Traduções dos rótulos conforme idioma da spec
 $lang = $data['idioma'] ?? 'pt';
 $labels = [
-    'pt' => ['produto'=>'Produto','cliente'=>'Cliente','fornecedor'=>'Fornecedor','emissao'=>'Emissão','revisao'=>'Revisão','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovacao'=>'Aprovação','pendente'=>'Pendente','aguarda'=>'Aguarda validação','pagina'=>'Página','de'=>'de','assinatura'=>'Assinatura / Aprovação','versao'=>'Versão','impresso'=>'Impresso'],
-    'en' => ['produto'=>'Product','cliente'=>'Client','fornecedor'=>'Supplier','emissao'=>'Issue Date','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Prepared by','aprovacao'=>'Approval','pendente'=>'Pending','aguarda'=>'Awaiting validation','pagina'=>'Page','de'=>'of','assinatura'=>'Signature / Approval','versao'=>'Version','impresso'=>'Printed'],
-    'es' => ['produto'=>'Producto','cliente'=>'Cliente','fornecedor'=>'Proveedor','emissao'=>'Emisión','revisao'=>'Revisión','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovacao'=>'Aprobación','pendente'=>'Pendiente','aguarda'=>'En espera de validación','pagina'=>'Página','de'=>'de','assinatura'=>'Firma / Aprobación','versao'=>'Versión','impresso'=>'Impreso'],
-    'fr' => ['produto'=>'Produit','cliente'=>'Client','fornecedor'=>'Fournisseur','emissao'=>'Émission','revisao'=>'Révision','estado'=>'Statut','elaborado_por'=>'Préparé par','aprovacao'=>'Approbation','pendente'=>'En attente','aguarda'=>'En attente de validation','pagina'=>'Page','de'=>'de','assinatura'=>'Signature / Approbation','versao'=>'Version','impresso'=>'Imprimé'],
-    'de' => ['produto'=>'Produkt','cliente'=>'Kunde','fornecedor'=>'Lieferant','emissao'=>'Ausgabe','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Erstellt von','aprovacao'=>'Genehmigung','pendente'=>'Ausstehend','aguarda'=>'Warten auf Validierung','pagina'=>'Seite','de'=>'von','assinatura'=>'Unterschrift / Genehmigung','versao'=>'Version','impresso'=>'Gedruckt'],
-    'it' => ['produto'=>'Prodotto','cliente'=>'Cliente','fornecedor'=>'Fornitore','emissao'=>'Emissione','revisao'=>'Revisione','estado'=>'Stato','elaborado_por'=>'Preparato da','aprovacao'=>'Approvazione','pendente'=>'In sospeso','aguarda'=>'In attesa di validazione','pagina'=>'Pagina','de'=>'di','assinatura'=>'Firma / Approvazione','versao'=>'Versione','impresso'=>'Stampato'],
+    'pt' => ['produto'=>'Produto','cliente'=>'Cliente','fornecedor'=>'Fornecedor','emissao'=>'Emissão','revisao'=>'Revisão','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovado_por'=>'Aprovado por','aprovacao'=>'Aprovação','aprovacoes'=>'Aprovações','aprovacao_interna'=>'Aprovação Interna','aceitacao'=>'Aceitação','pendente'=>'Pendente','aguarda'=>'Aguarda validação','pagina'=>'Página','de'=>'de','assinatura'=>'Assinatura / Aprovação','versao'=>'Versão','impresso'=>'Impresso'],
+    'en' => ['produto'=>'Product','cliente'=>'Client','fornecedor'=>'Supplier','emissao'=>'Issue Date','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Prepared by','aprovado_por'=>'Approved by','aprovacao'=>'Approval','aprovacoes'=>'Approvals','aprovacao_interna'=>'Internal Approval','aceitacao'=>'Acceptance','pendente'=>'Pending','aguarda'=>'Awaiting validation','pagina'=>'Page','de'=>'of','assinatura'=>'Signature / Approval','versao'=>'Version','impresso'=>'Printed'],
+    'es' => ['produto'=>'Producto','cliente'=>'Cliente','fornecedor'=>'Proveedor','emissao'=>'Emisión','revisao'=>'Revisión','estado'=>'Estado','elaborado_por'=>'Elaborado por','aprovado_por'=>'Aprobado por','aprovacao'=>'Aprobación','aprovacoes'=>'Aprobaciones','aprovacao_interna'=>'Aprobación Interna','aceitacao'=>'Aceptación','pendente'=>'Pendiente','aguarda'=>'En espera de validación','pagina'=>'Página','de'=>'de','assinatura'=>'Firma / Aprobación','versao'=>'Versión','impresso'=>'Impreso'],
+    'fr' => ['produto'=>'Produit','cliente'=>'Client','fornecedor'=>'Fournisseur','emissao'=>'Émission','revisao'=>'Révision','estado'=>'Statut','elaborado_por'=>'Préparé par','aprovado_por'=>'Approuvé par','aprovacao'=>'Approbation','aprovacoes'=>'Approbations','aprovacao_interna'=>'Approbation Interne','aceitacao'=>'Acceptation','pendente'=>'En attente','aguarda'=>'En attente de validation','pagina'=>'Page','de'=>'de','assinatura'=>'Signature / Approbation','versao'=>'Version','impresso'=>'Imprimé'],
+    'de' => ['produto'=>'Produkt','cliente'=>'Kunde','fornecedor'=>'Lieferant','emissao'=>'Ausgabe','revisao'=>'Revision','estado'=>'Status','elaborado_por'=>'Erstellt von','aprovado_por'=>'Genehmigt von','aprovacao'=>'Genehmigung','aprovacoes'=>'Freigaben','aprovacao_interna'=>'Interne Freigabe','aceitacao'=>'Annahme','pendente'=>'Ausstehend','aguarda'=>'Warten auf Validierung','pagina'=>'Seite','de'=>'von','assinatura'=>'Unterschrift / Genehmigung','versao'=>'Version','impresso'=>'Gedruckt'],
+    'it' => ['produto'=>'Prodotto','cliente'=>'Cliente','fornecedor'=>'Fornitore','emissao'=>'Emissione','revisao'=>'Revisione','estado'=>'Stato','elaborado_por'=>'Preparato da','aprovado_por'=>'Approvato da','aprovacao'=>'Approvazione','aprovacoes'=>'Approvazioni','aprovacao_interna'=>'Approvazione Interna','aceitacao'=>'Accettazione','pendente'=>'In sospeso','aguarda'=>'In attesa di validazione','pagina'=>'Pagina','de'=>'di','assinatura'=>'Firma / Approvazione','versao'=>'Versione','impresso'=>'Stampato'],
 ];
 $L = $labels[$lang] ?? $labels['pt'];
 
@@ -69,6 +69,30 @@ $stmtPedResp = $db->prepare('SELECT r.*, p.titulo as pedido_titulo FROM especifi
 $stmtPedResp->execute([$id]);
 while ($pr = $stmtPedResp->fetch(PDO::FETCH_ASSOC)) {
     $pedidoRespostas[$pr['token_id']][] = $pr;
+}
+
+// Dados de validação interna (elaborado + aprovado)
+$elaboradoNome = ''; $elaboradoData = ''; $elaboradoAssinatura = '';
+if (!empty($data['publicado_por'])) {
+    $stmtElab = $db->prepare('SELECT nome, assinatura FROM utilizadores WHERE id = ?');
+    $stmtElab->execute([$data['publicado_por']]);
+    $elab = $stmtElab->fetch();
+    if ($elab) {
+        $elaboradoNome = $elab['nome'];
+        $elaboradoAssinatura = $elab['assinatura'] ?? '';
+        $elaboradoData = !empty($data['publicado_em']) ? date('d/m/Y H:i', strtotime($data['publicado_em'])) : '';
+    }
+}
+$aprovadoNome = ''; $aprovadoData = ''; $aprovadoAssinatura = '';
+if (!empty($data['aprovado_por'])) {
+    $stmtAprovInt = $db->prepare('SELECT nome, assinatura FROM utilizadores WHERE id = ?');
+    $stmtAprovInt->execute([$data['aprovado_por']]);
+    $apInt = $stmtAprovInt->fetch();
+    if ($apInt) {
+        $aprovadoNome = $apInt['nome'];
+        $aprovadoAssinatura = $apInt['assinatura'] ?? '';
+        $aprovadoData = !empty($data['aprovado_em']) ? date('d/m/Y H:i', strtotime($data['aprovado_em'])) : '';
+    }
 }
 
 $cores = getOrgColors($org);
@@ -121,11 +145,25 @@ $subBold = ($cv['subtitulos_bold'] ?? '1') === '1' ? 'bold' : 'normal';
         .doc-meta {
             display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
             background: #f3f4f6; padding: 12px; border-radius: 8px; font-size: 12px;
-            margin-bottom: 24px;
+            margin-bottom: 10px;
         }
         .doc-meta .meta-full { grid-column: 1 / -1; }
+        .doc-meta .meta-right { grid-column: 2; }
         .doc-meta strong { color: #111827; }
         .doc-meta span { color: #667085; }
+        .doc-meta .meta-produto strong { font-size: 14px; }
+        .doc-approvals {
+            background: #ffffff; border: 1px solid #e5e7eb; border-left: 3px solid <?= $corPrimaria ?>;
+            border-radius: 6px; padding: 10px 16px; margin-bottom: 24px; font-size: 12px;
+        }
+        .doc-approvals .approvals-title {
+            font-size: 10px; text-transform: uppercase; color: #667085;
+            letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600;
+        }
+        .doc-approvals .approval-item { padding: 3px 0; display: flex; justify-content: space-between; align-items: baseline; }
+        .doc-approvals .approval-item span { color: #667085; }
+        .doc-approvals .approval-item strong { color: #111827; }
+        .doc-approvals .approval-date { color: #888; font-size: 11px; }
         .doc-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12px; }
         .doc-table th {
             background: <?= $corPrimaria ?>; color: white; padding: 8px 10px;
@@ -275,38 +313,53 @@ if (!empty($data['seccoes'])) {
 
             <!-- Meta -->
             <div class="doc-meta">
-                <div class="meta-full"><span><?= $L['produto'] ?>:</span> <strong><?= san($data['produto_nome'] ?? '-') ?></strong></div>
-                <?php if ($temClientes): ?>
+                <div class="meta-full meta-produto"><span><?= $L['produto'] ?>:</span> <strong><?= san($data['produto_nome'] ?? '-') ?></strong></div>
+                <?php if ($temClientes && $temFornecedores): ?>
+                <div><span><?= $L['cliente'] ?>:</span> <strong><?= san($data['cliente_nome'] ?? 'Geral') ?></strong></div>
+                <div><span><?= $L['fornecedor'] ?>:</span> <strong><?= san($fornecedorDisplay) ?></strong></div>
+                <?php elseif ($temClientes): ?>
                 <div class="meta-full"><span><?= $L['cliente'] ?>:</span> <strong><?= san($data['cliente_nome'] ?? 'Geral') ?></strong></div>
-                <?php endif; ?>
-                <?php if ($temFornecedores): ?>
+                <?php elseif ($temFornecedores): ?>
                 <div class="meta-full"><span><?= $L['fornecedor'] ?>:</span> <strong><?= san($fornecedorDisplay) ?></strong></div>
                 <?php endif; ?>
                 <div><span><?= $L['emissao'] ?>:</span> <strong><?= formatDate($data['data_emissao']) ?></strong></div>
                 <div><span><?= $L['revisao'] ?>:</span> <strong><?= $data['data_revisao'] ? formatDate($data['data_revisao']) : '-' ?></strong></div>
                 <div><span><?= $L['estado'] ?>:</span> <strong><?= ucfirst($data['estado']) ?></strong></div>
-                <div><span>Criado por:</span> <strong><?= san($data['criado_por_nome'] ?? '-') ?></strong></div>
+                <div><span><?= $L['elaborado_por'] ?>:</span> <strong><?= san($elaboradoNome ?: ($data['criado_por_nome'] ?? '-')) ?></strong></div>
+            </div>
+            <?php if ($aprovadoNome || !empty($aprovacoes)): ?>
+            <div class="doc-approvals">
+                <div class="approvals-title"><?= $L['aprovacoes'] ?></div>
+                <?php if ($aprovadoNome): ?>
+                <div class="approval-item">
+                    <div><span><?= $L['aprovacao_interna'] ?>:</span> <strong><?= san($aprovadoNome) ?></strong></div>
+                    <span class="approval-date"><?= $aprovadoData ?></span>
+                </div>
+                <?php endif; ?>
                 <?php if (!empty($aprovacoes)): ?>
                 <?php foreach ($aprovacoes as $aprov): ?>
-                <div class="meta-full" style="margin-top:4px;">
-                    <span><?= $aprov['tipo_destinatario'] === 'fornecedor' ? $L['fornecedor'] : ($aprov['tipo_destinatario'] === 'cliente' ? $L['cliente'] : $L['aprovacao']) ?>:</span>
-                    <strong style="color:<?= $aprov['tipo_decisao'] === 'aceite' ? '#16a34a' : '#dc2626' ?>">
-                        <?= $aprov['tipo_decisao'] === 'aceite' ? 'Aceite' : 'Rejeitado' ?>
-                    </strong>
-                    — <?= san($aprov['nome_signatario']) ?>
-                    <?= $aprov['cargo_signatario'] ? '(' . san($aprov['cargo_signatario']) . ')' : '' ?>
-                    <span style="color:#888; font-size:11px;"><?= date('d/m/Y', strtotime($aprov['created_at'])) ?></span>
-                    <?php if (!empty($pedidoRespostas[$aprov['token_id']])): ?>
-                        <?php foreach ($pedidoRespostas[$aprov['token_id']] as $pResp): ?>
-                        <a href="<?= BASE_PATH ?>/api.php?action=download_pedido_resposta&id=<?= $pResp['id'] ?>" target="_blank" style="margin-left:8px; font-size:11px; color:#2596be; text-decoration:underline;" title="<?= sanitize($pResp['pedido_titulo']) ?>">
-                            &#128206; <?= sanitize($pResp['nome_ficheiro']) ?>
-                        </a>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
+                <?php $lblTipo = $L['aceitacao'] . ' ' . ($aprov['tipo_destinatario'] === 'fornecedor' ? $L['fornecedor'] : $L['cliente']); ?>
+                <div class="approval-item">
+                    <div>
+                        <span><?= $lblTipo ?>:</span>
+                        <strong style="color:<?= $aprov['tipo_decisao'] === 'aceite' ? '#16a34a' : '#dc2626' ?>">
+                            <?= $aprov['tipo_decisao'] === 'aceite' ? 'Aceite' : 'Rejeitado' ?>
+                        </strong>
+                        — <?= san($aprov['nome_signatario']) ?>
+                        <?php if (!empty($pedidoRespostas[$aprov['token_id']])): ?>
+                            <?php foreach ($pedidoRespostas[$aprov['token_id']] as $pResp): ?>
+                            <a href="<?= BASE_PATH ?>/api.php?action=download_pedido_resposta&id=<?= $pResp['id'] ?>" target="_blank" style="margin-left:8px; font-size:11px; color:#2596be; text-decoration:underline;" title="<?= sanitize($pResp['pedido_titulo']) ?>">
+                                &#128206; <?= sanitize($pResp['nome_ficheiro']) ?>
+                            </a>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                    <span class="approval-date"><?= date('d/m/Y H:i', strtotime($aprov['created_at'])) ?></span>
                 </div>
                 <?php endforeach; ?>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
 
             <?php /* $navItems, $validFilesVer, $ficheirosPos já preparados antes do body */ ?>
 
@@ -457,6 +510,50 @@ if (!empty($data['seccoes'])) {
             <?php endif; ?>
 
 
+
+            <?php if ($data['estado'] === 'ativo'): ?>
+            <div style="margin-top:40px; padding-top:20px; border-top:1px solid #e5e7eb; display:flex; gap:24px; justify-content:center; text-align:center;">
+                <div style="flex:1; max-width:220px;">
+                    <p style="font-weight:600; color:<?= $corPrimaria ?>; margin:0 0 8px; font-size:13px;"><?= $L['elaborado_por'] ?></p>
+                    <?php if ($elaboradoAssinatura && file_exists(__DIR__ . '/uploads/assinaturas/' . $elaboradoAssinatura)): ?>
+                    <img src="<?= BASE_PATH ?>/uploads/assinaturas/<?= $elaboradoAssinatura ?>" style="max-height:40px; margin-bottom:4px;" alt="">
+                    <?php endif; ?>
+                    <?php if ($elaboradoNome): ?>
+                    <p style="margin:0; font-size:12px; border-top:1px solid #ccc; padding-top:6px;"><?= san($elaboradoNome) ?></p>
+                    <p style="margin:2px 0 0; font-size:11px; color:#888;"><?= $elaboradoData ?></p>
+                    <p style="margin:2px 0 0; font-size:11px; color:#16a34a;">&#10003; Validado</p>
+                    <?php else: ?>
+                    <p style="margin:0; font-size:12px; color:#888;"><?= $L['pendente'] ?></p>
+                    <?php endif; ?>
+                </div>
+                <?php if ($aprovadoNome): ?>
+                <div style="flex:1; max-width:220px;">
+                    <p style="font-weight:600; color:<?= $corPrimaria ?>; margin:0 0 8px; font-size:13px;"><?= $L['aprovado_por'] ?></p>
+                    <?php if ($aprovadoAssinatura && file_exists(__DIR__ . '/uploads/assinaturas/' . $aprovadoAssinatura)): ?>
+                    <img src="<?= BASE_PATH ?>/uploads/assinaturas/<?= $aprovadoAssinatura ?>" style="max-height:40px; margin-bottom:4px;" alt="">
+                    <?php endif; ?>
+                    <p style="margin:0; font-size:12px; border-top:1px solid #ccc; padding-top:6px;"><?= san($aprovadoNome) ?></p>
+                    <p style="margin:2px 0 0; font-size:11px; color:#888;"><?= $aprovadoData ?></p>
+                    <p style="margin:2px 0 0; font-size:11px; color:#16a34a;">&#10003; Validado</p>
+                </div>
+                <?php endif; ?>
+                <?php if (!empty($aprovacoes)): ?>
+                <?php $lastAceite = $aprovacoes[0]; ?>
+                <div style="flex:1; max-width:220px;">
+                    <p style="font-weight:600; color:<?= $corPrimaria ?>; margin:0 0 8px; font-size:13px;"><?= $L['aceitacao'] ?> <?= $lastAceite['tipo_destinatario'] === 'cliente' ? $L['cliente'] : $L['fornecedor'] ?></p>
+                    <p style="margin:0; font-size:12px; border-top:1px solid #ccc; padding-top:6px;"><?= san($lastAceite['nome_signatario']) ?></p>
+                    <?php if ($lastAceite['cargo_signatario']): ?><p style="margin:2px 0 0; font-size:11px; color:#888;"><?= san($lastAceite['cargo_signatario']) ?></p><?php endif; ?>
+                    <p style="margin:2px 0 0; font-size:11px; color:#888;"><?= date('d/m/Y H:i', strtotime($lastAceite['created_at'])) ?></p>
+                    <p style="margin:2px 0 0; font-size:11px; color:<?= $lastAceite['tipo_decisao'] === 'aceite' ? '#16a34a' : '#dc2626' ?>;">&#10003; <?= $lastAceite['tipo_decisao'] === 'aceite' ? 'Validado' : 'Rejeitado' ?></p>
+                </div>
+                <?php else: ?>
+                <div style="flex:1; max-width:220px;">
+                    <p style="font-weight:600; color:<?= $corPrimaria ?>; margin:0 0 8px; font-size:13px;"><?= $L['aprovacao'] ?></p>
+                    <p style="margin:0; font-size:12px; color:#888;"><?= $L['aguarda'] ?></p>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
 
             <div class="doc-footer">
                 <span>&copy; <?= sanitize($orgNome) ?> <?= date('Y') ?></span>
