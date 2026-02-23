@@ -2235,7 +2235,7 @@ $breadcrumbs = [
                 editor.on('dirty', function() { editor.setDirty(false); });
             },
             plugins: 'lists link table code wordcount paste lineheight',
-            toolbar: 'fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright | lineheight bullist numlist | table link',
+            toolbar: 'fontsize | bold italic underline | forecolor | alignleft aligncenter alignright | bullist numlist | table link',
             toolbar_mode: 'floating',
             font_family_formats: 'Arial=arial,helvetica,sans-serif; Calibri=calibri,sans-serif; Georgia=georgia,serif; Helvetica=helvetica; Roboto=roboto,sans-serif; Segoe UI=segoe ui; Tahoma=tahoma; Times New Roman=times new roman,serif; Verdana=verdana',
             font_size_formats: '8pt 9pt 10pt 11pt 12pt 14pt 16pt 18pt 20pt 24pt 36pt',

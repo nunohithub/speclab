@@ -108,6 +108,20 @@ if ($search) {
 
 $whereSQL = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
+// Paginação
+$perPage = 25;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$stmtCount = $db->prepare("
+    SELECT COUNT(*) FROM especificacoes e
+    LEFT JOIN clientes c ON e.cliente_id = c.id
+    $whereSQL
+");
+$stmtCount->execute($params);
+$totalRows = (int)$stmtCount->fetchColumn();
+$totalPages = max(1, ceil($totalRows / $perPage));
+$page = min($page, $totalPages);
+$offset = ($page - 1) * $perPage;
+
 $stmt = $db->prepare("
     SELECT e.*,
            (SELECT GROUP_CONCAT(p.nome ORDER BY p.nome SEPARATOR ', ')
@@ -127,6 +141,7 @@ $stmt = $db->prepare("
     LEFT JOIN organizacoes org ON e.organizacao_id = org.id
     $whereSQL
     ORDER BY e.updated_at DESC
+    LIMIT $perPage OFFSET $offset
 ");
 $stmt->execute($params);
 $especificacoes = $stmt->fetchAll();
@@ -188,6 +203,10 @@ $breadcrumbs = [];
     <?php include __DIR__ . '/includes/header.php'; ?>
 
     <div class="container">
+        <nav class="breadcrumbs" aria-label="Navegação">
+            <span class="breadcrumb-current">Dashboard</span>
+        </nav>
+
         <!-- STATS -->
         <div class="stats-grid">
             <div class="stat-card">
@@ -295,8 +314,14 @@ $breadcrumbs = [];
             <?php if (empty($especificacoes)): ?>
                 <div class="empty-state">
                     <div class="icon">&#128196;</div>
-                    <h3>Nenhuma especificação encontrada</h3>
-                    <p class="muted">Crie a primeira especificação clicando no botão acima.</p>
+                    <?php if ($search || $filtro_estado || $filtro_produto || $filtro_cliente || $filtro_fornecedor || $filtro_org): ?>
+                        <h3>Nenhum resultado para os filtros aplicados</h3>
+                        <p class="muted">Tente alterar os critérios de pesquisa ou <a href="<?= BASE_PATH ?>/dashboard.php">limpar todos os filtros</a>.</p>
+                    <?php else: ?>
+                        <h3>Ainda não tem especificações</h3>
+                        <p class="muted">Comece criando a sua primeira especificação técnica.</p>
+                        <a href="<?= BASE_PATH ?>/especificacao.php?novo=1" class="btn btn-primary" style="margin-top:12px;">+ Nova Especificação</a>
+                    <?php endif; ?>
                 </div>
             <?php else: ?>
                 <div class="table-wrap">
@@ -384,6 +409,24 @@ $breadcrumbs = [];
                 </div>
             <?php endif; ?>
         </div>
+
+        <?php if ($totalPages > 1): ?>
+        <div class="pagination">
+            <?php
+            $queryParams = $_GET;
+            unset($queryParams['page']);
+            $qs = http_build_query($queryParams);
+            $baseUrl = BASE_PATH . '/dashboard.php?' . ($qs ? $qs . '&' : '');
+            ?>
+            <?php if ($page > 1): ?>
+                <a href="<?= $baseUrl ?>page=<?= $page - 1 ?>" class="btn btn-ghost btn-sm">&laquo; Anterior</a>
+            <?php endif; ?>
+            <span class="pagination-info">Página <?= $page ?> de <?= $totalPages ?> (<?= $totalRows ?> especificações)</span>
+            <?php if ($page < $totalPages): ?>
+                <a href="<?= $baseUrl ?>page=<?= $page + 1 ?>" class="btn btn-ghost btn-sm">Seguinte &raquo;</a>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
     </div>
 
     <div id="toast-container" class="toast-container"></div>

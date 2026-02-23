@@ -537,6 +537,12 @@ $breadcrumbs = [
     <?php include __DIR__ . '/includes/header.php'; ?>
 
     <div class="container">
+        <nav class="breadcrumbs" aria-label="Navegação">
+            <a href="<?= BASE_PATH ?>/dashboard.php" class="breadcrumb-link">Dashboard</a>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current"><?= sanitize($tabLabels[$tab] ?? 'Administração') ?></span>
+        </nav>
+
         <?php if ($msg): ?>
             <div class="alert <?= $msgType === 'error' ? 'alert-error' : 'alert-success' ?>"><?= sanitize($msg) ?></div>
         <?php endif; ?>
