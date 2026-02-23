@@ -947,7 +947,7 @@ $breadcrumbs = [
         <div class="sticky-header no-print">
         <div class="editor-toolbar">
             <div class="left">
-                <a href="<?= BASE_PATH ?>/dashboard.php" class="btn btn-ghost btn-sm" title="Voltar ao Dashboard">&larr; Voltar</a>
+                <a href="<?= BASE_PATH ?>/dashboard.php" class="btn btn-ghost btn-sm" title="Voltar ao Dashboard" onclick="return verificarSaidaPagina(this.href)">&larr; Voltar</a>
                 <h2><?= $saOutraOrg ? 'Ver Especificação' : ($isNew ? 'Nova Especificação' : 'Editar Especificação') ?></h2>
                 <span class="pill <?= $espec['estado'] === 'ativo' ? 'pill-success' : ($espec['estado'] === 'rascunho' ? 'pill-warning' : ($espec['estado'] === 'em_revisao' ? 'pill-info' : 'pill-muted')) ?>" id="estadoPill">
                     <?= $espec['estado'] === 'em_revisao' ? 'Em Revisão' : ucfirst($espec['estado']) ?>
@@ -5304,17 +5304,17 @@ $breadcrumbs = [
     })();
     <?php endif; ?>
 
-    // Avisar antes de sair se houver alterações pendentes
-    // Fallback: beforeunload para fechar separador/browser (modal nativo inevitável)
-    window.addEventListener('beforeunload', function(e) {
-        if (isDirty && !versaoBloqueada) {
-            e.preventDefault();
-            e.returnValue = '';
-        }
-    });
-
-    // Modal personalizado para navegação interna
+    // Modal personalizado para navegação (sem beforeunload nativo)
     var _unsavedPendingUrl = null;
+
+    function verificarSaidaPagina(url) {
+        if (!isDirty || versaoBloqueada) return true;
+        _unsavedPendingUrl = url || null;
+        var m = document.getElementById('unsavedModal');
+        m.classList.remove('hidden');
+        m.style.display = 'flex';
+        return false;
+    }
 
     function fecharUnsavedModal() {
         var m = document.getElementById('unsavedModal');
@@ -5335,14 +5335,16 @@ $breadcrumbs = [
         }
     }
 
-    function mostrarUnsavedModal(url) {
-        _unsavedPendingUrl = url || null;
-        var m = document.getElementById('unsavedModal');
-        m.classList.remove('hidden');
-        m.style.display = 'flex';
-    }
+    // Interceptar botão voltar do browser
+    history.pushState(null, '', location.href);
+    window.addEventListener('popstate', function(e) {
+        if (isDirty && !versaoBloqueada) {
+            history.pushState(null, '', location.href);
+            verificarSaidaPagina(null);
+        }
+    });
 
-    // Interceptar links internos
+    // Interceptar TODOS os links da página (header, nav, breadcrumbs, etc.)
     document.addEventListener('click', function(e) {
         if (versaoBloqueada || !isDirty) return;
         var link = e.target.closest('a[href]');
@@ -5350,17 +5352,9 @@ $breadcrumbs = [
         var href = link.getAttribute('href');
         if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
         if (link.target === '_blank') return;
+        if (link.getAttribute('onclick')) return; // já tem handler próprio (ex: Voltar)
         e.preventDefault();
-        mostrarUnsavedModal(href);
-    });
-
-    // Interceptar botão voltar do browser
-    history.pushState(null, '', location.href);
-    window.addEventListener('popstate', function(e) {
-        if (isDirty && !versaoBloqueada) {
-            history.pushState(null, '', location.href);
-            mostrarUnsavedModal(null);
-        }
+        verificarSaidaPagina(href);
     });
 
     // Atalho de teclado: Ctrl+S para guardar
@@ -5707,6 +5701,10 @@ $breadcrumbs = [
     }
 
     function reloadToTab(tab) {
+        if (isDirty && !versaoBloqueada) {
+            if (!confirm('Tem alterações por guardar. Deseja continuar?')) return;
+            isDirty = false;
+        }
         var url = window.location.pathname + window.location.search;
         url += (url.indexOf('#') > -1 ? '' : '#tab-') + tab;
         window.location.href = url.replace(/#.*/, '#tab-' + tab);
