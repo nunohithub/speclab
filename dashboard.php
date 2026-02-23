@@ -387,7 +387,7 @@ $breadcrumbs = [];
                                     <td>
                                         <div class="flex gap-sm">
                                             <a href="<?= BASE_PATH ?>/especificacao.php?id=<?= $e['id'] ?>" class="btn btn-ghost btn-sm" title="Editar">&#9998;</a>
-                                            <a href="<?= BASE_PATH ?>/ver.php?id=<?= $e['id'] ?>" class="btn btn-ghost btn-sm" title="Ver" target="_blank">&#128065;</a>
+                                            <button class="btn btn-ghost btn-sm" title="Pré-visualizar" onclick="previewEspec(<?= $e['id'] ?>)">&#128065;</button>
                                             <a href="<?= BASE_PATH ?>/pdf.php?id=<?= $e['id'] ?>" class="btn btn-ghost btn-sm" title="PDF" target="_blank">&#128196;</a>
                                             <button class="btn btn-ghost btn-sm" title="Duplicar" onclick="duplicarEspec(<?= $e['id'] ?>, '<?= sanitize($e['numero']) ?>')">&#128203;</button>
                                             <?php if ($e['codigo_acesso']): ?>
@@ -534,11 +534,35 @@ $breadcrumbs = [];
         filtrarTabela();
     }
 
+    // Pré-visualização rápida
+    function previewEspec(id) {
+        var modal = document.getElementById('previewModal');
+        var iframe = document.getElementById('previewIframe');
+        iframe.src = '<?= BASE_PATH ?>/ver.php?id=' + id + '&embed=1';
+        modal.style.display = 'flex';
+    }
+    function fecharPreview() {
+        var modal = document.getElementById('previewModal');
+        modal.style.display = 'none';
+        document.getElementById('previewIframe').src = '';
+    }
+
     // Aplicar filtros iniciais se houver
     <?php if ($search || $filtro_estado): ?>
     document.addEventListener('DOMContentLoaded', filtrarTabela);
     <?php endif; ?>
     </script>
+
+    <!-- Modal Pré-visualização -->
+    <div id="previewModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)fecharPreview();">
+        <div class="modal" style="width:90%; max-width:900px; height:85vh; display:flex; flex-direction:column;">
+            <div class="modal-header">
+                <h3>Pré-visualização</h3>
+                <button class="btn btn-ghost btn-sm" onclick="fecharPreview()">&times;</button>
+            </div>
+            <iframe id="previewIframe" style="flex:1; border:none; border-radius:0 0 var(--radius) var(--radius);" src=""></iframe>
+        </div>
+    </div>
     <?php include __DIR__ . '/includes/modals.php'; ?>
     <?php include __DIR__ . '/includes/footer.php'; ?>
 </body>

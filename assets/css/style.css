@@ -845,6 +845,20 @@ tr:hover { background: var(--color-primary-lighter); }
 
 .remove-btn:hover { background: rgba(180, 35, 24, 0.1); }
 
+/* ---- DRAG AND DROP ---- */
+.drag-handle {
+    cursor: grab;
+    color: var(--color-muted);
+    font-size: 16px;
+    padding: 0 4px;
+    user-select: none;
+    opacity: 0.5;
+    transition: opacity var(--transition-fast);
+}
+.drag-handle:hover { opacity: 1; }
+.seccao-block.dragging { opacity: 0.4; }
+.seccao-block.drag-over { border-top: 3px solid var(--color-primary); }
+
 /* ---- SECTION EDITOR ---- */
 .section-block {
     background: var(--color-bg);

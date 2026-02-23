@@ -3282,6 +3282,91 @@ $breadcrumbs = [
     }
 
     // ============================================================
+    // DRAG AND DROP SECTIONS
+    // ============================================================
+    (function() {
+        var container = document.getElementById('seccoesContainer');
+        if (!container) return;
+        var dragBlock = null;
+
+        function initDragHandles() {
+            container.querySelectorAll('.seccao-block').forEach(function(block) {
+                if (block.getAttribute('data-drag-init')) return;
+                block.setAttribute('data-drag-init', '1');
+                block.setAttribute('draggable', 'true');
+
+                var header = block.querySelector('.seccao-header');
+                if (header && !header.querySelector('.drag-handle')) {
+                    var handle = document.createElement('span');
+                    handle.className = 'drag-handle';
+                    handle.innerHTML = '&#9776;';
+                    handle.title = 'Arrastar para reordenar';
+                    header.insertBefore(handle, header.firstChild);
+                }
+
+                block.addEventListener('dragstart', function(e) {
+                    dragBlock = block;
+                    block.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    container.querySelectorAll('.seccao-block[data-tipo="texto"]').forEach(function(b) {
+                        var ta = b.querySelector('.seccao-editor');
+                        if (ta && tinyEditors[ta.id]) tinyEditors[ta.id].save();
+                    });
+                });
+
+                block.addEventListener('dragend', function() {
+                    block.classList.remove('dragging');
+                    container.querySelectorAll('.seccao-block').forEach(function(b) { b.classList.remove('drag-over'); });
+                    dragBlock = null;
+                });
+
+                block.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (block !== dragBlock) block.classList.add('drag-over');
+                });
+
+                block.addEventListener('dragleave', function() {
+                    block.classList.remove('drag-over');
+                });
+
+                block.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    if (!dragBlock || dragBlock === block) return;
+                    block.classList.remove('drag-over');
+
+                    container.querySelectorAll('.seccao-block[data-tipo="texto"]').forEach(function(b) {
+                        var ta = b.querySelector('.seccao-editor');
+                        if (ta && tinyEditors[ta.id]) {
+                            tinymce.get(ta.id).remove();
+                            delete tinyEditors[ta.id];
+                        }
+                    });
+
+                    var rect = block.getBoundingClientRect();
+                    if (e.clientY < rect.top + rect.height / 2) {
+                        container.insertBefore(dragBlock, block);
+                    } else {
+                        container.insertBefore(dragBlock, block.nextSibling);
+                    }
+
+                    container.querySelectorAll('.seccao-block[data-tipo="texto"]').forEach(function(b) {
+                        var ta = b.querySelector('.seccao-editor');
+                        if (ta) initSeccaoEditor(ta.id);
+                    });
+
+                    renumerarSeccoes();
+                    marcarAlterado();
+                });
+            });
+        }
+
+        initDragHandles();
+        var observer = new MutationObserver(function() { setTimeout(initDragHandles, 100); });
+        observer.observe(container, { childList: true });
+    })();
+
+    // ============================================================
     // IA ASSISTENTE (OpenAI)
     // ============================================================
     var aiCurrentBlock = null;

@@ -81,7 +81,11 @@ switch ($action) {
         if (!publicarVersao($db, $id, $user['id'], $notas ?: null)) {
             jsonError('Nao foi possivel publicar. Versao ja bloqueada ou nao encontrada.');
         }
-        jsonSuccess('Versao publicada.');
+        // Notificar fornecedores
+        require_once __DIR__ . '/../includes/email.php';
+        $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . BASE_PATH;
+        $notifResult = enviarNotificacaoPublicacao($db, $id, $baseUrl, $user['id']);
+        jsonSuccess('Versao publicada.' . ($notifResult['message'] ? ' ' . $notifResult['message'] : ''));
         break;
 
     // ===================================================================

@@ -15,6 +15,7 @@ header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
 
 $user = getCurrentUser();
 $db = getDB();
+$isEmbed = !empty($_GET['embed']);
 
 $id = (int)($_GET['id'] ?? 0);
 if (!$id) {
@@ -238,7 +239,7 @@ if (!empty($data['seccoes'])) {
     <div class="doc-container">
 
         <!-- Toolbar -->
-        <div class="toolbar no-print">
+        <div class="toolbar no-print" <?= $isEmbed ? 'style="display:none;"' : '' ?>>
             <div class="flex gap-sm">
                 <a href="<?= BASE_PATH ?>/dashboard.php" class="btn btn-ghost btn-sm">&larr; Voltar</a>
                 <a href="<?= BASE_PATH ?>/especificacao.php?id=<?= $data['id'] ?>" class="btn btn-secondary btn-sm">&#9998; Editar</a>

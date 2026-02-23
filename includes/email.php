@@ -439,3 +439,52 @@ function enviarNotificacaoRevisao(PDO $db, int $especId, array $adminIds, string
     if ($enviados === 0 && !empty($erros)) return ['success' => false, 'error' => 'Não foi possível notificar nenhum admin.'];
     return ['success' => true, 'message' => "Submetida para revisão. $enviados admin(s) notificado(s)."];
 }
+
+/**
+ * Envia notificação de publicação aos fornecedores vinculados
+ */
+function enviarNotificacaoPublicacao(PDO $db, int $especId, string $baseUrl, int $publicadoPor): array {
+    $stmt = $db->prepare('SELECT titulo, numero, versao, codigo_acesso FROM especificacoes WHERE id = ?');
+    $stmt->execute([$especId]);
+    $espec = $stmt->fetch();
+    if (!$espec) return ['success' => false, 'error' => 'Especificação não encontrada.'];
+
+    $stmtForn = $db->prepare('
+        SELECT DISTINCT f.nome, fe.email
+        FROM especificacao_fornecedores ef
+        INNER JOIN fornecedores f ON ef.fornecedor_id = f.id
+        LEFT JOIN fornecedor_emails fe ON fe.fornecedor_id = f.id
+        WHERE ef.especificacao_id = ? AND fe.email IS NOT NULL AND fe.email != ""
+    ');
+    $stmtForn->execute([$especId]);
+    $fornecedores = $stmtForn->fetchAll();
+
+    if (empty($fornecedores)) return ['success' => true, 'message' => 'Publicada. Nenhum fornecedor para notificar.'];
+
+    $link = $espec['codigo_acesso']
+        ? rtrim($baseUrl, '/') . '/publico.php?code=' . $espec['codigo_acesso']
+        : rtrim($baseUrl, '/') . '/ver.php?id=' . $especId;
+
+    $enviados = 0;
+    foreach ($fornecedores as $forn) {
+        if (!filter_var($forn['email'], FILTER_VALIDATE_EMAIL)) continue;
+
+        $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">';
+        $html .= '<div style="border-bottom: 3px solid #2596be; padding-bottom: 12px; margin-bottom: 20px;">';
+        $html .= '<h2 style="color: #2596be; margin: 0;">Novo Caderno de Encargos Publicado</h2></div>';
+        $html .= '<p>Olá ' . htmlspecialchars($forn['nome']) . ',</p>';
+        $html .= '<p>Foi publicada uma nova versão do caderno de encargos:</p>';
+        $html .= '<div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;">';
+        $html .= '<strong>' . htmlspecialchars($espec['titulo']) . '</strong><br>';
+        $html .= '<span style="color: #667085;">Número: ' . htmlspecialchars($espec['numero']) . ' | Versão: ' . htmlspecialchars($espec['versao']) . '</span></div>';
+        $html .= '<div style="margin: 24px 0; text-align: center;">';
+        $html .= '<a href="' . htmlspecialchars($link) . '" style="display: inline-block; background: #2596be; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Consultar Documento</a></div>';
+        $html .= '<div style="margin-top: 30px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #999;">Powered by <strong>SpecLab</strong> &copy;' . date('Y') . '</div>';
+        $html .= '</body></html>';
+
+        $result = enviarEmail($db, $especId, $forn['email'], 'Caderno de Encargos Publicado: ' . $espec['numero'], $html, false, $publicadoPor);
+        if ($result['success']) $enviados++;
+    }
+
+    return ['success' => true, 'message' => "$enviados fornecedor(es) notificado(s)."];
+}
