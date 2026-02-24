@@ -1898,11 +1898,17 @@ $breadcrumbs = [
                 var cols = getBancoCols();
                 var totalCols = cols.length + (IS_SA ? 1 : 0);
                 // Thead
+                var colWidths = null;
+                try { colWidths = typeof tipoAtual.col_widths === 'string' ? JSON.parse(tipoAtual.col_widths) : tipoAtual.col_widths; } catch(e) {}
                 var thHtml = '<tr>';
-                cols.forEach(function(c) { thHtml += '<th>' + escE(c.nome) + '</th>'; });
+                cols.forEach(function(c, ci) {
+                    var w = colWidths && colWidths[ci] ? ' style="width:' + colWidths[ci] + '"' : '';
+                    thHtml += '<th class="col-resize-th"' + w + '>' + escE(c.nome) + '</th>';
+                });
                 if (IS_SA) thHtml += '<th style="width:50px;"></th>';
                 thHtml += '</tr>';
                 document.getElementById('paramBancoHead').innerHTML = thHtml;
+                if (IS_SA) initBancoColResize();
                 // Tbody
                 var tbody = document.getElementById('paramBancoRows');
                 if (bancoRegistos.length === 0 && !IS_SA) {
@@ -2248,6 +2254,62 @@ $breadcrumbs = [
                         tipoAtual.legenda_tamanho = parseInt(document.getElementById('paramLegendaTam').value) || 9;
                         selecionarTipo(tipoAtual.id);
                     } else appAlert(data.error || 'Erro.');
+                });
+            }
+            // === COL RESIZE para tabela de parâmetros ===
+            var bancoResizeState = null;
+            function initBancoColResize() {
+                var table = document.getElementById('paramBancoTable');
+                var ths = table.querySelectorAll('thead th.col-resize-th');
+                for (var i = 0; i < ths.length - 1; i++) {
+                    if (ths[i].querySelector('.col-resize-handle')) continue;
+                    var h = document.createElement('div');
+                    h.className = 'col-resize-handle';
+                    ths[i].appendChild(h);
+                    h.addEventListener('mousedown', bancoResizeStart);
+                }
+            }
+            function bancoResizeStart(e) {
+                e.preventDefault(); e.stopPropagation();
+                var th = e.target.parentElement;
+                var table = th.closest('table');
+                var ths = table.querySelectorAll('thead th.col-resize-th');
+                var idx = Array.prototype.indexOf.call(ths, th);
+                var thNext = ths[idx + 1];
+                if (!thNext) return;
+                var tableW = table.offsetWidth;
+                e.target.classList.add('active');
+                bancoResizeState = { table:table, th:th, thNext:thNext, ths:ths, tableW:tableW, startX:e.clientX, startW:th.offsetWidth, startNextW:thNext.offsetWidth, handle:e.target };
+                document.addEventListener('mousemove', bancoResizeMove);
+                document.addEventListener('mouseup', bancoResizeEnd);
+            }
+            function bancoResizeMove(e) {
+                if (!bancoResizeState) return;
+                var s = bancoResizeState, diff = e.clientX - s.startX;
+                var newW = s.startW + diff, newNextW = s.startNextW - diff;
+                var minPx = s.tableW * 0.05;
+                if (newW < minPx || newNextW < minPx) return;
+                s.th.style.width = (newW / s.tableW * 100).toFixed(1) + '%';
+                s.thNext.style.width = (newNextW / s.tableW * 100).toFixed(1) + '%';
+            }
+            function bancoResizeEnd() {
+                if (!bancoResizeState) return;
+                bancoResizeState.handle.classList.remove('active');
+                var s = bancoResizeState;
+                bancoResizeState = null;
+                document.removeEventListener('mousemove', bancoResizeMove);
+                document.removeEventListener('mouseup', bancoResizeEnd);
+                // Gravar col_widths
+                if (!tipoAtual) return;
+                var ths = s.table.querySelectorAll('thead th.col-resize-th');
+                var widths = [];
+                for (var i = 0; i < ths.length; i++) widths.push(ths[i].style.width || '');
+                fetch(BASE + '/api.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
+                    body: JSON.stringify({ action: 'save_parametro_tipo_config', id: tipoAtual.id, col_widths: widths })
+                }).then(function(r){return r.json();}).then(function(data) {
+                    if (data.success) tipoAtual.col_widths = JSON.stringify(widths);
                 });
             }
             <?php endif; ?>
