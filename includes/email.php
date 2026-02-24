@@ -391,6 +391,54 @@ function enviarEmailConfirmacaoDecisao(PDO $db, int $especId, int $tokenId, stri
 }
 
 /**
+ * Notifica org_admin(s) quando fornecedor/cliente toma decisão sobre especificação
+ */
+function enviarNotificacaoDecisaoAdmin(PDO $db, int $especId, int $tokenId, string $decisao, string $nomeSig, string $baseUrl): array {
+    $stmt = $db->prepare('SELECT t.tipo_destinatario, t.destinatario_nome, t.destinatario_email, e.titulo, e.numero, e.versao, e.organizacao_id FROM especificacao_tokens t INNER JOIN especificacoes e ON e.id = t.especificacao_id WHERE t.id = ?');
+    $stmt->execute([$tokenId]);
+    $tk = $stmt->fetch();
+    if (!$tk) return ['success' => false, 'error' => 'Token não encontrado.'];
+
+    // Buscar admins da organização
+    $stmtAdmins = $db->prepare('SELECT nome, email FROM utilizadores WHERE organizacao_id = ? AND role IN (?, ?) AND ativo = 1');
+    $stmtAdmins->execute([$tk['organizacao_id'], 'org_admin', 'super_admin']);
+    $admins = $stmtAdmins->fetchAll();
+    if (empty($admins)) return ['success' => true, 'message' => 'Sem admins para notificar.'];
+
+    $cores = ['aceite' => '#16a34a', 'aceite_com_reservas' => '#d97706', 'rejeitado' => '#dc2626'];
+    $textos = ['aceite' => 'Aceite', 'aceite_com_reservas' => 'Aceite com Reservas', 'rejeitado' => 'Rejeitado'];
+    $cor = $cores[$decisao] ?? '#667085';
+    $texto = $textos[$decisao] ?? $decisao;
+    $tipo = ucfirst($tk['tipo_destinatario']);
+    $link = rtrim($baseUrl, '/') . '/ver.php?id=' . $especId;
+
+    $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">';
+    $html .= '<div style="border-bottom: 3px solid ' . $cor . '; padding-bottom: 12px; margin-bottom: 20px;">';
+    $html .= '<h2 style="color: ' . $cor . '; margin: 0;">Decisão Recebida — ' . htmlspecialchars($tk['numero']) . '</h2></div>';
+    $html .= '<p>Um ' . htmlspecialchars(strtolower($tipo)) . ' tomou uma decisão sobre o caderno de encargos:</p>';
+    $html .= '<div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;">';
+    $html .= '<strong>' . htmlspecialchars($tk['titulo']) . '</strong><br>';
+    $html .= '<span style="color: #667085;">Número: ' . htmlspecialchars($tk['numero']) . ' | Versão: ' . htmlspecialchars($tk['versao']) . '</span><br>';
+    $html .= '<span style="font-size: 15px; font-weight: 600; color: ' . $cor . ';">Decisão: ' . $texto . '</span><br>';
+    $html .= '<span style="color: #667085;">' . htmlspecialchars($tipo) . ': ' . htmlspecialchars($tk['destinatario_nome']) . ' (' . htmlspecialchars($tk['destinatario_email']) . ')</span><br>';
+    $html .= '<span style="color: #667085;">Assinado por: ' . htmlspecialchars($nomeSig) . ' em ' . date('d/m/Y H:i') . '</span>';
+    $html .= '</div>';
+    $html .= '<div style="margin: 24px 0; text-align: center;">';
+    $html .= '<a href="' . htmlspecialchars($link) . '" style="display: inline-block; background: #2596be; color: white; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Ver Detalhes</a></div>';
+    $html .= '<div style="margin-top: 30px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #999;">Powered by <strong>SpecLab</strong> &copy;' . date('Y') . '</div>';
+    $html .= '</body></html>';
+
+    $assunto = 'Decisão ' . $texto . ' — ' . $tk['numero'] . ' (' . $tipo . ')';
+    $enviados = 0;
+    foreach ($admins as $admin) {
+        if (!$admin['email'] || !filter_var($admin['email'], FILTER_VALIDATE_EMAIL)) continue;
+        $r = enviarEmail($db, $especId, $admin['email'], $assunto, $html);
+        if ($r['success']) $enviados++;
+    }
+    return ['success' => $enviados > 0, 'message' => "$enviados admin(s) notificado(s)."];
+}
+
+/**
  * Envia notificação de revisão aos admins selecionados
  */
 function enviarNotificacaoRevisao(PDO $db, int $especId, array $adminIds, string $baseUrl, int $submetidoPor): array {

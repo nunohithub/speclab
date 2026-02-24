@@ -176,7 +176,43 @@ if ($authenticated && $tokenData && $_SERVER['REQUEST_METHOD'] === 'POST' && iss
         require_once __DIR__ . '/includes/email.php';
         $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(BASE_PATH, '/');
         enviarEmailConfirmacaoDecisao($db, $espec['id'], $tokenData['id'], $decisao, $nome, $baseUrl);
+        enviarNotificacaoDecisaoAdmin($db, $espec['id'], $tokenData['id'], $decisao, $nome, $baseUrl);
     }
+}
+
+// Processar partilha interna (sub-token read-only) — suporta múltiplos destinatários
+$partilhaMsg = null;
+if ($authenticated && $tokenData && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao_partilha']) && validateCsrf()) {
+    $nomes = $_POST['partilha_nome'] ?? [];
+    $emails = $_POST['partilha_email'] ?? [];
+    if (!is_array($nomes)) $nomes = [$nomes];
+    if (!is_array($emails)) $emails = [$emails];
+    require_once __DIR__ . '/includes/email.php';
+    $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(BASE_PATH, '/');
+    $enviados = 0;
+    $count = min(count($nomes), count($emails));
+    for ($pi = 0; $pi < $count; $pi++) {
+        $pNome = sanitize($nomes[$pi] ?? '');
+        $pEmail = trim($emails[$pi] ?? '');
+        if (!$pNome || !filter_var($pEmail, FILTER_VALIDATE_EMAIL)) continue;
+        $subToken = bin2hex(random_bytes(32));
+        $stmt = $db->prepare('INSERT INTO especificacao_tokens (especificacao_id, token, tipo_destinatario, destinatario_nome, destinatario_email, permissao, criado_por, token_pai_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt->execute([$espec['id'], $subToken, $tokenData['tipo_destinatario'], $pNome, $pEmail, 'ver', $tokenData['criado_por'], $tokenData['id']]);
+        $subTokenId = (int)$db->lastInsertId();
+        $subLink = $baseUrl . '/publico.php?token=' . $subToken;
+        $htmlEmail = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;color:#111827;max-width:600px;margin:0 auto;padding:20px;">';
+        $htmlEmail .= '<div style="border-bottom:3px solid #2596be;padding-bottom:12px;margin-bottom:20px;"><h2 style="color:#2596be;margin:0;">Caderno de Encargos — Consulta</h2></div>';
+        $htmlEmail .= '<p>Olá ' . htmlspecialchars($pNome) . ',</p>';
+        $htmlEmail .= '<p>' . htmlspecialchars($tokenData['destinatario_nome']) . ' partilhou consigo o seguinte caderno de encargos para consulta:</p>';
+        $htmlEmail .= '<div style="background:#f8f9fa;padding:16px;border-radius:8px;margin:16px 0;"><strong>' . htmlspecialchars($espec['titulo']) . '</strong></div>';
+        $htmlEmail .= '<div style="margin:24px 0;text-align:center;"><a href="' . htmlspecialchars($subLink) . '" style="display:inline-block;background:#2596be;color:white;padding:14px 40px;border-radius:8px;text-decoration:none;font-weight:600;">Consultar Documento</a></div>';
+        $htmlEmail .= '<p style="font-size:12px;color:#667085;">Este link é apenas para consulta (leitura).</p>';
+        $htmlEmail .= '<div style="margin-top:30px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:11px;color:#999;">Powered by <strong>SpecLab</strong> &copy;' . date('Y') . '</div></body></html>';
+        enviarEmail($db, $espec['id'], $pEmail, 'Caderno de Encargos para consulta: ' . $espec['titulo'], $htmlEmail);
+        $db->prepare('UPDATE especificacao_tokens SET enviado_em = NOW() WHERE id = ?')->execute([$subTokenId]);
+        $enviados++;
+    }
+    $partilhaMsg = $enviados > 0 ? "Link enviado para $enviados destinatário(s)." : 'Preencha nome e email válido.';
 }
 
 // Se autenticado, carregar dados completos
@@ -599,6 +635,71 @@ $L = $labels[$lang] ?? $labels['pt'];
                         </div>
                         <?php endif; endif; ?>
                     </div>
+
+                    <!-- Partilha interna -->
+                    <div style="margin-top:16px; padding:16px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px;" class="no-print">
+                        <?php if ($partilhaMsg): ?>
+                        <div style="padding:8px 12px; background:#dcfce7; border-radius:6px; margin-bottom:12px; font-size:13px;"><?= $partilhaMsg ?></div>
+                        <?php endif; ?>
+
+                        <?php
+                        // Listar sub-tokens já criados
+                        $stmtSub = $db->prepare('SELECT destinatario_nome, destinatario_email, enviado_em, total_acessos FROM especificacao_tokens WHERE token_pai_id = ? AND ativo = 1');
+                        $stmtSub->execute([$tokenData['id']]);
+                        $subTokens = $stmtSub->fetchAll();
+                        ?>
+
+                        <button type="button" onclick="var f=document.getElementById('partilhaForm');f.style.display=f.style.display==='none'?'block':'none';" style="background:none; border:1px solid #0ea5e9; color:#0ea5e9; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600;">
+                            &#128279; Partilhar internamente
+                        </button>
+                        <span style="font-size:12px; color:#667085; margin-left:8px;">Envie uma cópia de leitura a colegas</span>
+
+                        <form method="POST" id="partilhaForm" style="margin-top:12px; display:none;">
+                            <input type="hidden" name="csrf_token" value="<?= getCsrfToken() ?>">
+                            <input type="hidden" name="acao_partilha" value="1">
+                            <div id="partilhaRows">
+                                <div class="partilha-row" style="display:flex; gap:8px; align-items:flex-end; margin-bottom:8px;">
+                                    <div style="flex:1;">
+                                        <label style="font-size:12px; display:block; margin-bottom:2px;">Nome</label>
+                                        <input type="text" name="partilha_nome[]" required placeholder="Nome do colega" style="width:100%; padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:13px;">
+                                    </div>
+                                    <div style="flex:1;">
+                                        <label style="font-size:12px; display:block; margin-bottom:2px;">Email</label>
+                                        <input type="email" name="partilha_email[]" required placeholder="email@empresa.com" style="width:100%; padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:13px;">
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
+                                <button type="button" onclick="addPartilhaRow()" style="padding:4px 12px; background:none; border:1px dashed #0ea5e9; color:#0ea5e9; border-radius:6px; font-size:12px; cursor:pointer;">+ Adicionar destinatário</button>
+                                <button type="submit" style="padding:6px 16px; background:#0ea5e9; color:#fff; border:none; border-radius:6px; font-size:13px; cursor:pointer;">Enviar</button>
+                            </div>
+                        </form>
+                        <script>
+                        function addPartilhaRow() {
+                            var container = document.getElementById('partilhaRows');
+                            var row = document.createElement('div');
+                            row.className = 'partilha-row';
+                            row.style.cssText = 'display:flex;gap:8px;align-items:flex-end;margin-bottom:8px;';
+                            row.innerHTML = '<div style="flex:1;"><input type="text" name="partilha_nome[]" required placeholder="Nome" style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;"></div>'
+                                + '<div style="flex:1;"><input type="email" name="partilha_email[]" required placeholder="email@empresa.com" style="width:100%;padding:6px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;"></div>'
+                                + '<button type="button" onclick="this.parentElement.remove()" style="padding:4px 8px;background:none;border:1px solid #fca5a5;color:#dc2626;border-radius:6px;font-size:12px;cursor:pointer;">&times;</button>';
+                            container.appendChild(row);
+                        }
+                        </script>
+
+                        <?php if (!empty($subTokens)): ?>
+                        <div style="margin-top:12px; font-size:12px;">
+                            <strong>Partilhado com:</strong>
+                            <?php foreach ($subTokens as $st): ?>
+                            <div style="padding:4px 0; color:#374151;">
+                                <?= san($st['destinatario_nome']) ?> (<?= san($st['destinatario_email']) ?>)
+                                <span style="color:#9ca3af;">— <?= $st['total_acessos'] ?> acesso(s)</span>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+
                 <?php else: ?>
                     <?php if (isset($aceitacaoMsg)): ?>
                         <div style="padding:var(--spacing-sm); border-radius:6px; background:#dcfce7; margin-bottom:var(--spacing-md); text-align:center;">
