@@ -175,15 +175,15 @@ function getTokensEspecificacao(PDO $db, int $especId): array {
 /**
  * Registar aceitação/rejeição
  */
-function registarDecisao(PDO $db, int $especId, int $tokenId, string $decisao, string $nome, ?string $cargo, ?string $comentario, ?string $assinatura = null): bool {
+function registarDecisao(PDO $db, int $especId, int $tokenId, string $decisao, string $nome, ?string $cargo, ?string $comentario, ?string $assinatura = null, ?string $revisaoSeccoes = null): bool {
     // Verificar se já existe decisão para este token
     $stmt = $db->prepare('SELECT id FROM especificacao_aceitacoes WHERE token_id = ?');
     $stmt->execute([$tokenId]);
     if ($stmt->fetch()) return false; // Já decidiu
 
-    $db->prepare('INSERT INTO especificacao_aceitacoes (especificacao_id, token_id, tipo_decisao, nome_signatario, cargo_signatario, assinatura_signatario, comentario, ip_address, user_agent)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        ->execute([$especId, $tokenId, $decisao, $nome, $cargo, $assinatura, $comentario, $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '']);
+    $db->prepare('INSERT INTO especificacao_aceitacoes (especificacao_id, token_id, tipo_decisao, nome_signatario, cargo_signatario, assinatura_signatario, comentario, revisao_seccoes, ip_address, user_agent)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        ->execute([$especId, $tokenId, $decisao, $nome, $cargo, $assinatura, $comentario, $revisaoSeccoes, $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '']);
 
     // Log
     $db->prepare('INSERT INTO especificacao_token_log (token_id, especificacao_id, acao, ip_address, user_agent)

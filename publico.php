@@ -104,10 +104,22 @@ if ($authenticated) {
 // Processar aceitação/rejeição via formulário
 $aceitacaoMsg = null;
 if ($authenticated && $tokenData && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao_aceitacao']) && validateCsrf()) {
-    $decisao = ($_POST['decisao'] ?? '') === 'aceite' ? 'aceite' : 'rejeitado';
+    $decRaw = $_POST['decisao'] ?? '';
+    $decisao = in_array($decRaw, ['aceite', 'aceite_com_reservas', 'rejeitado']) ? $decRaw : 'rejeitado';
     $nome = sanitize($_POST['aceitar_nome'] ?? '');
     $cargo = sanitize($_POST['aceitar_cargo'] ?? '');
     $comentario = sanitize($_POST['aceitar_comentario'] ?? '');
+    $revisaoSeccoesJson = null;
+    if (!empty($_POST['revisao_seccoes'])) {
+        $revData = json_decode($_POST['revisao_seccoes'], true);
+        if (is_array($revData)) {
+            $revClean = [];
+            foreach ($revData as $r) {
+                $revClean[] = ['seccao_id' => (int)($r['seccao_id'] ?? 0), 'titulo' => sanitize($r['titulo'] ?? ''), 'aceite' => (bool)($r['aceite'] ?? true), 'comentario' => sanitize($r['comentario'] ?? '')];
+            }
+            if (!empty($revClean)) $revisaoSeccoesJson = json_encode($revClean, JSON_UNESCAPED_UNICODE);
+        }
+    }
     // Upload opcional de assinatura
     $assinaturaFile = null;
     if (!empty($_FILES['aceitar_assinatura']['name']) && $_FILES['aceitar_assinatura']['error'] === UPLOAD_ERR_OK) {
@@ -157,8 +169,9 @@ if ($authenticated && $tokenData && $_SERVER['REQUEST_METHOD'] === 'POST' && iss
         }
     }
 
-    if ($nome && registarDecisao($db, $espec['id'], $tokenData['id'], $decisao, $nome, $cargo ?: null, $comentario ?: null, $assinaturaFile)) {
-        $aceitacaoMsg = $decisao === 'aceite' ? 'Documento aceite com sucesso!' : 'Documento rejeitado.';
+    if ($nome && registarDecisao($db, $espec['id'], $tokenData['id'], $decisao, $nome, $cargo ?: null, $comentario ?: null, $assinaturaFile, $revisaoSeccoesJson)) {
+        $msgMap = ['aceite' => 'Documento aceite com sucesso!', 'aceite_com_reservas' => 'Documento aceite com reservas.', 'rejeitado' => 'Documento rejeitado.'];
+        $aceitacaoMsg = $msgMap[$decisao] ?? 'Decisão registada.';
         // Enviar email de confirmação com link permanente
         require_once __DIR__ . '/includes/email.php';
         $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(BASE_PATH, '/');
@@ -235,7 +248,14 @@ $L = $labels[$lang] ?? $labels['pt'];
         .doc-header .doc-title { text-align: right; }
         .doc-header .doc-title h1 { font-size: 18px; color: <?= $corPrimaria ?>; margin: 0; }
         .doc-header .doc-title p { font-size: 12px; color: #667085; margin: 4px 0 0; }
-        .doc-section { margin-bottom: 24px; }
+        .doc-section { margin-bottom: 24px; position: relative; }
+        .sec-flag-btn { position:absolute; right:0; top:0; background:none; border:1px solid #ddd; border-radius:6px; padding:3px 8px; font-size:11px; color:#888; cursor:pointer; transition:all .2s; }
+        .sec-flag-btn:hover { border-color:#f59e0b; color:#f59e0b; }
+        .sec-flag-btn.flagged { background:#fef3c7; border-color:#f59e0b; color:#d97706; }
+        .sec-flag-comment { margin-top:8px; padding:8px; background:#fffbeb; border:1px solid #fbbf24; border-radius:6px; display:none; }
+        .sec-flag-comment.show { display:block; }
+        .sec-flag-comment textarea { width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:12px; resize:vertical; min-height:40px; }
+        .sec-flag-comment label { font-size:11px; color:#92400e; font-weight:600; display:block; margin-bottom:4px; }
         .doc-section h2 {
             font-size: 14px; color: <?= $corPrimaria ?>; border-bottom: 1px solid <?= $corPrimariaLight ?>;
             padding-bottom: 6px; margin-bottom: 12px;
@@ -359,6 +379,20 @@ $L = $labels[$lang] ?? $labels['pt'];
                 <?php endif; ?>
             </div>
 
+            <?php
+            // Determinar permissões de aceitação (antes do loop de secções para os flags)
+            $mostrarAceitacao = false;
+            $jaDecidiu = false;
+            $decisaoExistente = null;
+            if ($tokenData && $tokenData['permissao'] === 'ver_aceitar') {
+                $mostrarAceitacao = true;
+                $stmtDec = $db->prepare('SELECT * FROM especificacao_aceitacoes WHERE token_id = ?');
+                $stmtDec->execute([$tokenData['id']]);
+                $decisaoExistente = $stmtDec->fetch();
+                if ($decisaoExistente) $jaDecidiu = true;
+            }
+            ?>
+
             <!-- Secções -->
             <?php if (!empty($data['seccoes'])):
                 $hierNumbers = []; $mainC = 0; $subC = 0;
@@ -373,7 +407,10 @@ $L = $labels[$lang] ?? $labels['pt'];
                     $secNivel = (int)($sec['nivel'] ?? 1);
                     $secNum = $hierNumbers[$i] ?? ($i + 1) . '.';
                 ?>
-                    <div class="doc-section<?= $secNivel === 2 ? ' doc-section-sub' : '' ?>">
+                    <div class="doc-section<?= $secNivel === 2 ? ' doc-section-sub' : '' ?>" data-sec-id="<?= (int)($sec['id'] ?? $i) ?>" data-sec-titulo="<?= san($sec['titulo']) ?>">
+                        <?php if ($mostrarAceitacao && !$jaDecidiu): ?>
+                        <button type="button" class="sec-flag-btn no-print" onclick="toggleFlag(this)" title="Reportar observação nesta secção">&#9873; Flag</button>
+                        <?php endif; ?>
                         <<?= $secNivel === 2 ? 'h3' : 'h2' ?>><?= $secNum . ' ' . san($sec['titulo']) ?></<?= $secNivel === 2 ? 'h3' : 'h2' ?>>
                         <?php if ($secTipo === 'parametros' || $secTipo === 'parametros_custom'): ?>
                             <?php
@@ -415,6 +452,12 @@ $L = $labels[$lang] ?? $labels['pt'];
                                     echo sanitizeRichText($secContent);
                                 }
                             ?></div>
+                        <?php endif; ?>
+                        <?php if ($mostrarAceitacao && !$jaDecidiu): ?>
+                        <div class="sec-flag-comment" id="flagComment_<?= (int)($sec['id'] ?? $i) ?>">
+                            <label>Observação sobre "<?= san($sec['titulo']) ?>":</label>
+                            <textarea placeholder="Descreva o problema ou sugestão..."></textarea>
+                        </div>
                         <?php endif; ?>
                     </div>
                 <?php endforeach; ?>
@@ -512,20 +555,6 @@ $L = $labels[$lang] ?? $labels['pt'];
                 <span><?= $L['documento'] ?>: <?= san($data['numero']) ?> | <?= $L['versao'] ?> <?= san($data['versao']) ?></span>
             </div>
 
-            <?php
-            // Formulário de aceitação (só para tokens com permissão ver_aceitar)
-            $mostrarAceitacao = false;
-            $jaDecidiu = false;
-            $decisaoExistente = null;
-            if ($tokenData && $tokenData['permissao'] === 'ver_aceitar') {
-                $mostrarAceitacao = true;
-                $stmtDec = $db->prepare('SELECT * FROM especificacao_aceitacoes WHERE token_id = ?');
-                $stmtDec->execute([$tokenData['id']]);
-                $decisaoExistente = $stmtDec->fetch();
-                if ($decisaoExistente) $jaDecidiu = true;
-            }
-            ?>
-
             <?php if ($mostrarAceitacao): ?>
             <div class="doc-section" id="secAceitacao" style="margin-top:var(--spacing-xl); border-top:2px solid <?= $corPrimaria ?>; padding-top:var(--spacing-lg);">
                 <h2 style="color:<?= $corPrimaria ?>;">Aceitação do Documento</h2>
@@ -540,10 +569,14 @@ $L = $labels[$lang] ?? $labels['pt'];
                 </div>
                 <?php endif; ?>
 
-                <?php if ($jaDecidiu): ?>
-                    <div style="padding:var(--spacing-md); border-radius:8px; background:<?= $decisaoExistente['tipo_decisao'] === 'aceite' ? '#dcfce7' : '#fee2e2' ?>; text-align:center;">
+                <?php if ($jaDecidiu):
+                    $decTipo = $decisaoExistente['tipo_decisao'];
+                    $decCores = ['aceite' => '#dcfce7', 'aceite_com_reservas' => '#fef3c7', 'rejeitado' => '#fee2e2'];
+                    $decLabels = ['aceite' => 'Documento Aceite', 'aceite_com_reservas' => 'Documento Aceite com Reservas', 'rejeitado' => 'Documento Rejeitado'];
+                ?>
+                    <div style="padding:var(--spacing-md); border-radius:8px; background:<?= $decCores[$decTipo] ?? '#f3f4f6' ?>; text-align:center;">
                         <strong style="font-size:16px;">
-                            <?= $decisaoExistente['tipo_decisao'] === 'aceite' ? 'Documento Aceite' : 'Documento Rejeitado' ?>
+                            <?= $decLabels[$decTipo] ?? 'Decisão Registada' ?>
                         </strong>
                         <p style="margin:8px 0 0; color:#666;">
                             por <?= san($decisaoExistente['nome_signatario']) ?>
@@ -553,6 +586,18 @@ $L = $labels[$lang] ?? $labels['pt'];
                         <?php if ($decisaoExistente['comentario']): ?>
                         <p style="margin-top:8px; font-style:italic;">"<?= san($decisaoExistente['comentario']) ?>"</p>
                         <?php endif; ?>
+                        <?php if (!empty($decisaoExistente['revisao_seccoes'])):
+                            $revSecs = json_decode($decisaoExistente['revisao_seccoes'], true);
+                            if (!empty($revSecs)): ?>
+                        <div style="margin-top:12px; text-align:left; font-size:12px;">
+                            <strong style="color:#92400e;">Observações por secção:</strong>
+                            <?php foreach ($revSecs as $rs): ?>
+                            <div style="padding:4px 8px; margin-top:4px; background:rgba(255,255,255,0.6); border-radius:4px;">
+                                <strong><?= san($rs['titulo']) ?>:</strong> <?= san($rs['comentario'] ?: 'Sinalizada sem comentário') ?>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; endif; ?>
                     </div>
                 <?php else: ?>
                     <?php if (isset($aceitacaoMsg)): ?>
@@ -598,8 +643,13 @@ $L = $labels[$lang] ?? $labels['pt'];
                         </div>
                         <?php endif; ?>
 
+                        <input type="hidden" name="revisao_seccoes" id="revisaoSeccoesInput" value="">
+                        <div id="flagSummary" style="display:none; margin-bottom:12px; padding:10px; background:#fffbeb; border:1px solid #fbbf24; border-radius:8px; font-size:12px; color:#92400e;">
+                            <strong>Secções com observações:</strong> <span id="flagCount">0</span>
+                        </div>
                         <div style="display:flex; gap:12px;">
-                            <button type="submit" name="decisao" value="aceite" id="btnAceitar" style="flex:1; padding:12px; background:#16a34a; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Aceitar Documento</button>
+                            <button type="submit" name="decisao" value="aceite" id="btnAceitar" style="flex:1; padding:12px; background:#16a34a; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Aceitar</button>
+                            <button type="submit" name="decisao" value="aceite_com_reservas" id="btnReservas" style="flex:1; padding:12px; background:#f59e0b; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; display:none;">Aceitar com Reservas</button>
                             <button type="submit" name="decisao" value="rejeitado" style="flex:1; padding:12px; background:#dc2626; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer;">Rejeitar</button>
                         </div>
                     </form>
@@ -632,6 +682,46 @@ $L = $labels[$lang] ?? $labels['pt'];
 
 <?php endif; ?>
 
+<script>
+// Sistema de flags por secção
+function toggleFlag(btn) {
+    var sec = btn.closest('.doc-section');
+    var secId = sec.dataset.secId;
+    var commentBox = document.getElementById('flagComment_' + secId);
+    if (!commentBox) return;
+    btn.classList.toggle('flagged');
+    commentBox.classList.toggle('show');
+    if (!btn.classList.contains('flagged')) {
+        commentBox.querySelector('textarea').value = '';
+    }
+    compilarFlags();
+}
+function compilarFlags() {
+    var flags = [];
+    document.querySelectorAll('.sec-flag-btn.flagged').forEach(function(btn) {
+        var sec = btn.closest('.doc-section');
+        var secId = sec.dataset.secId;
+        var titulo = sec.dataset.secTitulo;
+        var commentBox = document.getElementById('flagComment_' + secId);
+        var comment = commentBox ? commentBox.querySelector('textarea').value.trim() : '';
+        flags.push({seccao_id: parseInt(secId), titulo: titulo, aceite: false, comentario: comment});
+    });
+    var input = document.getElementById('revisaoSeccoesInput');
+    if (input) input.value = flags.length > 0 ? JSON.stringify(flags) : '';
+    var summary = document.getElementById('flagSummary');
+    var count = document.getElementById('flagCount');
+    var btnReservas = document.getElementById('btnReservas');
+    if (summary && count) {
+        summary.style.display = flags.length > 0 ? 'block' : 'none';
+        count.textContent = flags.length;
+    }
+    if (btnReservas) btnReservas.style.display = flags.length > 0 ? 'block' : 'none';
+}
+// Atualizar flags ao digitar nos comentários
+document.addEventListener('input', function(e) {
+    if (e.target.closest && e.target.closest('.sec-flag-comment')) compilarFlags();
+});
+</script>
 <script>
 // Bloquear "Aceitar" se faltam uploads obrigatórios
 (function() {
