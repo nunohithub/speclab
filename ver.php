@@ -470,7 +470,7 @@ if (!empty($data['seccoes'])) {
                             </table>
                             <?php endif; ?>
                             <?php if (!empty($pcLegenda)): ?>
-                            <p style="font-size:<?= $pcLegTam ?>px; color:#888; font-style:italic; margin:3px 0 0 0;"><?= san($pcLegenda) ?></p>
+                            <p style="font-size:<?= $pcLegTam ?>px; color:#888; font-style:italic; margin:4px 0 0 0;"><?= san($pcLegenda) ?></p>
                             <?php endif; ?>
                             <?php endif; ?>
                         <?php else: ?>

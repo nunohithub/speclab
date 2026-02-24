@@ -497,7 +497,7 @@ if ($useMpdf) {
                     }
                     }
                     if (!empty($pcLegenda)) {
-                        $html .= '<p class="legenda" style="font-size:' . $pcLegTam . 'pt;">' . san($pcLegenda) . '</p>';
+                        $html .= '<p style="font-size:' . $pcLegTam . 'pt; color:#888; font-style:italic; margin:2pt 0 0 0;">' . san($pcLegenda) . '</p>';
                     }
                 }
             } else {
@@ -814,7 +814,7 @@ $tamNome    = (int)$cv['tamanho_nome'];
                         </tbody>
                     </table>
                     <?php if (!empty($pcLegenda)): ?>
-                    <p style="font-size:<?= max(7, $pcLegTam - 1) ?>px; color:#888; font-style:italic; margin:2px 0 0 0;"><?= san($pcLegenda) ?></p>
+                    <p style="font-size:<?= $pcLegTam ?>pt; color:#888; font-style:italic; margin:2pt 0 0 0;"><?= san($pcLegenda) ?></p>
                     <?php endif; ?>
                     <?php endif; ?>
                 <?php else: ?>
