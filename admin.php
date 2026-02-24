@@ -1738,6 +1738,7 @@ $breadcrumbs = [
                         <button class="btn btn-ghost btn-sm" onclick="toggleLegendaConfig()">Legenda</button>
                         <button class="btn btn-ghost btn-sm" onclick="adicionarCategoriaInline()">+ Categoria</button>
                         <button class="btn btn-ghost btn-sm" onclick="adicionarLinhaInline()">+ Linha</button>
+                        <button class="btn btn-ghost btn-sm" id="btnPreview" onclick="togglePreviewMode()">Preview</button>
                         <button class="btn btn-primary btn-sm" onclick="guardarBancoTudo()">Guardar Tudo</button>
                         <?php endif; ?>
                     </div>
@@ -1893,10 +1894,19 @@ $breadcrumbs = [
                 return cats || [];
             }
 
+            var previewMode = false;
+            function togglePreviewMode() {
+                previewMode = !previewMode;
+                var btn = document.getElementById('btnPreview');
+                if (btn) btn.textContent = previewMode ? 'Editar' : 'Preview';
+                renderBancoTable();
+            }
+
             function renderBancoTable() {
                 if (!tipoAtual) return;
                 var cols = getBancoCols();
-                var totalCols = cols.length + (IS_SA ? 1 : 0);
+                var isEdit = IS_SA && !previewMode;
+                var totalCols = cols.length + (isEdit ? 1 : 0);
                 // Thead
                 var colWidths = null;
                 try { colWidths = typeof tipoAtual.col_widths === 'string' ? JSON.parse(tipoAtual.col_widths) : tipoAtual.col_widths; } catch(e) {}
@@ -1905,13 +1915,13 @@ $breadcrumbs = [
                     var w = colWidths && colWidths[ci] ? ' style="width:' + colWidths[ci] + '"' : '';
                     thHtml += '<th class="col-resize-th"' + w + '>' + escE(c.nome) + '</th>';
                 });
-                if (IS_SA) thHtml += '<th style="width:50px;"></th>';
+                if (isEdit) thHtml += '<th style="width:50px;"></th>';
                 thHtml += '</tr>';
                 document.getElementById('paramBancoHead').innerHTML = thHtml;
                 if (IS_SA) initBancoColResize();
                 // Tbody
                 var tbody = document.getElementById('paramBancoRows');
-                if (bancoRegistos.length === 0 && !IS_SA) {
+                if (bancoRegistos.length === 0 && !isEdit) {
                     tbody.innerHTML = '<tr><td colspan="' + totalCols + '" class="muted" style="text-align:center; padding:20px;">Nenhum registo.</td></tr>';
                     return;
                 }
@@ -1919,37 +1929,37 @@ $breadcrumbs = [
                 bancoRegistos.forEach(function(r, idx) {
                     var vals = {};
                     try { vals = typeof r.valores === 'string' ? JSON.parse(r.valores) : (r.valores || {}); } catch(e) {}
-                    // Linha separadora de categoria
                     if (r.categoria && r.categoria !== lastCat) {
-                        html += renderCatRow(r.categoria, totalCols);
+                        html += renderCatRow(r.categoria, totalCols, !isEdit);
                         lastCat = r.categoria;
                     }
                     html += '<tr data-reg-id="' + (r.id || 0) + '" data-cat="' + escE(r.categoria || '') + '" data-ativo="' + (r.ativo != 0 ? '1' : '0') + '"' + (r.ativo == 0 ? ' style="opacity:0.45;"' : '') + '>';
                     cols.forEach(function(c) {
                         var v = vals[c.chave] || '';
-                        if (IS_SA) {
+                        if (isEdit) {
                             html += '<td><textarea class="banco-cell" data-chave="' + escE(c.chave) + '" rows="1" style="width:100%; border:1px solid #e5e7eb; border-radius:4px; padding:4px 6px; font-size:12px; resize:vertical; font-family:inherit;">' + escE(v) + '</textarea></td>';
                         } else {
-                            html += '<td style="font-size:12px; white-space:pre-wrap;">' + escE(v) + '</td>';
+                            html += '<td style="font-size:12px; white-space:pre-wrap; padding:6px 8px;">' + escE(v) + '</td>';
                         }
                     });
-                    if (IS_SA) {
+                    if (isEdit) {
                         html += '<td style="text-align:center;">';
                         html += '<button class="btn btn-ghost btn-sm" style="color:#b42318; padding:2px 6px;" onclick="removerLinhaInline(this)" title="Remover">x</button>';
                         html += '</td>';
                     }
                     html += '</tr>';
                 });
-                if (bancoRegistos.length === 0 && IS_SA) {
+                if (bancoRegistos.length === 0 && isEdit) {
                     html = '<tr><td colspan="' + totalCols + '" class="muted" style="text-align:center; padding:12px;">Tabela vazia. Use "+ Linha" ou "+ Categoria" para começar.</td></tr>';
                 }
                 tbody.innerHTML = html;
             }
 
-            function renderCatRow(catName, totalCols) {
-                return '<tr class="param-cat-row" data-cat-row="' + escE(catName) + '"><td colspan="' + totalCols + '" style="padding:4px 10px; font-weight:600; font-size:13px; background:var(--color-primary-lighter, #e6f4f9); color:var(--color-primary, #2596be); border-bottom:1px solid var(--color-primary, #2596be);">' +
-                    (IS_SA ? '<div style="display:flex; align-items:center; gap:6px;"><span contenteditable="true" style="flex:1; outline:none; min-width:80px;">' + escE(catName) + '</span><button class="btn btn-ghost btn-sm" style="color:#b42318; padding:0 4px; font-size:11px;" onclick="removerCategoriaInline(this)">x</button></div>' : escE(catName)) +
-                    '</td></tr>';
+            function renderCatRow(catName, totalCols, readOnly) {
+                var inner = (IS_SA && !readOnly)
+                    ? '<div style="display:flex; align-items:center; gap:6px;"><span contenteditable="true" style="flex:1; outline:none; min-width:80px;">' + escE(catName) + '</span><button class="btn btn-ghost btn-sm" style="color:#b42318; padding:0 4px; font-size:11px;" onclick="removerCategoriaInline(this)">x</button></div>'
+                    : escE(catName);
+                return '<tr class="param-cat-row" data-cat-row="' + escE(catName) + '"><td colspan="' + totalCols + '" style="padding:4px 10px; font-weight:600; font-size:13px; background:var(--color-primary-lighter, #e6f4f9); color:var(--color-primary, #2596be); border-bottom:1px solid var(--color-primary, #2596be);">' + inner + '</td></tr>';
             }
 
             <?php if ($isSuperAdminUser): ?>
