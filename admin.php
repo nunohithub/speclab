@@ -1739,7 +1739,7 @@ $breadcrumbs = [
                         <button class="btn btn-ghost btn-sm" onclick="adicionarCategoriaInline()">+ Categoria</button>
                         <button class="btn btn-ghost btn-sm" onclick="adicionarLinhaInline()">+ Linha</button>
                         <button class="btn btn-ghost btn-sm" id="btnPreview" onclick="togglePreviewMode()">Preview</button>
-                        <button class="btn btn-primary btn-sm" onclick="guardarBancoTudo()">Guardar Tudo</button>
+                        <button class="btn btn-primary btn-sm" id="btnGuardarTudo" onclick="guardarBancoTudo()">Guardar Tudo</button>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -1859,6 +1859,9 @@ $breadcrumbs = [
                 document.getElementById('paramContent').style.display = 'block';
                 document.getElementById('paramContentTitle').textContent = tipoAtual.nome;
                 document.getElementById('legendaConfig').style.display = 'none';
+                // Reset preview mode ao mudar de tipo
+                previewMode = false;
+                syncPreviewUI();
                 // Legenda display
                 if (tipoAtual.legenda) {
                     var ld = document.getElementById('paramLegendaDisplay');
@@ -1895,10 +1898,15 @@ $breadcrumbs = [
             }
 
             var previewMode = false;
-            function togglePreviewMode() {
-                previewMode = !previewMode;
+            function syncPreviewUI() {
                 var btn = document.getElementById('btnPreview');
                 if (btn) btn.textContent = previewMode ? 'Editar' : 'Preview';
+                var btnG = document.getElementById('btnGuardarTudo');
+                if (btnG) btnG.style.display = previewMode ? 'none' : '';
+            }
+            function togglePreviewMode() {
+                previewMode = !previewMode;
+                syncPreviewUI();
                 renderBancoTable();
             }
 
@@ -2203,6 +2211,7 @@ $breadcrumbs = [
 
             function guardarBancoTudo() {
                 if (!tipoAtual) return;
+                if (previewMode) { appAlert('Volta ao modo Editar antes de guardar.'); return; }
                 var cols = getBancoCols();
                 var tbody = document.getElementById('paramBancoRows');
                 var registos = [];
