@@ -2065,7 +2065,9 @@ $breadcrumbs = [
                         orientacao: document.getElementById('tipo_orientacao').value,
                         ativo: document.getElementById('tipo_ativo').checked ? 1 : 0,
                         todas_orgs: document.getElementById('tipo_todas_orgs').checked ? 1 : 0,
-                        org_ids: orgIds
+                        org_ids: orgIds,
+                        legenda: tipoAtual ? (tipoAtual.legenda || '') : '',
+                        legenda_tamanho: tipoAtual ? (tipoAtual.legenda_tamanho || 9) : 9
                     })
                 }).then(function(r){return r.json();}).then(function(data) {
                     if (data.success) {
