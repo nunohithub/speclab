@@ -285,9 +285,9 @@ $L = $labels[$lang] ?? $labels['pt'];
         .doc-header .doc-title h1 { font-size: 18px; color: <?= $corPrimaria ?>; margin: 0; }
         .doc-header .doc-title p { font-size: 12px; color: #667085; margin: 4px 0 0; }
         .doc-section { margin-bottom: 24px; position: relative; }
-        .sec-flag-btn { position:absolute; right:0; top:0; background:none; border:1px solid #ddd; border-radius:6px; padding:3px 8px; font-size:11px; color:#888; cursor:pointer; transition:all .2s; }
-        .sec-flag-btn:hover { border-color:#f59e0b; color:#f59e0b; }
-        .sec-flag-btn.flagged { background:#fef3c7; border-color:#f59e0b; color:#d97706; }
+        .sec-flag-btn { position:absolute; right:0; top:0; background:#fff8ef; border:1px solid #fbbf24; border-radius:6px; padding:4px 10px; font-size:11px; color:#b45309; cursor:pointer; transition:all .2s; font-weight:500; }
+        .sec-flag-btn:hover { background:#fef3c7; border-color:#f59e0b; color:#d97706; }
+        .sec-flag-btn.flagged { background:#fef3c7; border-color:#f59e0b; color:#d97706; font-weight:600; }
         .sec-flag-comment { margin-top:8px; padding:8px; background:#fffbeb; border:1px solid #fbbf24; border-radius:6px; display:none; }
         .sec-flag-comment.show { display:block; }
         .sec-flag-comment textarea { width:100%; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:12px; resize:vertical; min-height:40px; }
@@ -445,7 +445,7 @@ $L = $labels[$lang] ?? $labels['pt'];
                 ?>
                     <div class="doc-section<?= $secNivel === 2 ? ' doc-section-sub' : '' ?>" data-sec-id="<?= (int)($sec['id'] ?? $i) ?>" data-sec-titulo="<?= san($sec['titulo']) ?>">
                         <?php if ($mostrarAceitacao && !$jaDecidiu): ?>
-                        <button type="button" class="sec-flag-btn no-print" onclick="toggleFlag(this)" title="Reportar observação nesta secção">&#9873; Flag</button>
+                        <button type="button" class="sec-flag-btn no-print" onclick="toggleFlag(this)" title="Adicionar observação a esta secção">&#9873; Observação</button>
                         <?php endif; ?>
                         <<?= $secNivel === 2 ? 'h3' : 'h2' ?>><?= $secNum . ' ' . san($sec['titulo']) ?></<?= $secNivel === 2 ? 'h3' : 'h2' ?>>
                         <?php if ($secTipo === 'parametros' || $secTipo === 'parametros_custom'): ?>
@@ -602,6 +602,12 @@ $L = $labels[$lang] ?? $labels['pt'];
                     <strong>Nota:</strong> Este documento foi enviado para:
                     <?= san(implode(', ', $emailsToken)) ?>.
                     Apenas a primeira decisão será considerada.
+                </div>
+                <?php endif; ?>
+
+                <?php if (!$jaDecidiu): ?>
+                <div style="padding:12px 16px; border-radius:8px; background:#eff6ff; border:1px solid #bfdbfe; margin-bottom:var(--spacing-md); font-size:13px; color:#1e40af;">
+                    <strong>Dica:</strong> Antes de tomar a sua decisão, pode adicionar observações a secções individuais do documento usando o botão <span style="display:inline-block; background:#fff8ef; border:1px solid #fbbf24; border-radius:4px; padding:1px 6px; font-size:11px; color:#b45309;">&#9873; Observação</span> no canto superior direito de cada secção. As observações serão incluídas na sua decisão.
                 </div>
                 <?php endif; ?>
 
